@@ -3,17 +3,20 @@
 Agent-Based Medicine Stock Management System.
 
 ## Prerequisites
+
 - Node.js (v18+)
 - Docker (for database)
 
 ## Quick Start
 
 ### 1. Database
+
 ```bash
 docker-compose up -d
 ```
 
 ### 2. Backend
+
 ```bash
 cd backend
 npm install
@@ -32,6 +35,7 @@ Password: admin12345
 Change these credentials before using any shared or deployed environment.
 
 ### 3. Frontend
+
 ```bash
 cd frontend
 npm install
