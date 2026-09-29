@@ -14,15 +14,35 @@ type ApiResponse = {
   data: Medicine[];
 };
 
+type Session = {
+  token: string;
+  user: { name: string; role: string };
+};
+
 function App() {
+  const [session, setSession] = useState<Session | null>(() => {
+    const storedSession = sessionStorage.getItem("pharmasense-session");
+    return storedSession ? (JSON.parse(storedSession) as Session) : null;
+  });
+  const [email, setEmail] = useState("admin@pharmasense.local");
+  const [password, setPassword] = useState("admin12345");
+  const [loginError, setLoginError] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!session) {
+      setLoading(false);
+      return;
+    }
+
     const loadMedicines = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/v1/medicines");
+        const response = await fetch("http://localhost:5000/api/v1/medicines", {
+          headers: { Authorization: `Bearer ${session.token}` },
+        });
         if (!response.ok) {
           throw new Error("The inventory service returned an error.");
         }
@@ -41,7 +61,102 @@ function App() {
     };
 
     void loadMedicines();
-  }, []);
+  }, [session]);
+
+  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoggingIn(true);
+    setLoginError("");
+
+    try {
+      const response = await fetch("http://localhost:5000/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const result = (await response.json()) as {
+        success: boolean;
+        data?: Session;
+        error?: string;
+      };
+      if (!response.ok || !result.success || !result.data) {
+        throw new Error(result.error ?? "Unable to sign in.");
+      }
+
+      sessionStorage.setItem(
+        "pharmasense-session",
+        JSON.stringify(result.data),
+      );
+      setSession(result.data);
+    } catch (requestError) {
+      setLoginError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to sign in.",
+      );
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  if (!session) {
+    return (
+      <main className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
+        <form
+          onSubmit={handleLogin}
+          className="w-full max-w-md bg-white p-8 rounded-xl shadow-sm border border-gray-200"
+        >
+          <p className="text-sm font-semibold text-blue-600 mb-2">
+            PHARMASENSE
+          </p>
+          <h1 className="text-3xl font-bold text-gray-900">Sign in</h1>
+          <p className="text-gray-600 mt-2 mb-6">
+            Manage your pharmacy inventory securely.
+          </p>
+          {loginError && (
+            <p className="mb-4 p-3 rounded bg-red-50 text-red-700">
+              {loginError}
+            </p>
+          )}
+          <label
+            className="block text-sm font-medium text-gray-700 mb-2"
+            htmlFor="email"
+          >
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4"
+            required
+          />
+          <label
+            className="block text-sm font-medium text-gray-700 mb-2"
+            htmlFor="password"
+          >
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-6"
+            required
+          />
+          <button
+            type="submit"
+            disabled={loggingIn}
+            className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+          >
+            {loggingIn ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
+      </main>
+    );
+  }
 
   const totalUnits = medicines.reduce(
     (total, medicine) =>
@@ -70,6 +185,23 @@ function App() {
           <p className="text-gray-600 mt-1">
             Agent-Based Medicine Stock Management System
           </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <p className="text-sm font-medium text-gray-900">
+              {session.user.name}
+            </p>
+            <p className="text-xs text-gray-500">{session.user.role}</p>
+          </div>
+          <button
+            onClick={() => {
+              sessionStorage.removeItem("pharmasense-session");
+              setSession(null);
+            }}
+            className="text-gray-600 hover:text-gray-900 font-medium"
+          >
+            Sign out
+          </button>
         </div>
         <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition">
           + Add Medicine
