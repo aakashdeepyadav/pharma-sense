@@ -54,6 +54,20 @@ type InventoryAlert = {
   expiryDate?: string;
 };
 
+type ReportSummary = {
+  medicineCount: number;
+  supplierCount: number;
+  batchCount: number;
+  totalUnits: number;
+  inventoryCost: number;
+  issuedUnits: number;
+  topIssuedMedicines: {
+    medicineId: number;
+    medicineName: string;
+    quantityIssued: number;
+  }[];
+};
+
 type MedicineForm = {
   genericName: string;
   brandName: string;
@@ -109,6 +123,7 @@ function App() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
+  const [report, setReport] = useState<ReportSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -162,6 +177,7 @@ function App() {
           batchResponse,
           transactionResponse,
           alertResponse,
+          reportResponse,
         ] = await Promise.all([
           fetch("http://localhost:5000/api/v1/medicines", { headers }),
           fetch("http://localhost:5000/api/v1/categories", { headers }),
@@ -171,6 +187,7 @@ function App() {
             headers,
           }),
           fetch("http://localhost:5000/api/v1/alerts", { headers }),
+          fetch("http://localhost:5000/api/v1/reports/summary", { headers }),
         ]);
         if (
           !medicineResponse.ok ||
@@ -178,7 +195,8 @@ function App() {
           !supplierResponse.ok ||
           !batchResponse.ok ||
           !transactionResponse.ok ||
-          !alertResponse.ok
+          !alertResponse.ok ||
+          !reportResponse.ok
         ) {
           throw new Error("The inventory service returned an error.");
         }
@@ -204,12 +222,17 @@ function App() {
           success: boolean;
           data: InventoryAlert[];
         };
+        const reportResult = (await reportResponse.json()) as {
+          success: boolean;
+          data: ReportSummary;
+        };
         setMedicines(medicineResult.data);
         setCategories(categoryResult.data);
         setSuppliers(supplierResult.data);
         setBatches(batchResult.data);
         setTransactions(transactionResult.data);
         setAlerts(alertResult.data);
+        setReport(reportResult.data);
         setError("");
       } catch (requestError) {
         setError(
@@ -1160,7 +1183,8 @@ function App() {
                     {alert.message}
                   </p>
                   <p className="text-sm text-gray-500">
-                    Quantity affected: {alert.quantity} | Status: {alert.status.toLowerCase()}
+                    Quantity affected: {alert.quantity} | Status:{" "}
+                    {alert.status.toLowerCase()}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1181,6 +1205,39 @@ function App() {
           </div>
         )}
       </section>
+
+      {report && (
+        <section className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Inventory analytics</h2>
+              <p className="text-sm text-gray-500">Operational metrics from recorded inventory activity.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm"><p className="text-sm text-gray-500">Suppliers</p><p className="text-2xl font-bold text-gray-900 mt-1">{report.supplierCount}</p></div>
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm"><p className="text-sm text-gray-500">Batches</p><p className="text-2xl font-bold text-gray-900 mt-1">{report.batchCount}</p></div>
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm"><p className="text-sm text-gray-500">Units available</p><p className="text-2xl font-bold text-gray-900 mt-1">{report.totalUnits}</p></div>
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm"><p className="text-sm text-gray-500">Units issued</p><p className="text-2xl font-bold text-gray-900 mt-1">{report.issuedUnits}</p></div>
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm"><p className="text-sm text-gray-500">Inventory cost</p><p className="text-2xl font-bold text-gray-900 mt-1">{report.inventoryCost.toFixed(2)}</p></div>
+          </div>
+          <div className="mt-4 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <h3 className="font-bold text-gray-900 mb-4">Most issued medicines</h3>
+            {report.topIssuedMedicines.length === 0 ? (
+              <p className="text-gray-500">No stock-out activity has been recorded yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {report.topIssuedMedicines.map((medicine) => (
+                  <div key={medicine.medicineId} className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-gray-700">{medicine.medicineName}</span>
+                    <span className="text-gray-500">{medicine.quantityIssued} units issued</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">

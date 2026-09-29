@@ -8,6 +8,7 @@ import authRoutes from './routes/auth';
 import supplierRoutes from './routes/suppliers';
 import inventoryRoutes from './routes/inventory';
 import alertRoutes from './routes/alerts';
+import reportRoutes from './routes/reports';
 import prisma from './lib/prisma';
 import { requireAuth } from './auth';
 
@@ -26,6 +27,7 @@ app.use('/api/v1/batches', requireAuth, batchRoutes);
 app.use('/api/v1/suppliers', requireAuth, supplierRoutes);
 app.use('/api/v1/inventory', requireAuth, inventoryRoutes);
 app.use('/api/v1/alerts', requireAuth, alertRoutes);
+app.use('/api/v1/reports', requireAuth, reportRoutes);
 
 app.get('/health', async (_req, res) => {
   try {
