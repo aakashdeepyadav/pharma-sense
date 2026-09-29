@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  roleId        Int
+  role          Role     @relation(fields: [roleId], references: [id])
+  transactions  StockTransaction[]
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  permissions String
+  users       User[]
+}
+
+model Category {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique
+  description String?
+  medicines   Medicine[]
+}
+
+model Medicine {
+  id           Int        @id @default(autoincrement())
+  genericName  String
+  brandName    String
+  categoryId   Int
+  category     Category   @relation(fields: [categoryId], references: [id])
+  reorderLevel Int        @default(0)
+  unit         String
+  batches      Batch[]
+}
+
+model Supplier {
+  id          Int       @id @default(autoincrement())
+  name        String
+  contactInfo String?
+  batches     Batch[]
+}
+
+model Batch {
+  id            Int      @id @default(autoincrement())
+  medicineId    Int
+  medicine      Medicine @relation(fields: [medicineId], references: [id])
+  supplierId    Int
+  supplier      Supplier @relation(fields: [supplierId], references: [id])
+  batchNumber   String
+  mfgDate       DateTime
+  expiryDate    DateTime
+  quantity      Int      @default(0)
+  purchasePrice Float
+  transactions  StockTransaction[]
+}
+
+model StockTransaction {
+  id        Int      @id @default(autoincrement())
+  batchId   Int
+  batch     Batch    @relation(fields: [batchId], references: [id])
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // IN, OUT, ADJ
+  quantity  Int
+  timestamp DateTime @default(now())
+  notes     String?
+}
