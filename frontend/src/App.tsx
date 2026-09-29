@@ -1,12 +1,23 @@
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
 type Medicine = {
   id: number;
   genericName: string;
   brandName: string;
+  categoryId: number;
   unit: string;
   reorderLevel: number;
   batches: { quantity: number }[];
+};
+
+type Category = { id: number; name: string };
+
+type MedicineForm = {
+  genericName: string;
+  brandName: string;
+  categoryId: string;
+  unit: string;
+  reorderLevel: string;
 };
 
 type ApiResponse = {
@@ -29,8 +40,20 @@ function App() {
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [form, setForm] = useState<MedicineForm>({
+    genericName: "",
+    brandName: "",
+    categoryId: "",
+    unit: "Tablet",
+    reorderLevel: "0",
+  });
 
   useEffect(() => {
     if (!session) {
@@ -38,17 +61,25 @@ function App() {
       return;
     }
 
-    const loadMedicines = async () => {
+    const loadInventory = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/v1/medicines", {
-          headers: { Authorization: `Bearer ${session.token}` },
-        });
-        if (!response.ok) {
+        const headers = { Authorization: `Bearer ${session.token}` };
+        const [medicineResponse, categoryResponse] = await Promise.all([
+          fetch("http://localhost:5000/api/v1/medicines", { headers }),
+          fetch("http://localhost:5000/api/v1/categories", { headers }),
+        ]);
+        if (!medicineResponse.ok || !categoryResponse.ok) {
           throw new Error("The inventory service returned an error.");
         }
 
-        const result = (await response.json()) as ApiResponse;
-        setMedicines(result.data);
+        const medicineResult = (await medicineResponse.json()) as ApiResponse;
+        const categoryResult = (await categoryResponse.json()) as {
+          success: boolean;
+          data: Category[];
+        };
+        setMedicines(medicineResult.data);
+        setCategories(categoryResult.data);
+        setError("");
       } catch (requestError) {
         setError(
           requestError instanceof Error
@@ -60,10 +91,10 @@ function App() {
       }
     };
 
-    void loadMedicines();
+    void loadInventory();
   }, [session]);
 
-  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoggingIn(true);
     setLoginError("");
@@ -96,6 +127,73 @@ function App() {
       );
     } finally {
       setLoggingIn(false);
+    }
+  };
+
+  const openCreateForm = () => {
+    setEditingMedicine(null);
+    setForm({
+      genericName: "",
+      brandName: "",
+      categoryId: categories[0] ? String(categories[0].id) : "",
+      unit: "Tablet",
+      reorderLevel: "0",
+    });
+    setFormError("");
+    setFormOpen(true);
+  };
+
+  const openEditForm = (medicine: Medicine) => {
+    setEditingMedicine(medicine);
+    setForm({
+      genericName: medicine.genericName,
+      brandName: medicine.brandName,
+      categoryId: String(medicine.categoryId),
+      unit: medicine.unit,
+      reorderLevel: String(medicine.reorderLevel),
+    });
+    setFormError("");
+    setFormOpen(true);
+  };
+
+  const handleMedicineSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session) return;
+
+    setSaving(true);
+    setFormError("");
+    try {
+      const endpoint = editingMedicine
+        ? `http://localhost:5000/api/v1/medicines/${editingMedicine.id}`
+        : "http://localhost:5000/api/v1/medicines";
+      const response = await fetch(endpoint, {
+        method: editingMedicine ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify({
+          ...form,
+          categoryId: Number(form.categoryId),
+          reorderLevel: Number(form.reorderLevel),
+        }),
+      });
+      const result = (await response.json()) as { success: boolean; error?: string };
+      if (!response.ok || !result.success) {
+        throw new Error(typeof result.error === "string" ? result.error : "Unable to save medicine.");
+      }
+
+      setFormOpen(false);
+      setEditingMedicine(null);
+      const refreshed = await fetch("http://localhost:5000/api/v1/medicines", {
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
+      const refreshedResult = (await refreshed.json()) as ApiResponse;
+      setMedicines(refreshedResult.data);
+    } catch (requestError) {
+      setFormError(requestError instanceof Error ? requestError.message : "Unable to save medicine.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -203,10 +301,94 @@ function App() {
             Sign out
           </button>
         </div>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition">
+        <button
+          onClick={openCreateForm}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+        >
           + Add Medicine
         </button>
       </header>
+
+      {formOpen && (
+        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+          <form
+            onSubmit={handleMedicineSave}
+            className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingMedicine ? "Edit medicine" : "Add medicine"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setFormOpen(false)}
+                className="text-gray-500 hover:text-gray-900"
+              >
+                Close
+              </button>
+            </div>
+            {formError && <p className="mb-4 p-3 rounded bg-red-50 text-red-700">{formError}</p>}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="text-sm font-medium text-gray-700">
+                Generic name
+                <input
+                  value={form.genericName}
+                  onChange={(event) => setForm({ ...form, genericName: event.target.value })}
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Brand name
+                <input
+                  value={form.brandName}
+                  onChange={(event) => setForm({ ...form, brandName: event.target.value })}
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Category
+                <select
+                  value={form.categoryId}
+                  onChange={(event) => setForm({ ...form, categoryId: event.target.value })}
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                >
+                  <option value="" disabled>Select a category</option>
+                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Unit
+                <input
+                  value={form.unit}
+                  onChange={(event) => setForm({ ...form, unit: event.target.value })}
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Reorder level
+                <input
+                  type="number"
+                  min="0"
+                  value={form.reorderLevel}
+                  onChange={(event) => setForm({ ...form, reorderLevel: event.target.value })}
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button type="button" onClick={() => setFormOpen(false)} className="px-4 py-2 text-gray-600 hover:text-gray-900">Cancel</button>
+              <button type="submit" disabled={saving || categories.length === 0} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50">
+                {saving ? "Saving..." : "Save medicine"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -279,7 +461,7 @@ function App() {
                       / {med.reorderLevel}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="text-blue-600 hover:text-blue-800 font-medium">
+                      <button onClick={() => openEditForm(med)} className="text-blue-600 hover:text-blue-800 font-medium">
                         Edit
                       </button>
                     </td>

@@ -13,6 +13,8 @@ export const medicineSchema = z.object({
   unit: z.string().trim().min(1).max(50),
 });
 
+export const medicineUpdateSchema = medicineSchema.partial();
+
 export const batchSchema = z.object({
   medicineId: z.coerce.number().int().positive(),
   supplierId: z.coerce.number().int().positive(),

@@ -7,6 +7,11 @@ async function seed() {
     update: { permissions: 'all' },
     create: { name: 'Admin', permissions: 'all' },
   });
+  await prisma.category.upsert({
+    where: { name: 'General' },
+    update: {},
+    create: { name: 'General', description: 'Default development category' },
+  });
   const passwordHash = await bcrypt.hash('admin12345', 12);
 
   await prisma.user.upsert({
