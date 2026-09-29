@@ -9,10 +9,10 @@ services:
       POSTGRES_PASSWORD: password123
       POSTGRES_DB: pharmasense
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pharmasense_postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  pharmasense_postgres_data:
