@@ -19,6 +19,19 @@ type Supplier = {
   _count?: { batches: number };
 };
 
+type Batch = {
+  id: number;
+  medicineId: number;
+  supplierId: number;
+  batchNumber: string;
+  mfgDate: string;
+  expiryDate: string;
+  quantity: number;
+  purchasePrice: number;
+  medicine: { genericName: string; brandName: string };
+  supplier: { name: string };
+};
+
 type MedicineForm = {
   genericName: string;
   brandName: string;
@@ -30,6 +43,16 @@ type MedicineForm = {
 type SupplierForm = {
   name: string;
   contactInfo: string;
+};
+
+type BatchForm = {
+  medicineId: string;
+  supplierId: string;
+  batchNumber: string;
+  mfgDate: string;
+  expiryDate: string;
+  quantity: string;
+  purchasePrice: string;
 };
 
 type ApiResponse = {
@@ -54,6 +77,7 @@ function App() {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -62,7 +86,20 @@ function App() {
   const [formError, setFormError] = useState("");
   const [supplierFormOpen, setSupplierFormOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [supplierForm, setSupplierForm] = useState<SupplierForm>({ name: "", contactInfo: "" });
+  const [supplierForm, setSupplierForm] = useState<SupplierForm>({
+    name: "",
+    contactInfo: "",
+  });
+  const [batchFormOpen, setBatchFormOpen] = useState(false);
+  const [batchForm, setBatchForm] = useState<BatchForm>({
+    medicineId: "",
+    supplierId: "",
+    batchNumber: "",
+    mfgDate: "",
+    expiryDate: "",
+    quantity: "0",
+    purchasePrice: "0",
+  });
   const [form, setForm] = useState<MedicineForm>({
     genericName: "",
     brandName: "",
@@ -80,12 +117,23 @@ function App() {
     const loadInventory = async () => {
       try {
         const headers = { Authorization: `Bearer ${session.token}` };
-        const [medicineResponse, categoryResponse, supplierResponse] = await Promise.all([
+        const [
+          medicineResponse,
+          categoryResponse,
+          supplierResponse,
+          batchResponse,
+        ] = await Promise.all([
           fetch("http://localhost:5000/api/v1/medicines", { headers }),
           fetch("http://localhost:5000/api/v1/categories", { headers }),
           fetch("http://localhost:5000/api/v1/suppliers", { headers }),
+          fetch("http://localhost:5000/api/v1/batches", { headers }),
         ]);
-        if (!medicineResponse.ok || !categoryResponse.ok || !supplierResponse.ok) {
+        if (
+          !medicineResponse.ok ||
+          !categoryResponse.ok ||
+          !supplierResponse.ok ||
+          !batchResponse.ok
+        ) {
           throw new Error("The inventory service returned an error.");
         }
 
@@ -98,9 +146,14 @@ function App() {
           success: boolean;
           data: Supplier[];
         };
+        const batchResult = (await batchResponse.json()) as {
+          success: boolean;
+          data: Batch[];
+        };
         setMedicines(medicineResult.data);
         setCategories(categoryResult.data);
         setSuppliers(supplierResult.data);
+        setBatches(batchResult.data);
         setError("");
       } catch (requestError) {
         setError(
@@ -239,7 +292,10 @@ function App() {
 
   const openEditSupplierForm = (supplier: Supplier) => {
     setEditingSupplier(supplier);
-    setSupplierForm({ name: supplier.name, contactInfo: supplier.contactInfo ?? "" });
+    setSupplierForm({
+      name: supplier.name,
+      contactInfo: supplier.contactInfo ?? "",
+    });
     setFormError("");
     setSupplierFormOpen(true);
   };
@@ -262,9 +318,16 @@ function App() {
         },
         body: JSON.stringify(supplierForm),
       });
-      const result = (await response.json()) as { success: boolean; error?: string };
+      const result = (await response.json()) as {
+        success: boolean;
+        error?: string;
+      };
       if (!response.ok || !result.success) {
-        throw new Error(typeof result.error === "string" ? result.error : "Unable to save supplier.");
+        throw new Error(
+          typeof result.error === "string"
+            ? result.error
+            : "Unable to save supplier.",
+        );
       }
 
       const refreshed = await fetch("http://localhost:5000/api/v1/suppliers", {
@@ -275,7 +338,79 @@ function App() {
       setSupplierFormOpen(false);
       setEditingSupplier(null);
     } catch (requestError) {
-      setFormError(requestError instanceof Error ? requestError.message : "Unable to save supplier.");
+      setFormError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to save supplier.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openCreateBatchForm = () => {
+    setBatchForm({
+      medicineId: medicines[0] ? String(medicines[0].id) : "",
+      supplierId: suppliers[0] ? String(suppliers[0].id) : "",
+      batchNumber: "",
+      mfgDate: "",
+      expiryDate: "",
+      quantity: "0",
+      purchasePrice: "0",
+    });
+    setFormError("");
+    setBatchFormOpen(true);
+  };
+
+  const handleBatchSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session) return;
+
+    setSaving(true);
+    setFormError("");
+    try {
+      const response = await fetch("http://localhost:5000/api/v1/batches", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify({
+          ...batchForm,
+          medicineId: Number(batchForm.medicineId),
+          supplierId: Number(batchForm.supplierId),
+          quantity: Number(batchForm.quantity),
+          purchasePrice: Number(batchForm.purchasePrice),
+        }),
+      });
+      const result = (await response.json()) as {
+        success: boolean;
+        error?: string;
+      };
+      if (!response.ok || !result.success) {
+        throw new Error(
+          typeof result.error === "string"
+            ? result.error
+            : "Unable to receive batch.",
+        );
+      }
+
+      const headers = { Authorization: `Bearer ${session.token}` };
+      const [batchResponse, medicineResponse] = await Promise.all([
+        fetch("http://localhost:5000/api/v1/batches", { headers }),
+        fetch("http://localhost:5000/api/v1/medicines", { headers }),
+      ]);
+      const batchResult = (await batchResponse.json()) as { data: Batch[] };
+      const medicineResult = (await medicineResponse.json()) as ApiResponse;
+      setBatches(batchResult.data);
+      setMedicines(medicineResult.data);
+      setBatchFormOpen(false);
+    } catch (requestError) {
+      setFormError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to receive batch.",
+      );
     } finally {
       setSaving(false);
     }
@@ -387,6 +522,13 @@ function App() {
         </div>
         <div className="flex gap-3">
           <button
+            onClick={openCreateBatchForm}
+            disabled={medicines.length === 0 || suppliers.length === 0}
+            className="border border-blue-300 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition disabled:opacity-50"
+          >
+            Receive stock
+          </button>
+          <button
             onClick={openCreateSupplierForm}
             className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
           >
@@ -401,6 +543,168 @@ function App() {
         </div>
       </header>
 
+      {batchFormOpen && (
+        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+          <form
+            onSubmit={handleBatchSave}
+            className="w-full max-w-2xl bg-white rounded-xl shadow-xl p-6"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">
+                Receive stock batch
+              </h2>
+              <button
+                type="button"
+                onClick={() => setBatchFormOpen(false)}
+                className="text-gray-500 hover:text-gray-900"
+              >
+                Close
+              </button>
+            </div>
+            {formError && (
+              <p className="mb-4 p-3 rounded bg-red-50 text-red-700">
+                {formError}
+              </p>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="text-sm font-medium text-gray-700">
+                Medicine
+                <select
+                  value={batchForm.medicineId}
+                  onChange={(event) =>
+                    setBatchForm({
+                      ...batchForm,
+                      medicineId: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                >
+                  <option value="" disabled>
+                    Select medicine
+                  </option>
+                  {medicines.map((medicine) => (
+                    <option key={medicine.id} value={medicine.id}>
+                      {medicine.genericName} ({medicine.brandName})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Supplier
+                <select
+                  value={batchForm.supplierId}
+                  onChange={(event) =>
+                    setBatchForm({
+                      ...batchForm,
+                      supplierId: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                >
+                  <option value="" disabled>
+                    Select supplier
+                  </option>
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Batch number
+                <input
+                  value={batchForm.batchNumber}
+                  onChange={(event) =>
+                    setBatchForm({
+                      ...batchForm,
+                      batchNumber: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Quantity received
+                <input
+                  type="number"
+                  min="0"
+                  value={batchForm.quantity}
+                  onChange={(event) =>
+                    setBatchForm({ ...batchForm, quantity: event.target.value })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Manufacturing date
+                <input
+                  type="date"
+                  value={batchForm.mfgDate}
+                  onChange={(event) =>
+                    setBatchForm({ ...batchForm, mfgDate: event.target.value })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Expiry date
+                <input
+                  type="date"
+                  value={batchForm.expiryDate}
+                  onChange={(event) =>
+                    setBatchForm({
+                      ...batchForm,
+                      expiryDate: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Purchase price per unit
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={batchForm.purchasePrice}
+                  onChange={(event) =>
+                    setBatchForm({
+                      ...batchForm,
+                      purchasePrice: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setBatchFormOpen(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Receiving..." : "Receive stock"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {supplierFormOpen && (
         <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
           <form
@@ -411,16 +715,26 @@ function App() {
               <h2 className="text-xl font-bold text-gray-900">
                 {editingSupplier ? "Edit supplier" : "Add supplier"}
               </h2>
-              <button type="button" onClick={() => setSupplierFormOpen(false)} className="text-gray-500 hover:text-gray-900">
+              <button
+                type="button"
+                onClick={() => setSupplierFormOpen(false)}
+                className="text-gray-500 hover:text-gray-900"
+              >
                 Close
               </button>
             </div>
-            {formError && <p className="mb-4 p-3 rounded bg-red-50 text-red-700">{formError}</p>}
+            {formError && (
+              <p className="mb-4 p-3 rounded bg-red-50 text-red-700">
+                {formError}
+              </p>
+            )}
             <label className="block text-sm font-medium text-gray-700 mb-4">
               Supplier name
               <input
                 value={supplierForm.name}
-                onChange={(event) => setSupplierForm({ ...supplierForm, name: event.target.value })}
+                onChange={(event) =>
+                  setSupplierForm({ ...supplierForm, name: event.target.value })
+                }
                 className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
                 required
               />
@@ -429,14 +743,29 @@ function App() {
               Contact details
               <textarea
                 value={supplierForm.contactInfo}
-                onChange={(event) => setSupplierForm({ ...supplierForm, contactInfo: event.target.value })}
+                onChange={(event) =>
+                  setSupplierForm({
+                    ...supplierForm,
+                    contactInfo: event.target.value,
+                  })
+                }
                 className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
                 rows={3}
               />
             </label>
             <div className="flex justify-end gap-3 mt-6">
-              <button type="button" onClick={() => setSupplierFormOpen(false)} className="px-4 py-2 text-gray-600 hover:text-gray-900">Cancel</button>
-              <button type="submit" disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50">
+              <button
+                type="button"
+                onClick={() => setSupplierFormOpen(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
                 {saving ? "Saving..." : "Save supplier"}
               </button>
             </div>
@@ -657,15 +986,69 @@ function App() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {suppliers.length === 0 ? (
-                <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">No suppliers have been added yet.</td></tr>
-              ) : suppliers.map((supplier) => (
-                <tr key={supplier.id}>
-                  <td className="px-6 py-4 font-medium text-gray-900">{supplier.name}</td>
-                  <td className="px-6 py-4 text-gray-600">{supplier.contactInfo || "-"}</td>
-                  <td className="px-6 py-4 text-gray-600">{supplier._count?.batches ?? 0}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => openEditSupplierForm(supplier)} className="text-blue-600 hover:text-blue-800 font-medium">Edit</button>
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    No suppliers have been added yet.
                   </td>
+                </tr>
+              ) : (
+                suppliers.map((supplier) => (
+                  <tr key={supplier.id}>
+                    <td className="px-6 py-4 font-medium text-gray-900">
+                      {supplier.name}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {supplier.contactInfo || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {supplier._count?.batches ?? 0}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => openEditSupplierForm(supplier)}
+                        className="text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900">Received batches</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4">Batch</th>
+                <th className="px-6 py-4">Medicine</th>
+                <th className="px-6 py-4">Supplier</th>
+                <th className="px-6 py-4">Expiry</th>
+                <th className="px-6 py-4 text-right">Quantity</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {batches.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No batches have been received yet.</td>
+                </tr>
+              ) : batches.map((batch) => (
+                <tr key={batch.id}>
+                  <td className="px-6 py-4 font-medium text-gray-900">{batch.batchNumber}</td>
+                  <td className="px-6 py-4 text-gray-600">{batch.medicine.genericName}</td>
+                  <td className="px-6 py-4 text-gray-600">{batch.supplier.name}</td>
+                  <td className="px-6 py-4 text-gray-600">{new Date(batch.expiryDate).toLocaleDateString()}</td>
+                  <td className="px-6 py-4 text-gray-600 text-right">{batch.quantity}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { batchSchema } from '../validation/schemas';
+import { AuthenticatedRequest } from '../auth';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Add a new batch
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const result = batchSchema.safeParse(req.body);
     if (!result.success) {
@@ -25,8 +26,25 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
-    const batch = await prisma.batch.create({
-      data: result.data,
+    if (!req.user) {
+      res.status(401).json({ success: false, error: 'Authentication required' });
+      return;
+    }
+
+    const batch = await prisma.$transaction(async (transaction) => {
+      const createdBatch = await transaction.batch.create({
+        data: result.data,
+      });
+      await transaction.stockTransaction.create({
+        data: {
+          batchId: createdBatch.id,
+          userId: req.user!.id,
+          type: 'IN',
+          quantity: createdBatch.quantity,
+          notes: 'Initial batch receipt',
+        },
+      });
+      return createdBatch;
     });
     res.status(201).json({ success: true, data: batch });
   } catch (error) {
