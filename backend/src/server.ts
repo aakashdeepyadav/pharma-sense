@@ -5,6 +5,7 @@ import medicineRoutes from './routes/medicines';
 import categoryRoutes from './routes/categories';
 import batchRoutes from './routes/batches';
 import authRoutes from './routes/auth';
+import supplierRoutes from './routes/suppliers';
 import prisma from './lib/prisma';
 import { requireAuth } from './auth';
 
@@ -20,6 +21,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/medicines', requireAuth, medicineRoutes);
 app.use('/api/v1/categories', requireAuth, categoryRoutes);
 app.use('/api/v1/batches', requireAuth, batchRoutes);
+app.use('/api/v1/suppliers', requireAuth, supplierRoutes);
 
 app.get('/health', async (_req, res) => {
   try {

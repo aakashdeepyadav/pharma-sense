@@ -12,12 +12,24 @@ type Medicine = {
 
 type Category = { id: number; name: string };
 
+type Supplier = {
+  id: number;
+  name: string;
+  contactInfo: string | null;
+  _count?: { batches: number };
+};
+
 type MedicineForm = {
   genericName: string;
   brandName: string;
   categoryId: string;
   unit: string;
   reorderLevel: string;
+};
+
+type SupplierForm = {
+  name: string;
+  contactInfo: string;
 };
 
 type ApiResponse = {
@@ -41,12 +53,16 @@ function App() {
   const [loggingIn, setLoggingIn] = useState(false);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [supplierFormOpen, setSupplierFormOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [supplierForm, setSupplierForm] = useState<SupplierForm>({ name: "", contactInfo: "" });
   const [form, setForm] = useState<MedicineForm>({
     genericName: "",
     brandName: "",
@@ -64,11 +80,12 @@ function App() {
     const loadInventory = async () => {
       try {
         const headers = { Authorization: `Bearer ${session.token}` };
-        const [medicineResponse, categoryResponse] = await Promise.all([
+        const [medicineResponse, categoryResponse, supplierResponse] = await Promise.all([
           fetch("http://localhost:5000/api/v1/medicines", { headers }),
           fetch("http://localhost:5000/api/v1/categories", { headers }),
+          fetch("http://localhost:5000/api/v1/suppliers", { headers }),
         ]);
-        if (!medicineResponse.ok || !categoryResponse.ok) {
+        if (!medicineResponse.ok || !categoryResponse.ok || !supplierResponse.ok) {
           throw new Error("The inventory service returned an error.");
         }
 
@@ -77,8 +94,13 @@ function App() {
           success: boolean;
           data: Category[];
         };
+        const supplierResult = (await supplierResponse.json()) as {
+          success: boolean;
+          data: Supplier[];
+        };
         setMedicines(medicineResult.data);
         setCategories(categoryResult.data);
+        setSuppliers(supplierResult.data);
         setError("");
       } catch (requestError) {
         setError(
@@ -178,9 +200,16 @@ function App() {
           reorderLevel: Number(form.reorderLevel),
         }),
       });
-      const result = (await response.json()) as { success: boolean; error?: string };
+      const result = (await response.json()) as {
+        success: boolean;
+        error?: string;
+      };
       if (!response.ok || !result.success) {
-        throw new Error(typeof result.error === "string" ? result.error : "Unable to save medicine.");
+        throw new Error(
+          typeof result.error === "string"
+            ? result.error
+            : "Unable to save medicine.",
+        );
       }
 
       setFormOpen(false);
@@ -191,7 +220,62 @@ function App() {
       const refreshedResult = (await refreshed.json()) as ApiResponse;
       setMedicines(refreshedResult.data);
     } catch (requestError) {
-      setFormError(requestError instanceof Error ? requestError.message : "Unable to save medicine.");
+      setFormError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to save medicine.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openCreateSupplierForm = () => {
+    setEditingSupplier(null);
+    setSupplierForm({ name: "", contactInfo: "" });
+    setFormError("");
+    setSupplierFormOpen(true);
+  };
+
+  const openEditSupplierForm = (supplier: Supplier) => {
+    setEditingSupplier(supplier);
+    setSupplierForm({ name: supplier.name, contactInfo: supplier.contactInfo ?? "" });
+    setFormError("");
+    setSupplierFormOpen(true);
+  };
+
+  const handleSupplierSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session) return;
+
+    setSaving(true);
+    setFormError("");
+    try {
+      const endpoint = editingSupplier
+        ? `http://localhost:5000/api/v1/suppliers/${editingSupplier.id}`
+        : "http://localhost:5000/api/v1/suppliers";
+      const response = await fetch(endpoint, {
+        method: editingSupplier ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify(supplierForm),
+      });
+      const result = (await response.json()) as { success: boolean; error?: string };
+      if (!response.ok || !result.success) {
+        throw new Error(typeof result.error === "string" ? result.error : "Unable to save supplier.");
+      }
+
+      const refreshed = await fetch("http://localhost:5000/api/v1/suppliers", {
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
+      const refreshedResult = (await refreshed.json()) as { data: Supplier[] };
+      setSuppliers(refreshedResult.data);
+      setSupplierFormOpen(false);
+      setEditingSupplier(null);
+    } catch (requestError) {
+      setFormError(requestError instanceof Error ? requestError.message : "Unable to save supplier.");
     } finally {
       setSaving(false);
     }
@@ -301,13 +385,64 @@ function App() {
             Sign out
           </button>
         </div>
-        <button
-          onClick={openCreateForm}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
-        >
-          + Add Medicine
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={openCreateSupplierForm}
+            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
+          >
+            + Supplier
+          </button>
+          <button
+            onClick={openCreateForm}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+          >
+            + Add Medicine
+          </button>
+        </div>
       </header>
+
+      {supplierFormOpen && (
+        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+          <form
+            onSubmit={handleSupplierSave}
+            className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingSupplier ? "Edit supplier" : "Add supplier"}
+              </h2>
+              <button type="button" onClick={() => setSupplierFormOpen(false)} className="text-gray-500 hover:text-gray-900">
+                Close
+              </button>
+            </div>
+            {formError && <p className="mb-4 p-3 rounded bg-red-50 text-red-700">{formError}</p>}
+            <label className="block text-sm font-medium text-gray-700 mb-4">
+              Supplier name
+              <input
+                value={supplierForm.name}
+                onChange={(event) => setSupplierForm({ ...supplierForm, name: event.target.value })}
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                required
+              />
+            </label>
+            <label className="block text-sm font-medium text-gray-700">
+              Contact details
+              <textarea
+                value={supplierForm.contactInfo}
+                onChange={(event) => setSupplierForm({ ...supplierForm, contactInfo: event.target.value })}
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                rows={3}
+              />
+            </label>
+            <div className="flex justify-end gap-3 mt-6">
+              <button type="button" onClick={() => setSupplierFormOpen(false)} className="px-4 py-2 text-gray-600 hover:text-gray-900">Cancel</button>
+              <button type="submit" disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50">
+                {saving ? "Saving..." : "Save supplier"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {formOpen && (
         <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
@@ -327,13 +462,19 @@ function App() {
                 Close
               </button>
             </div>
-            {formError && <p className="mb-4 p-3 rounded bg-red-50 text-red-700">{formError}</p>}
+            {formError && (
+              <p className="mb-4 p-3 rounded bg-red-50 text-red-700">
+                {formError}
+              </p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="text-sm font-medium text-gray-700">
                 Generic name
                 <input
                   value={form.genericName}
-                  onChange={(event) => setForm({ ...form, genericName: event.target.value })}
+                  onChange={(event) =>
+                    setForm({ ...form, genericName: event.target.value })
+                  }
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
                   required
                 />
@@ -342,7 +483,9 @@ function App() {
                 Brand name
                 <input
                   value={form.brandName}
-                  onChange={(event) => setForm({ ...form, brandName: event.target.value })}
+                  onChange={(event) =>
+                    setForm({ ...form, brandName: event.target.value })
+                  }
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
                   required
                 />
@@ -351,19 +494,29 @@ function App() {
                 Category
                 <select
                   value={form.categoryId}
-                  onChange={(event) => setForm({ ...form, categoryId: event.target.value })}
+                  onChange={(event) =>
+                    setForm({ ...form, categoryId: event.target.value })
+                  }
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
                   required
                 >
-                  <option value="" disabled>Select a category</option>
-                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                  <option value="" disabled>
+                    Select a category
+                  </option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="text-sm font-medium text-gray-700">
                 Unit
                 <input
                   value={form.unit}
-                  onChange={(event) => setForm({ ...form, unit: event.target.value })}
+                  onChange={(event) =>
+                    setForm({ ...form, unit: event.target.value })
+                  }
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
                   required
                 />
@@ -374,15 +527,27 @@ function App() {
                   type="number"
                   min="0"
                   value={form.reorderLevel}
-                  onChange={(event) => setForm({ ...form, reorderLevel: event.target.value })}
+                  onChange={(event) =>
+                    setForm({ ...form, reorderLevel: event.target.value })
+                  }
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
                   required
                 />
               </label>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button type="button" onClick={() => setFormOpen(false)} className="px-4 py-2 text-gray-600 hover:text-gray-900">Cancel</button>
-              <button type="submit" disabled={saving || categories.length === 0} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50">
+              <button
+                type="button"
+                onClick={() => setFormOpen(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || categories.length === 0}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
                 {saving ? "Saving..." : "Save medicine"}
               </button>
             </div>
@@ -461,7 +626,10 @@ function App() {
                       / {med.reorderLevel}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={() => openEditForm(med)} className="text-blue-600 hover:text-blue-800 font-medium">
+                      <button
+                        onClick={() => openEditForm(med)}
+                        className="text-blue-600 hover:text-blue-800 font-medium"
+                      >
                         Edit
                       </button>
                     </td>
@@ -472,6 +640,38 @@ function App() {
           </table>
         </div>
       </div>
+
+      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900">Suppliers</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4">Supplier</th>
+                <th className="px-6 py-4">Contact</th>
+                <th className="px-6 py-4">Batches</th>
+                <th className="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {suppliers.length === 0 ? (
+                <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">No suppliers have been added yet.</td></tr>
+              ) : suppliers.map((supplier) => (
+                <tr key={supplier.id}>
+                  <td className="px-6 py-4 font-medium text-gray-900">{supplier.name}</td>
+                  <td className="px-6 py-4 text-gray-600">{supplier.contactInfo || "-"}</td>
+                  <td className="px-6 py-4 text-gray-600">{supplier._count?.batches ?? 0}</td>
+                  <td className="px-6 py-4 text-right">
+                    <button onClick={() => openEditSupplierForm(supplier)} className="text-blue-600 hover:text-blue-800 font-medium">Edit</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }

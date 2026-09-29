@@ -15,6 +15,13 @@ export const medicineSchema = z.object({
 
 export const medicineUpdateSchema = medicineSchema.partial();
 
+export const supplierSchema = z.object({
+  name: z.string().trim().min(1).max(150),
+  contactInfo: z.string().trim().max(300).optional(),
+});
+
+export const supplierUpdateSchema = supplierSchema.partial();
+
 export const batchSchema = z.object({
   medicineId: z.coerce.number().int().positive(),
   supplierId: z.coerce.number().int().positive(),
