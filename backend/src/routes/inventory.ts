@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import prisma from '../lib/prisma';
 import { AuthenticatedRequest } from '../auth';
 import { stockTransactionSchema } from '../validation/schemas';
+import { calculateStockDelta, minimumQuantityForDelta } from '../domain/stockRules';
 
 const router = Router();
 
@@ -33,8 +34,8 @@ router.post('/transactions', async (req: AuthenticatedRequest, res: Response) =>
 
   try {
     const transaction = await prisma.$transaction(async (database) => {
-      const adjustment = result.data.type === 'OUT' ? -result.data.quantity : result.data.quantity;
-      const minimumQuantity = adjustment < 0 ? Math.abs(adjustment) : 0;
+      const adjustment = calculateStockDelta(result.data.type, result.data.quantity);
+      const minimumQuantity = minimumQuantityForDelta(adjustment);
       const updatedBatch = await database.batch.updateMany({
         where: { id: result.data.batchId, quantity: { gte: minimumQuantity } },
         data: { quantity: { increment: adjustment } },
