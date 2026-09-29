@@ -34,3 +34,17 @@ export const batchSchema = z.object({
   message: 'Expiry date must be after manufacturing date',
   path: ['expiryDate'],
 });
+
+export const stockTransactionSchema = z.object({
+  batchId: z.coerce.number().int().positive(),
+  type: z.enum(['OUT', 'ADJ']),
+  quantity: z.coerce.number().int(),
+  notes: z.string().trim().max(500).optional(),
+}).superRefine((value, context) => {
+  if (value.type === 'OUT' && value.quantity <= 0) {
+    context.addIssue({ code: 'custom', message: 'Stock out quantity must be positive', path: ['quantity'] });
+  }
+  if (value.type === 'ADJ' && value.quantity === 0) {
+    context.addIssue({ code: 'custom', message: 'Adjustment quantity cannot be zero', path: ['quantity'] });
+  }
+});

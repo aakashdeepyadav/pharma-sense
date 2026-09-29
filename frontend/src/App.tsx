@@ -32,6 +32,16 @@ type Batch = {
   supplier: { name: string };
 };
 
+type StockTransaction = {
+  id: number;
+  type: "IN" | "OUT" | "ADJ";
+  quantity: number;
+  timestamp: string;
+  notes: string | null;
+  batch: { batchNumber: string; medicine: { genericName: string } };
+  user: { name: string };
+};
+
 type MedicineForm = {
   genericName: string;
   brandName: string;
@@ -53,6 +63,13 @@ type BatchForm = {
   expiryDate: string;
   quantity: string;
   purchasePrice: string;
+};
+
+type StockForm = {
+  batchId: string;
+  type: "OUT" | "ADJ";
+  quantity: string;
+  notes: string;
 };
 
 type ApiResponse = {
@@ -78,6 +95,7 @@ function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -99,6 +117,13 @@ function App() {
     expiryDate: "",
     quantity: "0",
     purchasePrice: "0",
+  });
+  const [stockFormOpen, setStockFormOpen] = useState(false);
+  const [stockForm, setStockForm] = useState<StockForm>({
+    batchId: "",
+    type: "OUT",
+    quantity: "1",
+    notes: "",
   });
   const [form, setForm] = useState<MedicineForm>({
     genericName: "",
@@ -122,17 +147,22 @@ function App() {
           categoryResponse,
           supplierResponse,
           batchResponse,
+          transactionResponse,
         ] = await Promise.all([
           fetch("http://localhost:5000/api/v1/medicines", { headers }),
           fetch("http://localhost:5000/api/v1/categories", { headers }),
           fetch("http://localhost:5000/api/v1/suppliers", { headers }),
           fetch("http://localhost:5000/api/v1/batches", { headers }),
+          fetch("http://localhost:5000/api/v1/inventory/transactions", {
+            headers,
+          }),
         ]);
         if (
           !medicineResponse.ok ||
           !categoryResponse.ok ||
           !supplierResponse.ok ||
-          !batchResponse.ok
+          !batchResponse.ok ||
+          !transactionResponse.ok
         ) {
           throw new Error("The inventory service returned an error.");
         }
@@ -150,10 +180,15 @@ function App() {
           success: boolean;
           data: Batch[];
         };
+        const transactionResult = (await transactionResponse.json()) as {
+          success: boolean;
+          data: StockTransaction[];
+        };
         setMedicines(medicineResult.data);
         setCategories(categoryResult.data);
         setSuppliers(supplierResult.data);
         setBatches(batchResult.data);
+        setTransactions(transactionResult.data);
         setError("");
       } catch (requestError) {
         setError(
@@ -416,6 +451,80 @@ function App() {
     }
   };
 
+  const openStockForm = (batch: Batch, type: "OUT" | "ADJ") => {
+    setStockForm({
+      batchId: String(batch.id),
+      type,
+      quantity: type === "OUT" ? "1" : "0",
+      notes: "",
+    });
+    setFormError("");
+    setStockFormOpen(true);
+  };
+
+  const handleStockSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session) return;
+
+    setSaving(true);
+    setFormError("");
+    try {
+      const response = await fetch(
+        "http://localhost:5000/api/v1/inventory/transactions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.token}`,
+          },
+          body: JSON.stringify({
+            ...stockForm,
+            batchId: Number(stockForm.batchId),
+            quantity: Number(stockForm.quantity),
+          }),
+        },
+      );
+      const result = (await response.json()) as {
+        success: boolean;
+        error?: string;
+      };
+      if (!response.ok || !result.success) {
+        throw new Error(
+          typeof result.error === "string"
+            ? result.error
+            : "Unable to record stock movement.",
+        );
+      }
+
+      const headers = { Authorization: `Bearer ${session.token}` };
+      const [batchResponse, medicineResponse, transactionResponse] =
+        await Promise.all([
+          fetch("http://localhost:5000/api/v1/batches", { headers }),
+          fetch("http://localhost:5000/api/v1/medicines", { headers }),
+          fetch("http://localhost:5000/api/v1/inventory/transactions", {
+            headers,
+          }),
+        ]);
+      const batchResult = (await batchResponse.json()) as { data: Batch[] };
+      const medicineResult = (await medicineResponse.json()) as ApiResponse;
+      const transactionResult = (await transactionResponse.json()) as {
+        data: StockTransaction[];
+      };
+      setBatches(batchResult.data);
+      setMedicines(medicineResult.data);
+      setTransactions(transactionResult.data);
+      setStockFormOpen(false);
+    } catch (requestError) {
+      setFormError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to record stock movement.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!session) {
     return (
       <main className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
@@ -542,6 +651,87 @@ function App() {
           </button>
         </div>
       </header>
+
+      {stockFormOpen && (
+        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+          <form
+            onSubmit={handleStockSave}
+            className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">
+                {stockForm.type === "OUT" ? "Issue stock" : "Adjust stock"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setStockFormOpen(false)}
+                className="text-gray-500 hover:text-gray-900"
+              >
+                Close
+              </button>
+            </div>
+            {formError && (
+              <p className="mb-4 p-3 rounded bg-red-50 text-red-700">
+                {formError}
+              </p>
+            )}
+            <p className="text-sm text-gray-600 mb-4">
+              {
+                batches.find((batch) => String(batch.id) === stockForm.batchId)
+                  ?.medicine.genericName
+              }{" "}
+              - batch{" "}
+              {
+                batches.find((batch) => String(batch.id) === stockForm.batchId)
+                  ?.batchNumber
+              }
+            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-4">
+              {stockForm.type === "ADJ"
+                ? "Adjustment quantity (+/-)"
+                : "Quantity issued"}
+              <input
+                type="number"
+                min={stockForm.type === "OUT" ? "1" : undefined}
+                value={stockForm.quantity}
+                onChange={(event) =>
+                  setStockForm({ ...stockForm, quantity: event.target.value })
+                }
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                required
+              />
+            </label>
+            <label className="block text-sm font-medium text-gray-700">
+              Reason or notes
+              <textarea
+                value={stockForm.notes}
+                onChange={(event) =>
+                  setStockForm({ ...stockForm, notes: event.target.value })
+                }
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                rows={3}
+                required
+              />
+            </label>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setStockFormOpen(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save movement"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {batchFormOpen && (
         <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
@@ -1035,22 +1225,111 @@ function App() {
                 <th className="px-6 py-4">Supplier</th>
                 <th className="px-6 py-4">Expiry</th>
                 <th className="px-6 py-4 text-right">Quantity</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {batches.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No batches have been received yet.</td>
+                  <td
+                    colSpan={6}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    No batches have been received yet.
+                  </td>
                 </tr>
-              ) : batches.map((batch) => (
-                <tr key={batch.id}>
-                  <td className="px-6 py-4 font-medium text-gray-900">{batch.batchNumber}</td>
-                  <td className="px-6 py-4 text-gray-600">{batch.medicine.genericName}</td>
-                  <td className="px-6 py-4 text-gray-600">{batch.supplier.name}</td>
-                  <td className="px-6 py-4 text-gray-600">{new Date(batch.expiryDate).toLocaleDateString()}</td>
-                  <td className="px-6 py-4 text-gray-600 text-right">{batch.quantity}</td>
+              ) : (
+                batches.map((batch) => (
+                  <tr key={batch.id}>
+                    <td className="px-6 py-4 font-medium text-gray-900">
+                      {batch.batchNumber}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {batch.medicine.genericName}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {batch.supplier.name}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {new Date(batch.expiryDate).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600 text-right">
+                      {batch.quantity}
+                    </td>
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => openStockForm(batch, "OUT")}
+                        className="text-blue-600 hover:text-blue-800 font-medium mr-3"
+                      >
+                        Issue
+                      </button>
+                      <button
+                        onClick={() => openStockForm(batch, "ADJ")}
+                        className="text-gray-600 hover:text-gray-900 font-medium"
+                      >
+                        Adjust
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900">
+            Stock transaction history
+          </h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4">Time</th>
+                <th className="px-6 py-4">Medicine</th>
+                <th className="px-6 py-4">Batch</th>
+                <th className="px-6 py-4">Type</th>
+                <th className="px-6 py-4">Quantity</th>
+                <th className="px-6 py-4">Recorded by</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {transactions.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    No stock movements have been recorded yet.
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                transactions.map((transaction) => (
+                  <tr key={transaction.id}>
+                    <td className="px-6 py-4 text-gray-600">
+                      {new Date(transaction.timestamp).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-gray-900">
+                      {transaction.batch.medicine.genericName}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {transaction.batch.batchNumber}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {transaction.type}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {transaction.quantity}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {transaction.user.name}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
