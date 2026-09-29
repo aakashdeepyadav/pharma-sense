@@ -13,12 +13,22 @@ router.get('/', async (_req: Request, res: Response) => {
     const now = new Date();
     const warningDate = new Date(now);
     warningDate.setDate(warningDate.getDate() + EXPIRY_WARNING_DAYS);
-    const alerts = [];
+    const alerts: Array<{
+      fingerprint: string;
+      type: string;
+      severity: string;
+      medicineId: number;
+      batchId?: number;
+      message: string;
+      quantity: number;
+      expiryDate?: Date;
+    }> = [];
 
     for (const medicine of medicines) {
       const currentStock = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
       if (currentStock === 0) {
         alerts.push({
+          fingerprint: `OUT_OF_STOCK:${medicine.id}`,
           type: 'OUT_OF_STOCK',
           severity: 'critical',
           medicineId: medicine.id,
@@ -27,6 +37,7 @@ router.get('/', async (_req: Request, res: Response) => {
         });
       } else if (currentStock <= medicine.reorderLevel) {
         alerts.push({
+          fingerprint: `LOW_STOCK:${medicine.id}`,
           type: 'LOW_STOCK',
           severity: 'warning',
           medicineId: medicine.id,
@@ -39,6 +50,7 @@ router.get('/', async (_req: Request, res: Response) => {
         if (batch.quantity === 0) continue;
         if (batch.expiryDate < now) {
           alerts.push({
+            fingerprint: `EXPIRED:${medicine.id}:${batch.id}`,
             type: 'EXPIRED',
             severity: 'critical',
             medicineId: medicine.id,
@@ -49,6 +61,7 @@ router.get('/', async (_req: Request, res: Response) => {
           });
         } else if (batch.expiryDate <= warningDate) {
           alerts.push({
+            fingerprint: `EXPIRING_SOON:${medicine.id}:${batch.id}`,
             type: 'EXPIRING_SOON',
             severity: 'warning',
             medicineId: medicine.id,
@@ -61,9 +74,49 @@ router.get('/', async (_req: Request, res: Response) => {
       }
     }
 
-    res.json({ success: true, data: alerts, meta: { generatedAt: now, expiryWarningDays: EXPIRY_WARNING_DAYS } });
+    await prisma.alert.updateMany({
+      where: { status: 'OPEN' },
+      data: { status: 'RESOLVED' },
+    });
+    for (const alert of alerts) {
+      await prisma.alert.upsert({
+        where: { fingerprint: alert.fingerprint },
+        create: alert,
+        update: {
+          type: alert.type,
+          severity: alert.severity,
+          message: alert.message,
+          quantity: alert.quantity,
+          expiryDate: alert.expiryDate,
+          status: undefined,
+        },
+      });
+    }
+    const currentAlerts = await prisma.alert.findMany({
+      where: { status: { in: ['OPEN', 'ACKNOWLEDGED'] } },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ success: true, data: currentAlerts, meta: { generatedAt: now, expiryWarningDays: EXPIRY_WARNING_DAYS } });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to calculate inventory alerts' });
+  }
+});
+
+router.patch('/:id/acknowledge', async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    res.status(400).json({ success: false, error: 'Alert id must be a positive integer' });
+    return;
+  }
+
+  try {
+    const alert = await prisma.alert.update({
+      where: { id },
+      data: { status: 'ACKNOWLEDGED', acknowledgedAt: new Date() },
+    });
+    res.json({ success: true, data: alert });
+  } catch {
+    res.status(404).json({ success: false, error: 'Alert not found' });
   }
 });
 

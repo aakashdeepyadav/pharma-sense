@@ -43,8 +43,10 @@ type StockTransaction = {
 };
 
 type InventoryAlert = {
+  id: number;
   type: "OUT_OF_STOCK" | "LOW_STOCK" | "EXPIRED" | "EXPIRING_SOON";
   severity: "critical" | "warning";
+  status: "OPEN" | "ACKNOWLEDGED";
   medicineId: number;
   batchId?: number;
   message: string;
@@ -542,6 +544,26 @@ function App() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const acknowledgeAlert = async (alertId: number) => {
+    if (!session) return;
+    const response = await fetch(
+      `http://localhost:5000/api/v1/alerts/${alertId}/acknowledge`,
+      {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${session.token}` },
+      },
+    );
+    if (!response.ok) {
+      setError("Unable to acknowledge alert.");
+      return;
+    }
+    const refreshed = await fetch("http://localhost:5000/api/v1/alerts", {
+      headers: { Authorization: `Bearer ${session.token}` },
+    });
+    const result = (await refreshed.json()) as { data: InventoryAlert[] };
+    setAlerts(result.data);
   };
 
   if (!session) {
@@ -1122,9 +1144,9 @@ function App() {
           </p>
         ) : (
           <div className="divide-y divide-gray-100">
-            {alerts.map((alert, index) => (
+            {alerts.map((alert) => (
               <div
-                key={`${alert.type}-${alert.medicineId}-${alert.batchId ?? index}`}
+                key={alert.id}
                 className="p-4 flex items-center justify-between gap-4"
               >
                 <div>
@@ -1138,12 +1160,22 @@ function App() {
                     {alert.message}
                   </p>
                   <p className="text-sm text-gray-500">
-                    Quantity affected: {alert.quantity}
+                    Quantity affected: {alert.quantity} | Status: {alert.status.toLowerCase()}
                   </p>
                 </div>
-                <span className="text-xs font-semibold uppercase text-gray-500">
-                  {alert.type.replaceAll("_", " ")}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold uppercase text-gray-500">
+                    {alert.type.replaceAll("_", " ")}
+                  </span>
+                  {alert.status === "OPEN" && (
+                    <button
+                      onClick={() => void acknowledgeAlert(alert.id)}
+                      className="text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Acknowledge
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
