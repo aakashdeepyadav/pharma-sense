@@ -42,6 +42,16 @@ type StockTransaction = {
   user: { name: string };
 };
 
+type InventoryAlert = {
+  type: "OUT_OF_STOCK" | "LOW_STOCK" | "EXPIRED" | "EXPIRING_SOON";
+  severity: "critical" | "warning";
+  medicineId: number;
+  batchId?: number;
+  message: string;
+  quantity: number;
+  expiryDate?: string;
+};
+
 type MedicineForm = {
   genericName: string;
   brandName: string;
@@ -96,6 +106,7 @@ function App() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
+  const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -148,6 +159,7 @@ function App() {
           supplierResponse,
           batchResponse,
           transactionResponse,
+          alertResponse,
         ] = await Promise.all([
           fetch("http://localhost:5000/api/v1/medicines", { headers }),
           fetch("http://localhost:5000/api/v1/categories", { headers }),
@@ -156,13 +168,15 @@ function App() {
           fetch("http://localhost:5000/api/v1/inventory/transactions", {
             headers,
           }),
+          fetch("http://localhost:5000/api/v1/alerts", { headers }),
         ]);
         if (
           !medicineResponse.ok ||
           !categoryResponse.ok ||
           !supplierResponse.ok ||
           !batchResponse.ok ||
-          !transactionResponse.ok
+          !transactionResponse.ok ||
+          !alertResponse.ok
         ) {
           throw new Error("The inventory service returned an error.");
         }
@@ -184,11 +198,16 @@ function App() {
           success: boolean;
           data: StockTransaction[];
         };
+        const alertResult = (await alertResponse.json()) as {
+          success: boolean;
+          data: InventoryAlert[];
+        };
         setMedicines(medicineResult.data);
         setCategories(categoryResult.data);
         setSuppliers(supplierResult.data);
         setBatches(batchResult.data);
         setTransactions(transactionResult.data);
+        setAlerts(alertResult.data);
         setError("");
       } catch (requestError) {
         setError(
@@ -584,15 +603,6 @@ function App() {
     );
   }
 
-  const totalUnits = medicines.reduce(
-    (total, medicine) =>
-      total +
-      medicine.batches.reduce(
-        (batchTotal, batch) => batchTotal + batch.quantity,
-        0,
-      ),
-    0,
-  );
   const lowStockCount = medicines.filter((medicine) => {
     const quantity = medicine.batches.reduce(
       (total, batch) => total + batch.quantity,
@@ -600,6 +610,9 @@ function App() {
     );
     return quantity <= medicine.reorderLevel;
   }).length;
+  const expiringSoonCount = alerts.filter(
+    (alert) => alert.type === "EXPIRING_SOON" || alert.type === "EXPIRED",
+  ).length;
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -1083,14 +1096,59 @@ function App() {
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 font-medium mb-2">Low Stock Alerts</h3>
-          <p className="text-3xl font-bold text-red-600">{lowStockCount}</p>
+          <p className="text-3xl font-bold text-red-600">
+            {alerts.filter(
+              (alert) =>
+                alert.type === "LOW_STOCK" || alert.type === "OUT_OF_STOCK",
+            ).length || lowStockCount}
+          </p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 font-medium mb-2">Expiring Soon</h3>
-          <p className="text-3xl font-bold text-orange-500">{totalUnits}</p>
-          <p className="text-gray-500 text-sm mt-1">Total units in stock</p>
+          <p className="text-3xl font-bold text-orange-500">
+            {expiringSoonCount}
+          </p>
+          <p className="text-gray-500 text-sm mt-1">Expiry alerts</p>
         </div>
       </div>
+
+      <section className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900">Inventory alerts</h2>
+        </div>
+        {alerts.length === 0 ? (
+          <p className="p-6 text-gray-500">
+            No stock or expiry alerts right now.
+          </p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {alerts.map((alert, index) => (
+              <div
+                key={`${alert.type}-${alert.medicineId}-${alert.batchId ?? index}`}
+                className="p-4 flex items-center justify-between gap-4"
+              >
+                <div>
+                  <p
+                    className={
+                      alert.severity === "critical"
+                        ? "font-medium text-red-700"
+                        : "font-medium text-orange-700"
+                    }
+                  >
+                    {alert.message}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Quantity affected: {alert.quantity}
+                  </p>
+                </div>
+                <span className="text-xs font-semibold uppercase text-gray-500">
+                  {alert.type.replaceAll("_", " ")}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
