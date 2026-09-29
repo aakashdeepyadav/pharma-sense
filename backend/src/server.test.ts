@@ -54,4 +54,17 @@ describe('PharmaSense API', () => {
     assert.equal(result.success, true);
     assert.equal(typeof result.data.medicineCount, 'number');
   });
+
+  it('rejects invalid forecast parameters', async () => {
+    const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@pharmasense.local', password: 'admin12345' }),
+    });
+    const login = (await loginResponse.json()) as { data: { token: string } };
+    const response = await fetch(`${baseUrl}/api/v1/reports/forecast-baseline?medicineId=1&horizon=0`, {
+      headers: { Authorization: `Bearer ${login.data.token}` },
+    });
+    assert.equal(response.status, 400);
+  });
 });
