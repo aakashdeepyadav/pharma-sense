@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "tsx src/scripts/seed.ts",
-    "test": "tsx src/domain/stockRules.test.ts"
+    "test": "tsx --test src/domain/stockRules.test.ts src/server.test.ts"
   },
   "keywords": [],
   "author": "",
