@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
+import { categorySchema } from '../validation/schemas';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Get all categories
 router.get('/', async (req: Request, res: Response) => {
@@ -17,11 +17,16 @@ router.get('/', async (req: Request, res: Response) => {
 // Add a category
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { name, description } = req.body;
+    const result = categorySchema.safeParse(req.body);
+    if (!result.success) {
+      res.status(400).json({ success: false, error: result.error.issues });
+      return;
+    }
+
     const category = await prisma.category.create({
-      data: { name, description }
+      data: result.data,
     });
-    res.json({ success: true, data: category });
+    res.status(201).json({ success: true, data: category });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to add category' });
   }

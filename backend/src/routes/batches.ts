@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
+import { batchSchema } from '../validation/schemas';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Get all batches
 router.get('/', async (req: Request, res: Response) => {
@@ -19,19 +19,16 @@ router.get('/', async (req: Request, res: Response) => {
 // Add a new batch
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { medicineId, supplierId, batchNumber, mfgDate, expiryDate, quantity, purchasePrice } = req.body;
+    const result = batchSchema.safeParse(req.body);
+    if (!result.success) {
+      res.status(400).json({ success: false, error: result.error.issues });
+      return;
+    }
+
     const batch = await prisma.batch.create({
-      data: {
-        medicineId,
-        supplierId,
-        batchNumber,
-        mfgDate: new Date(mfgDate),
-        expiryDate: new Date(expiryDate),
-        quantity,
-        purchasePrice
-      }
+      data: result.data,
     });
-    res.json({ success: true, data: batch });
+    res.status(201).json({ success: true, data: batch });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to add batch' });
   }

@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
+import { medicineSchema } from '../validation/schemas';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Get all medicines
 router.get('/', async (req: Request, res: Response) => {
@@ -19,17 +19,16 @@ router.get('/', async (req: Request, res: Response) => {
 // Add a new medicine
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { genericName, brandName, categoryId, reorderLevel, unit } = req.body;
+    const result = medicineSchema.safeParse(req.body);
+    if (!result.success) {
+      res.status(400).json({ success: false, error: result.error.issues });
+      return;
+    }
+
     const medicine = await prisma.medicine.create({
-      data: {
-        genericName,
-        brandName,
-        categoryId,
-        reorderLevel,
-        unit
-      }
+      data: result.data,
     });
-    res.json({ success: true, data: medicine });
+    res.status(201).json({ success: true, data: medicine });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to add medicine' });
   }
