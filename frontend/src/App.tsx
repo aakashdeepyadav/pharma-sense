@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { apiFetch } from "./api";
+import "./App.css";
 
 type Medicine = {
   id: number;
@@ -195,6 +196,32 @@ function extractErrorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+const roleThemeMap: Record<
+  string,
+  { tone: string; accent: string; description: string }
+> = {
+  Admin: {
+    tone: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    accent: "text-emerald-700",
+    description: "Full operational control across inventory, purchasing, and reporting.",
+  },
+  Pharmacist: {
+    tone: "bg-cyan-100 text-cyan-800 border-cyan-200",
+    accent: "text-cyan-700",
+    description: "Medication and stock management with read-write dispensing controls.",
+  },
+  "Inventory Manager": {
+    tone: "bg-violet-100 text-violet-800 border-violet-200",
+    accent: "text-violet-700",
+    description: "Vendor, batch, and stock integrity oversight for the supply chain.",
+  },
+  Staff: {
+    tone: "bg-amber-100 text-amber-800 border-amber-200",
+    accent: "text-amber-700",
+    description: "Operational access for daily stock movement and issue monitoring.",
+  },
+};
+
 function App() {
   const [session, setSession] = useState<Session | null>(() => {
     const storedSession = sessionStorage.getItem("pharmasense-session");
@@ -277,6 +304,12 @@ function App() {
     unit: "Tablet",
     reorderLevel: "0",
   });
+
+  const roleMeta = roleThemeMap[session?.user.role ?? "Staff"] ?? {
+    tone: "bg-slate-100 text-slate-700 border-slate-200",
+    accent: "text-slate-700",
+    description: "Operational access across the PharmaSense workspace.",
+  };
 
   useEffect(() => {
     if (!session) {
@@ -453,9 +486,7 @@ function App() {
         error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success || !result.data) {
-        throw new Error(
-          extractErrorMessage(result, "Unable to sign in."),
-        );
+        throw new Error(extractErrorMessage(result, "Unable to sign in."));
       }
 
       sessionStorage.setItem(
@@ -1036,59 +1067,98 @@ function App() {
 
   if (!session) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
-        <form
-          onSubmit={handleLogin}
-          className="w-full max-w-md bg-white p-8 rounded-xl shadow-sm border border-gray-200"
-        >
-          <p className="text-sm font-semibold text-blue-600 mb-2">
-            PHARMASENSE
-          </p>
-          <h1 className="text-3xl font-bold text-gray-900">Sign in</h1>
-          <p className="text-gray-600 mt-2 mb-6">
-            Manage your pharmacy inventory securely.
-          </p>
-          {loginError && (
-            <p className="mb-4 p-3 rounded bg-red-50 text-red-700">
-              {loginError}
+      <main className="auth-shell min-h-screen">
+        <div className="auth-card">
+          <section className="auth-hero">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.22em] text-cyan-50 backdrop-blur-sm">
+              PHARMASENSE
+            </div>
+            <h1 className="mt-6 text-4xl font-black leading-tight text-white">
+              Better pharmacy operations,
+              <span className="block text-cyan-200">in one secure workspace.</span>
+            </h1>
+            <p className="mt-4 max-w-md text-sm leading-6 text-slate-200">
+              Monitor stock, receive purchase orders, manage suppliers, and keep your medicine flow compliant across every role.
             </p>
-          )}
-          <label
-            className="block text-sm font-medium text-gray-700 mb-2"
-            htmlFor="email"
-          >
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4"
-            required
-          />
-          <label
-            className="block text-sm font-medium text-gray-700 mb-2"
-            htmlFor="password"
-          >
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-6"
-            required
-          />
-          <button
-            type="submit"
-            disabled={loggingIn}
-            className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loggingIn ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+
+            <div className="mt-8 grid gap-3 text-sm text-slate-100 sm:grid-cols-2">
+              {[
+                "Live medicine visibility",
+                "Audit-ready transactions",
+                "Role-aware approvals",
+                "Forecast and reorder support",
+              ].map((feature) => (
+                <div
+                  key={feature}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5"
+                >
+                  {feature}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 rounded-2xl border border-cyan-400/30 bg-slate-950/20 p-4 backdrop-blur-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">
+                Demo access
+              </p>
+              <div className="mt-3 space-y-2 text-sm text-slate-100">
+                <p>Email: admin@pharmasense.local</p>
+                <p>Password: admin12345</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="auth-form-shell">
+            <div className="mb-6">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">
+                Sign in
+              </p>
+              <h2 className="mt-2 text-3xl font-bold text-slate-900">
+                Welcome back
+              </h2>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-5">
+              {loginError && (
+                <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {loginError}
+                </p>
+              )}
+
+              <label className="block text-sm font-medium text-slate-700" htmlFor="email">
+                Email address
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100"
+                  required
+                />
+              </label>
+
+              <label className="block text-sm font-medium text-slate-700" htmlFor="password">
+                Password
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100"
+                  required
+                />
+              </label>
+
+              <button
+                type="submit"
+                disabled={loggingIn}
+                className="w-full rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-3 text-base font-semibold text-white shadow-lg shadow-cyan-600/20 transition hover:scale-[1.01] hover:from-cyan-500 hover:to-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {loggingIn ? "Signing in..." : "Sign in to dashboard"}
+              </button>
+            </form>
+          </section>
+        </div>
       </main>
     );
   }
@@ -1137,36 +1207,51 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <header className="mb-8 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            PharmaSense Dashboard
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Agent-Based Medicine Stock Management System
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-sm font-medium text-gray-900">
-              {session.user.name}
+    <div className="min-h-screen bg-slate-100 p-4 md:p-8">
+      <header className="mb-8 rounded-[28px] border border-slate-200 bg-white/80 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur md:p-7">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-cyan-700">
+              PharmaSense
+            </div>
+            <h1 className="text-2xl font-black text-slate-900 md:text-3xl">
+              Inventory command center
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Agent-based medicine stock and replenishment operations
             </p>
-            <p className="text-xs text-gray-500">{session.user.role}</p>
           </div>
-          <button
-            onClick={() => void handleLogout()}
-            className="text-gray-600 hover:text-gray-900 font-medium"
-          >
-            Sign out
-          </button>
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 font-bold text-white">
+                {session.user.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-semibold text-slate-900">
+                  {session.user.name}
+                </p>
+                <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${roleMeta.tone}`}>
+                  {session.user.role}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => void handleLogout()}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
-        <div className="flex gap-3">
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
           {canReceiveStock && (
             <button
               onClick={openCreatePurchaseForm}
               disabled={medicines.length === 0 || suppliers.length === 0}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50"
+              className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-600/20 transition hover:from-blue-500 hover:to-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Receive purchase
             </button>
@@ -1175,7 +1260,7 @@ function App() {
             <button
               onClick={openCreateBatchForm}
               disabled={medicines.length === 0 || suppliers.length === 0}
-              className="border border-blue-300 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition disabled:opacity-50"
+              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Receive stock
             </button>
@@ -1183,7 +1268,7 @@ function App() {
           {canManageSuppliers && (
             <button
               onClick={openCreateSupplierForm}
-              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               + Supplier
             </button>
@@ -1196,7 +1281,7 @@ function App() {
                 setFormError("");
                 setCategoryFormOpen(true);
               }}
-              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               + Category
             </button>
@@ -1204,7 +1289,7 @@ function App() {
           {canWriteMedicines && (
             <button
               onClick={openCreateForm}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+              className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
               + Add Medicine
             </button>
