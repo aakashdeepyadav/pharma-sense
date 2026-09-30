@@ -933,6 +933,17 @@ function App() {
     await refreshAuditLogs();
   };
 
+  const handleLogout = async () => {
+    if (session) {
+      await apiFetch("/api/v1/auth/logout", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
+    }
+    sessionStorage.removeItem("pharmasense-session");
+    setSession(null);
+  };
+
   if (!session) {
     return (
       <main className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
@@ -1051,10 +1062,7 @@ function App() {
             <p className="text-xs text-gray-500">{session.user.role}</p>
           </div>
           <button
-            onClick={() => {
-              sessionStorage.removeItem("pharmasense-session");
-              setSession(null);
-            }}
+            onClick={() => void handleLogout()}
             className="text-gray-600 hover:text-gray-900 font-medium"
           >
             Sign out

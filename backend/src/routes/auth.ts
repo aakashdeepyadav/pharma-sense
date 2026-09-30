@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
-import { createAccessToken, requireAuth, AuthenticatedRequest } from '../auth';
+import { createAccessToken, requireAuth, AuthenticatedRequest, revokeAccessToken } from '../auth';
 
 const router = Router();
 const loginSchema = z.object({
@@ -77,6 +77,13 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response) 
   } catch {
     res.status(500).json({ success: false, error: 'Unable to load user profile' });
   }
+});
+
+router.post('/logout', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const authorization = req.header('authorization');
+  const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
+  if (token) revokeAccessToken(token);
+  res.json({ success: true, data: { loggedOut: true } });
 });
 
 export default router;

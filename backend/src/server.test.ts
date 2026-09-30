@@ -43,6 +43,20 @@ describe('PharmaSense API', () => {
     assert.equal(response.status, 400);
   });
 
+  it('revokes a token on logout', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const logoutResponse = await fetch(`${baseUrl}/api/v1/auth/logout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(logoutResponse.status, 200);
+
+    const protectedResponse = await fetch(`${baseUrl}/api/v1/reports/summary`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(protectedResponse.status, 401);
+  });
+
   it('allows the seeded admin to read reports', async () => {
     const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
       method: 'POST',
