@@ -12,6 +12,7 @@ Agent-Based Medicine Stock Management System.
 - JWT login with server-side role checks for Admin, Pharmacist, Inventory Manager, and Staff.
 - Medicine, category, supplier, and batch management through the live API and dashboard, including manufacturer, dosage/form, barcode, and active status fields.
 - Server-side medicine search by name, manufacturer, barcode, and active status.
+- Supplier search by name through the API and dashboard.
 - Purchase drafts and atomic receiving into batches with stock-IN history.
 - Fixed-precision purchase and selling prices with unique medicine batch numbers.
 - Atomic stock receiving, issuing, and adjustments with transaction history.

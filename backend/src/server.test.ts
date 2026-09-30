@@ -118,6 +118,14 @@ describe('PharmaSense API', () => {
     assert.equal(searchResponse.status, 200);
   });
 
+  it('validates supplier search filters', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const response = await fetch(`${baseUrl}/api/v1/suppliers?search=${'x'.repeat(151)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.status, 400);
+  });
+
   it('denies Staff medicine writes', async () => {
     const response = await fetch(`${baseUrl}/api/v1/medicines`, {
       method: 'POST',

@@ -174,6 +174,7 @@ function App() {
   const [loading, setLoading] = useState(() => session !== null);
   const [error, setError] = useState("");
   const [medicineSearch, setMedicineSearch] = useState("");
+  const [supplierSearch, setSupplierSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1042,6 +1043,9 @@ function App() {
       medicine.barcode?.toLowerCase().includes(search)
     );
   });
+  const filteredSuppliers = suppliers.filter((supplier) =>
+    supplier.name.toLowerCase().includes(supplierSearch.trim().toLowerCase()),
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -2149,8 +2153,18 @@ function App() {
       </section>
 
       <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
+        <div className="p-6 border-b border-gray-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <h2 className="text-xl font-bold text-gray-900">Suppliers</h2>
+          <label>
+            <span className="sr-only">Search suppliers</span>
+            <input
+              type="search"
+              value={supplierSearch}
+              onChange={(event) => setSupplierSearch(event.target.value)}
+              placeholder="Search suppliers"
+              className="w-full md:w-72 border border-gray-300 rounded-lg px-3 py-2"
+            />
+          </label>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -2163,17 +2177,19 @@ function App() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {suppliers.length === 0 ? (
+              {filteredSuppliers.length === 0 ? (
                 <tr>
                   <td
                     colSpan={4}
                     className="px-6 py-8 text-center text-gray-500"
                   >
-                    No suppliers have been added yet.
+                    {suppliers.length === 0
+                      ? "No suppliers have been added yet."
+                      : "No suppliers match this search."}
                   </td>
                 </tr>
               ) : (
-                suppliers.map((supplier) => (
+                filteredSuppliers.map((supplier) => (
                   <tr key={supplier.id}>
                     <td className="px-6 py-4 font-medium text-gray-900">
                       {supplier.name}

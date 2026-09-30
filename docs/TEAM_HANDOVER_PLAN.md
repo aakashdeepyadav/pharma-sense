@@ -107,6 +107,8 @@ Do not commit `backend/.env`, frontend environment files containing secrets, dat
 
 **How to do it:** start in `backend/src/routes`, `backend/src/validation/schemas.ts`, and `backend/src/server.test.ts`. For every endpoint, write down the allowed roles, input schema, success response, error responses, transaction boundary, and audit event before editing. Use non-destructive tests when possible and clean up any data created by a test.
 
+**Current status:** supplier search is implemented in the API and dashboard. Continue with structured errors, rollback coverage, and endpoint review rather than reimplementing supplier search.
+
 **Tasks:**
 
 - Complete supplier search and filtering.

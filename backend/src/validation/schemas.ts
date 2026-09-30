@@ -34,6 +34,10 @@ export const supplierSchema = z.object({
 
 export const supplierUpdateSchema = supplierSchema.partial();
 
+export const supplierQuerySchema = z.object({
+  search: z.string().trim().max(150).optional(),
+});
+
 export const batchSchema = z.object({
   medicineId: z.coerce.number().int().positive(),
   supplierId: z.coerce.number().int().positive(),
