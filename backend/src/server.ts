@@ -20,7 +20,7 @@ export const app = express();
 const port = process.env.PORT || 5000;
 
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/medicines', requireAuth, medicineRoutes);
