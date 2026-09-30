@@ -80,3 +80,10 @@ npm run build
 - Stock changes and inventory master-data writes create audit records tied to the authenticated user.
 - Keep `JWT_SECRET`, database credentials, and shared-environment credentials outside source control.
 - The seeded account and Docker database password are for local development only.
+
+## Branch Workflow
+
+- `master` is the release-ready branch.
+- `develop` is the integration branch for the next release.
+- `feature/*` branches contain one focused change and should merge into `develop` through a pull request.
+- Use small commits with behavior-focused messages, and require CI to pass before merging.
