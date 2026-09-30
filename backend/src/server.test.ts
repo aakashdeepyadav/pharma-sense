@@ -23,6 +23,10 @@ describe('PharmaSense API', () => {
     const response = await fetch(`${baseUrl}/health`);
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { status: 'ok', database: 'ok' });
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(response.headers.get('x-frame-options'), 'DENY');
+    assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(response.headers.get('x-powered-by'), null);
   });
 
   it('protects inventory routes from anonymous access', async () => {
