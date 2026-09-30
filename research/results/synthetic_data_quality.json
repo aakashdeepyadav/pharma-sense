@@ -1,0 +1,16 @@
+{
+  "dataset": "synthetic_demand.csv",
+  "status": "PASS_WITH_WARNINGS",
+  "rows": 540,
+  "medicines": 3,
+  "dateRange": {
+    "from": "2026-01-01",
+    "to": "2026-06-29"
+  },
+  "zeroDemandRows": 0,
+  "errors": [],
+  "warnings": [
+    "This dataset is synthetic and cannot support production performance claims.",
+    "Stockout censoring and organization_group are not represented in the synthetic schema."
+  ]
+}

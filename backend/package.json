@@ -10,6 +10,7 @@
     "seed": "tsx src/scripts/seed.ts",
     "research:demand": "tsx src/scripts/generateSyntheticDemand.ts",
     "research:evaluate": "tsx src/scripts/evaluateSyntheticForecast.ts",
+    "research:validate": "tsx src/scripts/validateDemandDataset.ts",
     "test": "tsx --test src/domain/stockRules.test.ts src/domain/forecasting.test.ts src/server.test.ts"
   },
   "keywords": [],
