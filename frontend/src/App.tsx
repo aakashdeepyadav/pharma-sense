@@ -135,7 +135,7 @@ function App() {
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [report, setReport] = useState<ReportSummary | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => session !== null);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
@@ -174,7 +174,6 @@ function App() {
 
   useEffect(() => {
     if (!session) {
-      setLoading(false);
       return;
     }
 
@@ -300,6 +299,7 @@ function App() {
         "pharmasense-session",
         JSON.stringify(result.data),
       );
+      setLoading(true);
       setSession(result.data);
     } catch (requestError) {
       setLoginError(
