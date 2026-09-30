@@ -21,6 +21,7 @@ Agent-Based Medicine Stock Management System.
 - Operational reports, management-only audit logs, and transactional audit events for writes.
 - Read-only replenishment recommendations based on recent OUT demand and reorder levels; recommendations never place purchases automatically.
 - Pagination metadata and a structured validation error envelope on list endpoints for safer production API contracts.
+- Dashboard error handling aligned with the structured API envelope so login, submit, and inventory actions show actionable server messages.
 - CI checks for migrations, backend tests, research validation, frontend lint, and frontend builds.
 
 ## Completion Status

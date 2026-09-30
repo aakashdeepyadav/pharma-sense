@@ -166,6 +166,35 @@ type Session = {
   user: { name: string; role: string };
 };
 
+type ApiErrorPayload = {
+  code?: string;
+  message?: string;
+  details?: unknown[];
+};
+
+function extractErrorMessage(payload: unknown, fallback: string): string {
+  if (!payload || typeof payload !== "object") {
+    return fallback;
+  }
+
+  const candidate = payload as {
+    error?: string | ApiErrorPayload;
+  };
+
+  if (typeof candidate.error === "string") {
+    return candidate.error;
+  }
+
+  if (candidate.error && typeof candidate.error === "object") {
+    const message = (candidate.error as ApiErrorPayload).message;
+    if (typeof message === "string" && message.trim().length > 0) {
+      return message;
+    }
+  }
+
+  return fallback;
+}
+
 function App() {
   const [session, setSession] = useState<Session | null>(() => {
     const storedSession = sessionStorage.getItem("pharmasense-session");
@@ -183,7 +212,9 @@ function App() {
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [report, setReport] = useState<ReportSummary | null>(null);
-    const [replenishment, setReplenishment] = useState<ReplenishmentRecommendation[]>([]);
+  const [replenishment, setReplenishment] = useState<
+    ReplenishmentRecommendation[]
+  >([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(() => session !== null);
   const [error, setError] = useState("");
@@ -286,54 +317,94 @@ function App() {
           !purchaseResponse.ok ||
           !transactionResponse.ok ||
           !alertResponse.ok ||
-            !reportResponse.ok ||
-            !replenishmentResponse.ok
+          !reportResponse.ok ||
+          !replenishmentResponse.ok
         ) {
           throw new Error("The inventory service returned an error.");
         }
 
-        const medicineResult = (await medicineResponse.json()) as ApiResponse;
+        const medicineResult = (await medicineResponse.json()) as {
+          success?: boolean;
+          data?: Medicine[];
+          error?: string | ApiErrorPayload;
+        };
         const categoryResult = (await categoryResponse.json()) as {
-          success: boolean;
-          data: Category[];
+          success?: boolean;
+          data?: Category[];
+          error?: string | ApiErrorPayload;
         };
         const supplierResult = (await supplierResponse.json()) as {
-          success: boolean;
-          data: Supplier[];
+          success?: boolean;
+          data?: Supplier[];
+          error?: string | ApiErrorPayload;
         };
         const batchResult = (await batchResponse.json()) as {
-          success: boolean;
-          data: Batch[];
+          success?: boolean;
+          data?: Batch[];
+          error?: string | ApiErrorPayload;
         };
         const purchaseResult = (await purchaseResponse.json()) as {
-          success: boolean;
-          data: Purchase[];
+          success?: boolean;
+          data?: Purchase[];
+          error?: string | ApiErrorPayload;
         };
         const transactionResult = (await transactionResponse.json()) as {
-          success: boolean;
-          data: StockTransaction[];
+          success?: boolean;
+          data?: StockTransaction[];
+          error?: string | ApiErrorPayload;
         };
         const alertResult = (await alertResponse.json()) as {
-          success: boolean;
-          data: InventoryAlert[];
+          success?: boolean;
+          data?: InventoryAlert[];
+          error?: string | ApiErrorPayload;
         };
         const reportResult = (await reportResponse.json()) as {
-          success: boolean;
-          data: ReportSummary;
+          success?: boolean;
+          data?: ReportSummary;
+          error?: string | ApiErrorPayload;
         };
         const replenishmentResult = (await replenishmentResponse.json()) as {
-          success: boolean;
-          data: ReplenishmentRecommendation[];
+          success?: boolean;
+          data?: ReplenishmentRecommendation[];
+          error?: string | ApiErrorPayload;
         };
-        setMedicines(medicineResult.data);
-        setCategories(categoryResult.data);
-        setSuppliers(supplierResult.data);
-        setBatches(batchResult.data);
-        setPurchases(purchaseResult.data);
-        setTransactions(transactionResult.data);
-        setAlerts(alertResult.data);
-        setReport(reportResult.data);
-          setReplenishment(replenishmentResult.data);
+
+        if (
+          !medicineResult.success ||
+          !categoryResult.success ||
+          !supplierResult.success ||
+          !batchResult.success ||
+          !purchaseResult.success ||
+          !transactionResult.success ||
+          !alertResult.success ||
+          !reportResult.success ||
+          !replenishmentResult.success
+        ) {
+          throw new Error(
+            extractErrorMessage(
+              medicineResult.error ??
+                categoryResult.error ??
+                supplierResult.error ??
+                batchResult.error ??
+                purchaseResult.error ??
+                transactionResult.error ??
+                alertResult.error ??
+                reportResult.error ??
+                replenishmentResult.error,
+              "Unable to load inventory.",
+            ),
+          );
+        }
+
+        setMedicines(medicineResult.data ?? []);
+        setCategories(categoryResult.data ?? []);
+        setSuppliers(supplierResult.data ?? []);
+        setBatches(batchResult.data ?? []);
+        setPurchases(purchaseResult.data ?? []);
+        setTransactions(transactionResult.data ?? []);
+        setAlerts(alertResult.data ?? []);
+        setReport(reportResult.data ?? null);
+        setReplenishment(replenishmentResult.data ?? []);
         if (
           session.user.role === "Admin" ||
           session.user.role === "Inventory Manager"
@@ -377,12 +448,14 @@ function App() {
         body: JSON.stringify({ email, password }),
       });
       const result = (await response.json()) as {
-        success: boolean;
+        success?: boolean;
         data?: Session;
-        error?: string;
+        error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success || !result.data) {
-        throw new Error(result.error ?? "Unable to sign in.");
+        throw new Error(
+          extractErrorMessage(result, "Unable to sign in."),
+        );
       }
 
       sessionStorage.setItem(
@@ -487,14 +560,12 @@ function App() {
         }),
       });
       const result = (await response.json()) as {
-        success: boolean;
-        error?: string;
+        success?: boolean;
+        error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success) {
         throw new Error(
-          typeof result.error === "string"
-            ? result.error
-            : "Unable to save medicine.",
+          extractErrorMessage(result, "Unable to save medicine."),
         );
       }
 
@@ -553,14 +624,12 @@ function App() {
         body: JSON.stringify(supplierForm),
       });
       const result = (await response.json()) as {
-        success: boolean;
-        error?: string;
+        success?: boolean;
+        error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success) {
         throw new Error(
-          typeof result.error === "string"
-            ? result.error
-            : "Unable to save supplier.",
+          extractErrorMessage(result, "Unable to save supplier."),
         );
       }
 
@@ -612,15 +681,13 @@ function App() {
         body: JSON.stringify(categoryForm),
       });
       const result = (await response.json()) as {
-        success: boolean;
+        success?: boolean;
         data?: Category;
-        error?: string;
+        error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success || !result.data) {
         throw new Error(
-          typeof result.error === "string"
-            ? result.error
-            : "Unable to save category.",
+          extractErrorMessage(result, "Unable to save category."),
         );
       }
 
@@ -708,16 +775,18 @@ function App() {
         }),
       });
       const purchaseResult = (await purchaseResponse.json()) as {
-        success: boolean;
+        success?: boolean;
         data?: { id: number };
-        error?: string;
+        error?: string | ApiErrorPayload;
       };
       if (
         !purchaseResponse.ok ||
         !purchaseResult.success ||
         !purchaseResult.data
       ) {
-        throw new Error(purchaseResult.error ?? "Unable to create purchase.");
+        throw new Error(
+          extractErrorMessage(purchaseResult, "Unable to create purchase."),
+        );
       }
 
       const receiveResponse = await apiFetch(
@@ -725,11 +794,13 @@ function App() {
         { method: "POST", headers },
       );
       const receiveResult = (await receiveResponse.json()) as {
-        success: boolean;
-        error?: string;
+        success?: boolean;
+        error?: string | ApiErrorPayload;
       };
       if (!receiveResponse.ok || !receiveResult.success) {
-        throw new Error(receiveResult.error ?? "Unable to receive purchase.");
+        throw new Error(
+          extractErrorMessage(receiveResult, "Unable to receive purchase."),
+        );
       }
 
       const authHeaders = { Authorization: `Bearer ${session.token}` };
@@ -794,14 +865,12 @@ function App() {
         }),
       });
       const result = (await response.json()) as {
-        success: boolean;
-        error?: string;
+        success?: boolean;
+        error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success) {
         throw new Error(
-          typeof result.error === "string"
-            ? result.error
-            : "Unable to receive batch.",
+          extractErrorMessage(result, "Unable to receive batch."),
         );
       }
 
@@ -858,14 +927,12 @@ function App() {
         }),
       });
       const result = (await response.json()) as {
-        success: boolean;
-        error?: string;
+        success?: boolean;
+        error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success) {
         throw new Error(
-          typeof result.error === "string"
-            ? result.error
-            : "Unable to record stock movement.",
+          extractErrorMessage(result, "Unable to record stock movement."),
         );
       }
 
@@ -907,11 +974,11 @@ function App() {
       headers,
     });
     const result = (await response.json()) as {
-      success: boolean;
-      error?: string;
+      success?: boolean;
+      error?: string | ApiErrorPayload;
     };
     if (!response.ok || !result.success) {
-      setError(result.error ?? "Unable to receive purchase.");
+      setError(extractErrorMessage(result, "Unable to receive purchase."));
       return;
     }
 
@@ -1967,26 +2034,40 @@ function App() {
             Replenishment recommendations
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Read-only estimates based on recent stock OUT activity and reorder levels.
+            Read-only estimates based on recent stock OUT activity and reorder
+            levels.
           </p>
         </div>
-        {replenishment.filter((item) => item.status === "REPLENISH").length === 0 ? (
-          <p className="p-6 text-gray-500">No replenishment review is suggested right now.</p>
+        {replenishment.filter((item) => item.status === "REPLENISH").length ===
+        0 ? (
+          <p className="p-6 text-gray-500">
+            No replenishment review is suggested right now.
+          </p>
         ) : (
           <div className="divide-y divide-gray-100">
             {replenishment
               .filter((item) => item.status === "REPLENISH")
               .map((item) => (
-                <div key={item.medicineId} className="p-4 flex items-center justify-between gap-4">
+                <div
+                  key={item.medicineId}
+                  className="p-4 flex items-center justify-between gap-4"
+                >
                   <div>
-                    <p className="font-medium text-gray-900">{item.medicineName}</p>
-                    <p className="text-sm text-gray-500">
-                      {item.currentUnits} available, {item.averageDailyDemand.toFixed(2)} units/day average
+                    <p className="font-medium text-gray-900">
+                      {item.medicineName}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">{item.explanation}</p>
+                    <p className="text-sm text-gray-500">
+                      {item.currentUnits} available,{" "}
+                      {item.averageDailyDemand.toFixed(2)} units/day average
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {item.explanation}
+                    </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-blue-700">{item.recommendedUnits}</p>
+                    <p className="text-lg font-bold text-blue-700">
+                      {item.recommendedUnits}
+                    </p>
                     <p className="text-xs text-gray-500">units to review</p>
                   </div>
                 </div>

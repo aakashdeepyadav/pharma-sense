@@ -119,7 +119,7 @@ PostgreSQL via Prisma
           +--> Optional agent service (later)
 ```
 
-The API is the authority for inventory state. The frontend never directly writes to PostgreSQL. ML and agent services consume approved API/data contracts and return predictions or recommendations; they do not mutate stock directly.
+The API is the authority for inventory state. The frontend never directly writes to PostgreSQL, and its forms are now aligned with the API's structured validation envelope and paginated list responses. ML and agent services consume approved API/data contracts and return predictions or recommendations; they do not mutate stock directly.
 
 Recommended backend layers:
 
