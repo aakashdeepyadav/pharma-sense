@@ -20,7 +20,13 @@ export const medicineSchema = z.object({
   categoryId: z.coerce.number().int().positive(),
   manufacturer: z.string().trim().max(150).optional(),
   dosageForm: z.string().trim().max(100).optional(),
-  barcode: z.string().trim().max(100).optional(),
+  barcode: z.preprocess(
+    (value) =>
+      typeof value === 'string' && value.trim().length === 0
+        ? undefined
+        : value,
+    z.string().trim().max(100).optional(),
+  ),
   active: z.coerce.boolean().default(true),
   reorderLevel: z.coerce.number().int().nonnegative(),
   unit: z.string().trim().min(1).max(50),
@@ -44,6 +50,35 @@ export const supplierSchema = z.object({
 });
 
 export const supplierUpdateSchema = supplierSchema.partial();
+
+export const userCreateSchema = z.object({
+  name: z.string().trim().min(1).max(150),
+  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
+  password: z.string().min(12).max(100),
+  roleId: z.coerce.number().int().positive(),
+});
+
+export const userUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(150).optional(),
+  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()).optional(),
+  roleId: z.coerce.number().int().positive().optional(),
+  active: z.boolean().optional(),
+}).refine((value) => Object.keys(value).length > 0);
+
+export const userPasswordResetSchema = z.object({
+  password: z.string().min(12).max(100),
+});
+
+export const auditQuerySchema = z.object({
+  search: z.string().trim().max(150).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
+
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(8).max(100),
+  newPassword: z.string().min(12).max(100),
+});
 
 export const supplierQuerySchema = z.object({
   search: z.string().trim().max(150).optional(),

@@ -113,6 +113,16 @@ type AuditLog = {
   user: { name: string; role: { name: string } };
 };
 
+type ManagedUser = {
+  id: number;
+  name: string;
+  email: string;
+  active: boolean;
+  role: { id: number; name: string };
+};
+
+type ManagedRole = { id: number; name: string };
+
 type MedicineForm = {
   genericName: string;
   brandName: string;
@@ -133,6 +143,20 @@ type SupplierForm = {
 type CategoryForm = {
   name: string;
   description: string;
+};
+
+type UserForm = {
+  name: string;
+  email: string;
+  password: string;
+  roleId: string;
+  active: boolean;
+};
+
+type PasswordChangeForm = {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
 };
 
 type BatchForm = {
@@ -164,7 +188,7 @@ type ApiResponse = {
 
 type Session = {
   token: string;
-  user: { name: string; role: string };
+  user: { id?: number; name: string; email?: string; role: string };
 };
 
 type ApiErrorPayload = {
@@ -194,6 +218,38 @@ function extractErrorMessage(payload: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+async function fetchUserAdministration(token: string) {
+  const headers = { Authorization: `Bearer ${token}` };
+  const [usersResponse, rolesResponse] = await Promise.all([
+    apiFetch("/api/v1/users", { headers }),
+    apiFetch("/api/v1/users/roles", { headers }),
+  ]);
+  const usersResult = (await usersResponse.json()) as {
+    success?: boolean;
+    data?: ManagedUser[];
+    error?: string | ApiErrorPayload;
+  };
+  const rolesResult = (await rolesResponse.json()) as {
+    success?: boolean;
+    data?: ManagedRole[];
+    error?: string | ApiErrorPayload;
+  };
+  if (
+    !usersResponse.ok ||
+    !rolesResponse.ok ||
+    !usersResult.success ||
+    !rolesResult.success
+  ) {
+    throw new Error(
+      extractErrorMessage(
+        usersResult.error ?? rolesResult.error,
+        "Unable to load user administration.",
+      ),
+    );
+  }
+  return { users: usersResult.data ?? [], roles: rolesResult.data ?? [] };
 }
 
 function readStoredSession(): Session | null {
@@ -266,6 +322,9 @@ function App() {
     ReplenishmentRecommendation[]
   >([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditSearch, setAuditSearch] = useState("");
+  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
+  const [managedRoles, setManagedRoles] = useState<ManagedRole[]>([]);
   const [loading, setLoading] = useState(() => session !== null);
   const [error, setError] = useState("");
   const [medicineSearch, setMedicineSearch] = useState("");
@@ -286,6 +345,22 @@ function App() {
     name: "",
     description: "",
   });
+  const [userFormOpen, setUserFormOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+  const [userForm, setUserForm] = useState<UserForm>({
+    name: "",
+    email: "",
+    password: "",
+    roleId: "",
+    active: true,
+  });
+  const [passwordChangeOpen, setPasswordChangeOpen] = useState(false);
+  const [passwordChangeForm, setPasswordChangeForm] =
+    useState<PasswordChangeForm>({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
   const [batchFormOpen, setBatchFormOpen] = useState(false);
   const [batchForm, setBatchForm] = useState<BatchForm>({
     medicineId: "",
@@ -465,9 +540,12 @@ function App() {
           session.user.role === "Admin" ||
           session.user.role === "Inventory Manager"
         ) {
-          const auditResponse = await apiFetch("/api/v1/audit-logs", {
-            headers,
-          });
+          const auditResponse = await apiFetch(
+            "/api/v1/audit-logs?page=1&pageSize=100",
+            {
+              headers,
+            },
+          );
           if (auditResponse.ok) {
             const auditResult = (await auditResponse.json()) as {
               data: AuditLog[];
@@ -476,6 +554,14 @@ function App() {
           }
         } else {
           setAuditLogs([]);
+        }
+        if (session.user.role === "Admin") {
+          const administration = await fetchUserAdministration(session.token);
+          setManagedUsers(administration.users);
+          setManagedRoles(administration.roles);
+        } else {
+          setManagedUsers([]);
+          setManagedRoles([]);
         }
         setError("");
       } catch (requestError) {
@@ -529,7 +615,7 @@ function App() {
     }
   };
 
-  const refreshAuditLogs = async () => {
+  const refreshAuditLogs = async (search = auditSearch) => {
     if (
       !session ||
       !["Admin", "Inventory Manager"].includes(session.user.role)
@@ -537,13 +623,45 @@ function App() {
       return;
     }
 
-    const response = await apiFetch("/api/v1/audit-logs", {
+    const query = new URLSearchParams({ page: "1", pageSize: "100" });
+    if (search.trim()) query.set("search", search.trim());
+    const response = await apiFetch(`/api/v1/audit-logs?${query.toString()}`, {
       headers: { Authorization: `Bearer ${session.token}` },
     });
     if (response.ok) {
       const result = (await response.json()) as { data: AuditLog[] };
       setAuditLogs(result.data);
     }
+  };
+
+  const exportAuditLogs = () => {
+    const escapeCsv = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    const rows = [
+      ["Time", "Action", "Entity", "User", "Details"],
+      ...auditLogs.map((log) => [
+        new Date(log.createdAt).toISOString(),
+        log.action.replaceAll("_", " "),
+        `${log.entity}${log.entityId === null ? "" : ` #${log.entityId}`}`,
+        `${log.user.name} (${log.user.role.name})`,
+        log.details ?? "",
+      ]),
+    ];
+    const csv = rows.map((row) => row.map(escapeCsv).join(",")).join("\r\n");
+    const downloadUrl = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8" }),
+    );
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = `pharmasense-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(downloadUrl);
+  };
+
+  const refreshUserAdministration = async () => {
+    if (!session || session.user.role !== "Admin") return;
+    const administration = await fetchUserAdministration(session.token);
+    setManagedUsers(administration.users);
+    setManagedRoles(administration.roles);
   };
 
   const refreshPurchases = async () => {
@@ -657,6 +775,102 @@ function App() {
     });
     setFormError("");
     setSupplierFormOpen(true);
+  };
+
+  const openCreateUserForm = () => {
+    setEditingUser(null);
+    setUserForm({
+      name: "",
+      email: "",
+      password: "",
+      roleId: managedRoles[0] ? String(managedRoles[0].id) : "",
+      active: true,
+    });
+    setFormError("");
+    setUserFormOpen(true);
+  };
+
+  const openEditUserForm = (user: ManagedUser) => {
+    setEditingUser(user);
+    setUserForm({
+      name: user.name,
+      email: user.email,
+      password: "",
+      roleId: String(user.role.id),
+      active: user.active,
+    });
+    setFormError("");
+    setUserFormOpen(true);
+  };
+
+  const handleUserSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session) return;
+
+    setSaving(true);
+    setFormError("");
+    try {
+      const endpoint = editingUser
+        ? `/api/v1/users/${editingUser.id}`
+        : "/api/v1/users";
+      const response = await apiFetch(endpoint, {
+        method: editingUser ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify({
+          name: userForm.name,
+          email: userForm.email,
+          roleId: Number(userForm.roleId),
+          ...(editingUser ? { active: userForm.active } : {}),
+          ...(editingUser ? {} : { password: userForm.password }),
+        }),
+      });
+      const result = (await response.json()) as {
+        success?: boolean;
+        error?: string | ApiErrorPayload;
+      };
+      if (!response.ok || !result.success) {
+        throw new Error(extractErrorMessage(result, "Unable to save user."));
+      }
+
+      if (editingUser && userForm.password.trim().length > 0) {
+        const passwordResponse = await apiFetch(
+          `/api/v1/users/${editingUser.id}/reset-password`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.token}`,
+            },
+            body: JSON.stringify({ password: userForm.password }),
+          },
+        );
+        const passwordResult = (await passwordResponse.json()) as {
+          success?: boolean;
+          error?: string | ApiErrorPayload;
+        };
+        if (!passwordResponse.ok || !passwordResult.success) {
+          throw new Error(
+            extractErrorMessage(passwordResult, "Unable to reset password."),
+          );
+        }
+      }
+
+      await refreshUserAdministration();
+      await refreshAuditLogs();
+      setUserFormOpen(false);
+      setEditingUser(null);
+    } catch (requestError) {
+      setFormError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to save user.",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSupplierSave = async (event: FormEvent<HTMLFormElement>) => {
@@ -1100,6 +1314,58 @@ function App() {
     }
   };
 
+  const handlePasswordChange = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session) return;
+    if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
+      setFormError("New passwords do not match.");
+      return;
+    }
+
+    setSaving(true);
+    setFormError("");
+    try {
+      const response = await apiFetch("/api/v1/auth/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify({
+          currentPassword: passwordChangeForm.currentPassword,
+          newPassword: passwordChangeForm.newPassword,
+        }),
+      });
+      const result = (await response.json()) as {
+        success?: boolean;
+        error?: string | ApiErrorPayload;
+      };
+      if (!response.ok || !result.success) {
+        throw new Error(
+          extractErrorMessage(result, "Unable to change password."),
+        );
+      }
+
+      sessionStorage.removeItem("pharmasense-session");
+      setPasswordChangeOpen(false);
+      setPasswordChangeForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setSession(null);
+      setLoginError("Password changed. Sign in again with your new password.");
+    } catch (requestError) {
+      setFormError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to change password.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!session) {
     return (
       <main className="auth-shell min-h-screen">
@@ -1148,7 +1414,10 @@ function App() {
 
             <form onSubmit={handleLogin} className="space-y-5">
               {loginError && (
-                <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <p
+                  role="alert"
+                  className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                >
                   {loginError}
                 </p>
               )}
@@ -1229,6 +1498,7 @@ function App() {
   const canViewAudit = ["Admin", "Inventory Manager"].includes(
     session.user.role,
   );
+  const canManageUsers = session.user.role === "Admin";
   const filteredMedicines = medicines.filter((medicine) => {
     const search = medicineSearch.trim().toLowerCase();
     return (
@@ -1280,6 +1550,20 @@ function App() {
               </div>
             </div>
 
+            <button
+              onClick={() => {
+                setFormError("");
+                setPasswordChangeForm({
+                  currentPassword: "",
+                  newPassword: "",
+                  confirmPassword: "",
+                });
+                setPasswordChangeOpen(true);
+              }}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Change password
+            </button>
             <button
               onClick={() => void handleLogout()}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
@@ -1335,6 +1619,15 @@ function App() {
               className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
               + Add Medicine
+            </button>
+          )}
+          {canManageUsers && (
+            <button
+              onClick={openCreateUserForm}
+              disabled={managedRoles.length === 0}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              + User
             </button>
           )}
         </div>
@@ -1787,6 +2080,265 @@ function App() {
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
               >
                 {saving ? "Receiving..." : "Receive stock"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {userFormOpen && (
+        <div
+          className="fixed inset-0 z-20 flex items-center justify-center bg-slate-950/40 p-4"
+          role="presentation"
+        >
+          <form
+            onSubmit={handleUserSave}
+            aria-labelledby="user-form-title"
+            aria-modal="true"
+            role="dialog"
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
+          >
+            <div className="mb-6 flex items-center justify-between">
+              <h2
+                id="user-form-title"
+                className="text-xl font-bold text-slate-900"
+              >
+                {editingUser ? "Edit user" : "Add user"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setUserFormOpen(false)}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+            {formError && (
+              <p
+                role="alert"
+                className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700"
+              >
+                {formError}
+              </p>
+            )}
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Name
+                <input
+                  value={userForm.name}
+                  onChange={(event) =>
+                    setUserForm({ ...userForm, name: event.target.value })
+                  }
+                  autoComplete="name"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Email
+                <input
+                  type="email"
+                  value={userForm.email}
+                  onChange={(event) =>
+                    setUserForm({ ...userForm, email: event.target.value })
+                  }
+                  autoComplete="email"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Role
+                <select
+                  value={userForm.roleId}
+                  onChange={(event) =>
+                    setUserForm({ ...userForm, roleId: event.target.value })
+                  }
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required
+                >
+                  <option value="" disabled>
+                    Select a role
+                  </option>
+                  {managedRoles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {editingUser && (
+                <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={userForm.active}
+                    disabled={
+                      editingUser.id === session.user.id ||
+                      (editingUser.role.name === "Admin" &&
+                        editingUser.active &&
+                        managedUsers.filter(
+                          (user) => user.role.name === "Admin" && user.active,
+                        ).length <= 1)
+                    }
+                    onChange={(event) =>
+                      setUserForm({ ...userForm, active: event.target.checked })
+                    }
+                    className="mt-0.5 h-4 w-4"
+                  />
+                  <span>
+                    Account active
+                    <span className="mt-1 block text-xs font-normal text-slate-500">
+                      Deactivation blocks sign-in and invalidates existing
+                      sessions.
+                    </span>
+                  </span>
+                </label>
+              )}
+              <label className="block text-sm font-medium text-slate-700">
+                {editingUser
+                  ? "Reset password (optional)"
+                  : "Temporary password"}
+                <input
+                  type="password"
+                  value={userForm.password}
+                  onChange={(event) =>
+                    setUserForm({ ...userForm, password: event.target.value })
+                  }
+                  autoComplete="new-password"
+                  minLength={12}
+                  maxLength={100}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required={!editingUser}
+                />
+                <span className="mt-1 block text-xs font-normal text-slate-500">
+                  {editingUser
+                    ? "Leave blank to keep the current password."
+                    : "Use at least 12 characters."}
+                </span>
+              </label>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setUserFormOpen(false)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || managedRoles.length === 0}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving
+                  ? "Saving..."
+                  : editingUser
+                    ? "Save changes"
+                    : "Create user"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {passwordChangeOpen && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-950/40 p-4">
+          <form
+            onSubmit={handlePasswordChange}
+            aria-labelledby="password-change-title"
+            aria-modal="true"
+            role="dialog"
+            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+          >
+            <div className="mb-6 flex items-center justify-between">
+              <h2
+                id="password-change-title"
+                className="text-xl font-bold text-slate-900"
+              >
+                Change password
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPasswordChangeOpen(false)}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+            {formError && (
+              <p
+                role="alert"
+                className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700"
+              >
+                {formError}
+              </p>
+            )}
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Current password
+                <input
+                  type="password"
+                  value={passwordChangeForm.currentPassword}
+                  onChange={(event) =>
+                    setPasswordChangeForm({
+                      ...passwordChangeForm,
+                      currentPassword: event.target.value,
+                    })
+                  }
+                  autoComplete="current-password"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                New password
+                <input
+                  type="password"
+                  value={passwordChangeForm.newPassword}
+                  onChange={(event) =>
+                    setPasswordChangeForm({
+                      ...passwordChangeForm,
+                      newPassword: event.target.value,
+                    })
+                  }
+                  autoComplete="new-password"
+                  minLength={12}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Confirm new password
+                <input
+                  type="password"
+                  value={passwordChangeForm.confirmPassword}
+                  onChange={(event) =>
+                    setPasswordChangeForm({
+                      ...passwordChangeForm,
+                      confirmPassword: event.target.value,
+                    })
+                  }
+                  autoComplete="new-password"
+                  minLength={12}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required
+                />
+              </label>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPasswordChangeOpen(false)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? "Changing..." : "Change password"}
               </button>
             </div>
           </form>
@@ -2423,6 +2975,78 @@ function App() {
             </div>
           </section>
 
+          {canManageUsers && (
+            <section className="mt-8 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+              <div className="flex flex-col gap-3 border-b border-gray-100 p-6 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    User access
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Manage account details and assigned roles.
+                  </p>
+                </div>
+                <button
+                  onClick={openCreateUserForm}
+                  disabled={managedRoles.length === 0}
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Add user
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="border-b border-gray-100 bg-gray-50 font-medium text-gray-600">
+                    <tr>
+                      <th className="px-6 py-4">Name</th>
+                      <th className="px-6 py-4">Email</th>
+                      <th className="px-6 py-4">Role</th>
+                      <th className="px-6 py-4">Account status</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {managedUsers.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-6 py-8 text-center text-gray-500"
+                        >
+                          No user accounts found.
+                        </td>
+                      </tr>
+                    ) : (
+                      managedUsers.map((user) => (
+                        <tr key={user.id}>
+                          <td className="px-6 py-4 font-medium text-gray-900">
+                            {user.name}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600">
+                            {user.email}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600">
+                            {user.role.name}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600">
+                            {user.active ? "Active" : "Deactivated"}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => openEditUserForm(user)}
+                              className="font-medium text-blue-700 hover:text-blue-900"
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
           <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <h2 className="text-xl font-bold text-gray-900">Suppliers</h2>
@@ -2690,10 +3314,58 @@ function App() {
           {canViewAudit && (
             <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-100">
-                <h2 className="text-xl font-bold text-gray-900">Audit log</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Recent operational changes recorded by the system.
-                </p>
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      Audit log
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Recent operational changes recorded by the system.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <label>
+                      <span className="sr-only">Search audit log</span>
+                      <input
+                        type="search"
+                        value={auditSearch}
+                        onChange={(event) => setAuditSearch(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") void refreshAuditLogs();
+                        }}
+                        placeholder="Search audit events"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm md:w-64"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void refreshAuditLogs()}
+                      className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                    >
+                      Search
+                    </button>
+                    <button
+                      type="button"
+                      onClick={exportAuditLogs}
+                      disabled={auditLogs.length === 0}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Export CSV
+                    </button>
+                    {auditSearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuditSearch("");
+                          void refreshAuditLogs("");
+                        }}
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">

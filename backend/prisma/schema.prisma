@@ -12,6 +12,8 @@ model User {
   name         String
   email        String             @unique
   passwordHash String
+  active       Boolean            @default(true)
+  sessionVersion Int              @default(0)
   roleId       Int
   role         Role               @relation(fields: [roleId], references: [id])
   transactions StockTransaction[]

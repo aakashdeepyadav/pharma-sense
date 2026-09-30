@@ -2,6 +2,10 @@ import bcrypt from 'bcrypt';
 import prisma from '../lib/prisma';
 
 async function seed() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('The development seed cannot run in production');
+  }
+
   const roles = [
     { name: 'Admin', permissions: 'all' },
     { name: 'Pharmacist', permissions: 'medicine:write,stock:write' },
@@ -13,27 +17,56 @@ async function seed() {
     update: { permissions: role.permissions },
     create: role,
   })));
-  const role = savedRoles.find((savedRole) => savedRole.name === 'Admin');
-  if (!role) throw new Error('Admin role was not created');
   await prisma.category.upsert({
     where: { name: 'General' },
     update: {},
     create: { name: 'General', description: 'Default development category' },
   });
-  const passwordHash = await bcrypt.hash('admin12345', 12);
-
-  await prisma.user.upsert({
-    where: { email: 'admin@pharmasense.local' },
-    update: { roleId: role.id },
-    create: {
+  const developmentAccounts = [
+    {
       name: 'PharmaSense Admin',
       email: 'admin@pharmasense.local',
-      passwordHash,
-      roleId: role.id,
+      password: 'admin12345',
+      role: 'Admin',
     },
-  });
+    {
+      name: 'PharmaSense Pharmacist',
+      email: 'pharmacist@pharmasense.local',
+      password: 'pharmacist12345',
+      role: 'Pharmacist',
+    },
+    {
+      name: 'PharmaSense Inventory Manager',
+      email: 'manager@pharmasense.local',
+      password: 'manager12345',
+      role: 'Inventory Manager',
+    },
+    {
+      name: 'PharmaSense Staff',
+      email: 'staff@pharmasense.local',
+      password: 'staff12345',
+      role: 'Staff',
+    },
+  ];
 
-  console.log('Development admin ready: admin@pharmasense.local / admin12345');
+  for (const account of developmentAccounts) {
+    const role = savedRoles.find((savedRole) => savedRole.name === account.role);
+    if (!role) throw new Error(`${account.role} role was not created`);
+
+    const passwordHash = await bcrypt.hash(account.password, 12);
+    await prisma.user.upsert({
+      where: { email: account.email },
+      update: { name: account.name, passwordHash, roleId: role.id },
+      create: {
+        name: account.name,
+        email: account.email,
+        passwordHash,
+        roleId: role.id,
+      },
+    });
+  }
+
+  console.log('Local development accounts for all four roles are ready.');
 }
 
 seed()

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import crypto from 'node:crypto';
 import medicineRoutes from './routes/medicines';
 import categoryRoutes from './routes/categories';
 import batchRoutes from './routes/batches';
@@ -11,43 +12,88 @@ import alertRoutes from './routes/alerts';
 import reportRoutes from './routes/reports';
 import auditRoutes from './routes/audit';
 import purchaseRoutes from './routes/purchases';
+import userRoutes from './routes/users';
 import prisma from './lib/prisma';
 import { requireAuth } from './auth';
 
 dotenv.config();
 
+function validateRuntimeConfiguration() {
+  if (process.env.NODE_ENV !== 'production') return;
+
+  const jwtSecret = process.env.JWT_SECRET ?? '';
+  if (jwtSecret.length < 32 || jwtSecret === 'replace-with-a-long-random-secret') {
+    throw new Error('Production JWT_SECRET must be a unique secret of at least 32 characters');
+  }
+  if (!process.env.DATABASE_URL) {
+    throw new Error('Production DATABASE_URL is required');
+  }
+  if (!process.env.FRONTEND_URLS && !process.env.FRONTEND_URL) {
+    throw new Error('Production FRONTEND_URLS or FRONTEND_URL is required');
+  }
+}
+
+validateRuntimeConfiguration();
+
 export const app = express();
 const port = process.env.PORT || 5000;
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_REQUESTS = 40;
+const trustProxy = process.env.TRUST_PROXY === 'true';
+const allowedOrigins = (
+  process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? 'http://localhost:5173'
+)
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+function positiveIntegerSetting(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+const RATE_LIMIT_WINDOW_MS = positiveIntegerSetting('RATE_LIMIT_WINDOW_MS', 60_000);
+const RATE_LIMIT_MAX_REQUESTS = positiveIntegerSetting('RATE_LIMIT_MAX_REQUESTS', 40);
 const requestCounts = new Map<string, { count: number; windowStart: number }>();
 
 app.disable('x-powered-by');
+app.set('trust proxy', trustProxy);
+app.use((_req, res, next) => {
+  res.setHeader('X-Request-Id', crypto.randomUUID());
+  next();
+});
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
   next();
 });
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(null, false);
+  },
+}));
 app.use((req, res, next) => {
   const forwarded = req.headers['x-forwarded-for'];
-  const clientKey = Array.isArray(forwarded)
+  const clientKey = trustProxy && Array.isArray(forwarded)
     ? forwarded[0]
-    : typeof forwarded === 'string'
+    : trustProxy && typeof forwarded === 'string'
       ? forwarded.split(',')[0].trim()
       : req.socket.remoteAddress ?? 'unknown';
+  const rateLimitKey = `${clientKey}:${req.path}`;
 
   const now = Date.now();
-  const currentWindow = requestCounts.get(clientKey) ?? { count: 0, windowStart: now };
+  const currentWindow = requestCounts.get(rateLimitKey) ?? { count: 0, windowStart: now };
 
   if (now - currentWindow.windowStart > RATE_LIMIT_WINDOW_MS) {
-    requestCounts.set(clientKey, { count: 1, windowStart: now });
+    requestCounts.set(rateLimitKey, { count: 1, windowStart: now });
     next();
     return;
   }
 
   currentWindow.count += 1;
-  requestCounts.set(clientKey, currentWindow);
+  requestCounts.set(rateLimitKey, currentWindow);
 
   if (currentWindow.count > RATE_LIMIT_MAX_REQUESTS) {
     res.status(429).json({
@@ -62,10 +108,10 @@ app.use((req, res, next) => {
 
   next();
 });
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
 app.use(express.json({ limit: '100kb' }));
 
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', requireAuth, userRoutes);
 app.use('/api/v1/medicines', requireAuth, medicineRoutes);
 app.use('/api/v1/categories', requireAuth, categoryRoutes);
 app.use('/api/v1/batches', requireAuth, batchRoutes);
