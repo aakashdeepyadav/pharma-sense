@@ -20,8 +20,13 @@ dotenv.config();
 export const app = express();
 const port = process.env.PORT || 5000;
 const trustProxy = process.env.TRUST_PROXY === 'true';
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_REQUESTS = 40;
+function positiveIntegerSetting(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+const RATE_LIMIT_WINDOW_MS = positiveIntegerSetting('RATE_LIMIT_WINDOW_MS', 60_000);
+const RATE_LIMIT_MAX_REQUESTS = positiveIntegerSetting('RATE_LIMIT_MAX_REQUESTS', 40);
 const requestCounts = new Map<string, { count: number; windowStart: number }>();
 
 app.disable('x-powered-by');
