@@ -323,6 +323,23 @@ function App() {
     }
   };
 
+  const refreshAuditLogs = async () => {
+    if (
+      !session ||
+      !["Admin", "Inventory Manager"].includes(session.user.role)
+    ) {
+      return;
+    }
+
+    const response = await fetch("http://localhost:5000/api/v1/audit-logs", {
+      headers: { Authorization: `Bearer ${session.token}` },
+    });
+    if (response.ok) {
+      const result = (await response.json()) as { data: AuditLog[] };
+      setAuditLogs(result.data);
+    }
+  };
+
   const openCreateForm = () => {
     setEditingMedicine(null);
     setForm({
@@ -390,6 +407,7 @@ function App() {
       });
       const refreshedResult = (await refreshed.json()) as ApiResponse;
       setMedicines(refreshedResult.data);
+      await refreshAuditLogs();
     } catch (requestError) {
       setFormError(
         requestError instanceof Error
@@ -453,6 +471,7 @@ function App() {
       });
       const refreshedResult = (await refreshed.json()) as { data: Supplier[] };
       setSuppliers(refreshedResult.data);
+      await refreshAuditLogs();
       setSupplierFormOpen(false);
       setEditingSupplier(null);
     } catch (requestError) {
@@ -494,11 +513,14 @@ function App() {
         );
       }
 
-      setCategories((current) => [...current, result.data!].sort((left, right) =>
-        left.name.localeCompare(right.name),
-      ));
+      setCategories((current) =>
+        [...current, result.data!].sort((left, right) =>
+          left.name.localeCompare(right.name),
+        ),
+      );
       setCategoryFormOpen(false);
       setCategoryForm({ name: "", description: "" });
+      await refreshAuditLogs();
     } catch (requestError) {
       setFormError(
         requestError instanceof Error
@@ -567,6 +589,7 @@ function App() {
       setBatches(batchResult.data);
       setMedicines(medicineResult.data);
       setBatchFormOpen(false);
+      await refreshAuditLogs();
     } catch (requestError) {
       setFormError(
         requestError instanceof Error
@@ -641,6 +664,7 @@ function App() {
       setMedicines(medicineResult.data);
       setTransactions(transactionResult.data);
       setStockFormOpen(false);
+      await refreshAuditLogs();
     } catch (requestError) {
       setFormError(
         requestError instanceof Error
@@ -670,6 +694,7 @@ function App() {
     });
     const result = (await refreshed.json()) as { data: InventoryAlert[] };
     setAlerts(result.data);
+    await refreshAuditLogs();
   };
 
   if (!session) {
@@ -1157,9 +1182,7 @@ function App() {
             className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">
-                Add category
-              </h2>
+              <h2 className="text-xl font-bold text-gray-900">Add category</h2>
               <button
                 type="button"
                 onClick={() => setCategoryFormOpen(false)}
