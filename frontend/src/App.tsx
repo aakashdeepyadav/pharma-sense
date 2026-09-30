@@ -137,6 +137,7 @@ function App() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(() => session !== null);
   const [error, setError] = useState("");
+  const [medicineSearch, setMedicineSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
   const [saving, setSaving] = useState(false);
@@ -706,6 +707,14 @@ function App() {
   const canViewAudit = ["Admin", "Inventory Manager"].includes(
     session.user.role,
   );
+  const filteredMedicines = medicines.filter((medicine) => {
+    const search = medicineSearch.trim().toLowerCase();
+    return (
+      search.length === 0 ||
+      medicine.genericName.toLowerCase().includes(search) ||
+      medicine.brandName.toLowerCase().includes(search)
+    );
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -1334,10 +1343,20 @@ function App() {
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
+        <div className="p-6 border-b border-gray-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <h2 className="text-xl font-bold text-gray-900">
             Inventory Overview
           </h2>
+          <label className="text-sm text-gray-600">
+            <span className="sr-only">Search medicines</span>
+            <input
+              type="search"
+              value={medicineSearch}
+              onChange={(event) => setMedicineSearch(event.target.value)}
+              placeholder="Search by generic or brand name"
+              className="w-full md:w-80 border border-gray-300 rounded-lg px-3 py-2"
+            />
+          </label>
         </div>
         {error && <p className="p-6 text-red-700 bg-red-50">{error}</p>}
         <div className="overflow-x-auto">
@@ -1361,17 +1380,19 @@ function App() {
                     Loading inventory data...
                   </td>
                 </tr>
-              ) : medicines.length === 0 && !error ? (
+              ) : filteredMedicines.length === 0 && !error ? (
                 <tr>
                   <td
                     colSpan={5}
                     className="px-6 py-8 text-center text-gray-500"
                   >
-                    No medicines have been added yet.
+                    {medicines.length === 0
+                      ? "No medicines have been added yet."
+                      : "No medicines match this search."}
                   </td>
                 </tr>
               ) : (
-                medicines.map((med) => (
+                filteredMedicines.map((med) => (
                   <tr key={med.id} className="hover:bg-gray-50 transition">
                     <td className="px-6 py-4 font-medium text-gray-900">
                       {med.genericName}
