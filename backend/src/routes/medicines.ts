@@ -1,15 +1,35 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
-import { medicineSchema, medicineUpdateSchema } from '../validation/schemas';
+import { medicineQuerySchema, medicineSchema, medicineUpdateSchema } from '../validation/schemas';
 import { AuthenticatedRequest, requireRoles } from '../auth';
 
 const router = Router();
 
 // Get all medicines
 router.get('/', async (req: Request, res: Response) => {
+  const query = medicineQuerySchema.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ success: false, error: query.error.issues });
+    return;
+  }
+
   try {
     const medicines = await prisma.medicine.findMany({
-      include: { category: true, batches: true }
+      where: {
+        ...(query.data.active === undefined ? {} : { active: query.data.active }),
+        ...(query.data.barcode ? { barcode: query.data.barcode } : {}),
+        ...(query.data.search
+          ? {
+              OR: [
+                { genericName: { contains: query.data.search, mode: 'insensitive' } },
+                { brandName: { contains: query.data.search, mode: 'insensitive' } },
+                { manufacturer: { contains: query.data.search, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
+      include: { category: true, batches: true },
+      orderBy: { genericName: 'asc' },
     });
     res.json({ success: true, data: medicines });
   } catch (error) {

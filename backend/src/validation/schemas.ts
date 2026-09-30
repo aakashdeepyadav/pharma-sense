@@ -21,6 +21,12 @@ export const medicineSchema = z.object({
 
 export const medicineUpdateSchema = medicineSchema.partial();
 
+export const medicineQuerySchema = z.object({
+  search: z.string().trim().max(150).optional(),
+  barcode: z.string().trim().max(100).optional(),
+  active: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
+});
+
 export const supplierSchema = z.object({
   name: z.string().trim().min(1).max(150),
   contactInfo: z.string().trim().max(300).optional(),
