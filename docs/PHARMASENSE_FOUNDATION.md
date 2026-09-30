@@ -94,7 +94,7 @@ The tenant boundary for the MVP is one organization per deployment. Multi-tenant
 ## F. Non-Functional Requirements
 
 - **Correctness:** stock changes use atomic database transactions and reject negative quantities.
-- **Security:** hashed passwords, validated input, least privilege, secure secrets, audit records, request throttling, and protected production transport.
+- **Security:** hashed passwords, validated input, least privilege, secure secrets, dependency auditing, audit records, request throttling, and protected production transport.
 - **Authorization:** each authenticated request resolves the user's current role from PostgreSQL; changing a role invalidates the old authorization claim without waiting for the JWT to expire.
 - **Availability:** core inventory remains operational if ML or agent services are down.
 - **Performance:** normal list and transaction operations should return within 500 ms in the local MVP dataset; measure rather than promise a production SLA.

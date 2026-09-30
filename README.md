@@ -26,6 +26,7 @@ Agent-Based Medicine Stock Management System.
 - Pagination metadata and a structured validation error envelope on list endpoints for safer production API contracts.
 - Dashboard error handling aligned with the structured API envelope so login, submit, and inventory actions show actionable server messages.
 - CI checks for migrations, backend tests, research validation, frontend lint/build, mocked browser smoke tests, and a live inventory workflow against an isolated PostgreSQL database.
+- CI audits backend and frontend production dependencies for high/critical known vulnerabilities.
 
 ## Completion Status
 
