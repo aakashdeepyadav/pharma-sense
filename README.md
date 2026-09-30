@@ -82,6 +82,8 @@ npm run dev
 
 Open the frontend at the Vite URL and sign in with the seeded administrator account. Inventory routes require a valid JWT issued by the backend.
 
+To manage accounts, open **Management and history** and use **User access**. Admins can create users and update their name, email, or role. The app prevents demoting the signed-in last Admin. Password reset/change and account deactivation are not implemented yet.
+
 ## Validation
 
 Run these checks from the repository root:

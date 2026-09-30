@@ -17,6 +17,8 @@ By default, the frontend calls `http://localhost:5000`. To use a different API o
 VITE_API_URL=http://localhost:5000
 ```
 
+Admins manage accounts under **Management and history → User access**. They can create accounts and update names, emails, and roles. Password reset/change and account deactivation are not available yet.
+
 ## Checks
 
 ```powershell

@@ -66,6 +66,7 @@ The tenant boundary for the MVP is one organization per deployment. Multi-tenant
 
 - Authenticate users with login and logout behavior; issue short-lived JWT access tokens and support revocation/session invalidation.
 - Authorize actions for Admin, Pharmacist, Inventory Manager, and Staff roles.
+- Allow Admins to list/create users and update names, emails, and roles; prevent self-demotion or demotion of the last Admin. Password reset/change and account deactivation remain open.
 - Create, read, update, search, and filter medicines.
 - Store generic name, brand name, category, manufacturer, dosage/form, unit, reorder level, barcode, and active status.
 - Create, read, update, and search categories and suppliers.
