@@ -11,11 +11,14 @@ Agent-Based Medicine Stock Management System.
 
 - JWT login with server-side role checks for Admin, Pharmacist, Inventory Manager, and Staff.
 - Medicine, category, supplier, and batch management through the live API and dashboard, including manufacturer, dosage/form, barcode, and active status fields.
+- Server-side medicine search by name, manufacturer, barcode, and active status.
 - Purchase drafts and atomic receiving into batches with stock-IN history.
+- Fixed-precision purchase and selling prices with unique medicine batch numbers.
 - Atomic stock receiving, issuing, and adjustments with transaction history.
 - Expiry-aware batch ordering and protection against issuing expired stock.
 - Low-stock, out-of-stock, expired, and expiring-soon alerts with acknowledgement.
 - Operational reports, management-only audit logs, and transactional audit events for writes.
+- CI checks for migrations, backend tests, research validation, frontend lint, and frontend builds.
 
 The forecasting pipeline currently uses synthetic research data only. It must not be mixed with operational inventory or treated as evidence of production model performance. See [research/data/DATA_CONTRACT.md](research/data/DATA_CONTRACT.md) before using any real or de-identified data.
 

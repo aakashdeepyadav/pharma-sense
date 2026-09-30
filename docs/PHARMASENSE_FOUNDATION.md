@@ -2,8 +2,8 @@
 
 **Formal title:** Agent-Based Medicine Stock Management System
 **Project type:** AI-powered pharmaceutical inventory management and decision-support system
-**Document status:** Baseline architecture and delivery plan
-**Version:** 0.1
+**Document status:** Baseline architecture and implementation status
+**Version:** 0.2
 **Date:** 2026-09-30
 
 ## How to use this document
@@ -18,7 +18,7 @@ The repository began as an early prototype. The current implementation has moved
 - The frontend dashboard reads live API data and supports medicine, category, supplier, batch, purchase, and stock workflows.
 - Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, and baseline tests are implemented; production deployment and advanced AI features remain open.
 
-The next work therefore starts with core correctness and security. AI agents, forecasting, mobile, and barcode features remain later phases.
+The next work focuses on final release hardening. Camera/mobile scanning, advanced forecasting, AI agents, and replenishment recommendations remain later phases.
 
 ## A. Executive Summary
 
@@ -178,11 +178,11 @@ No recommendation changes inventory or creates a purchase without explicit autho
 
 ### Required schema corrections before MVP
 
-- Add `sellingPrice` to `Batch`.
+- `sellingPrice` is implemented on `Batch` and purchase receiving items.
 - Manufacturer, dosage/form, barcode, and active status are implemented for `Medicine`.
 - `Purchase`, `PurchaseItem`, `Alert`, and `AuditLog` models are implemented.
 - Prefer enums for role, transaction type, purchase status, alert type, and alert status.
-- Use `Decimal` for money instead of floating point. Purchase prices now use `Decimal(12,2)`.
+- Use `Decimal` for money instead of floating point. Purchase and selling prices now use `Decimal(12,2)`.
 - The `(medicineId, batchNumber)` batch uniqueness constraint is implemented; supplier contact uniqueness remains a future data-policy decision.
 - Add checks for positive quantities, non-negative prices, expiry after manufacturing date, and valid dates.
 - Add indexes for medicine search fields, batch expiry, batch medicine, transaction timestamp, and alert status/type.
@@ -202,7 +202,7 @@ Base path: `/api/v1`.
 | Area       | Endpoints                                                                       |
 | ---------- | ------------------------------------------------------------------------------- |
 | Auth       | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`                         |
-| Medicines  | `GET/POST /medicines`, `GET/PATCH /medicines/:id`                               |
+| Medicines  | `GET/POST /medicines`, `GET/PATCH /medicines/:id`, search/barcode filters      |
 | Categories | `GET/POST /categories`, `PATCH /categories/:id`                                 |
 | Suppliers  | `GET/POST /suppliers`, `GET/PATCH /suppliers/:id`                               |
 | Batches    | `GET/POST /batches`, `GET/PATCH /batches/:id`                                   |
