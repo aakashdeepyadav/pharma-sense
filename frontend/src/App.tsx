@@ -106,6 +106,10 @@ type BatchForm = {
   purchasePrice: string;
 };
 
+type PurchaseForm = BatchForm & {
+  notes: string;
+};
+
 type StockForm = {
   batchId: string;
   type: "OUT" | "ADJ";
@@ -167,6 +171,17 @@ function App() {
     expiryDate: "",
     quantity: "0",
     purchasePrice: "0",
+  });
+  const [purchaseFormOpen, setPurchaseFormOpen] = useState(false);
+  const [purchaseForm, setPurchaseForm] = useState<PurchaseForm>({
+    medicineId: "",
+    supplierId: "",
+    batchNumber: "",
+    mfgDate: "",
+    expiryDate: "",
+    quantity: "0",
+    purchasePrice: "0",
+    notes: "",
   });
   const [stockFormOpen, setStockFormOpen] = useState(false);
   const [stockForm, setStockForm] = useState<StockForm>({
@@ -546,6 +561,103 @@ function App() {
     setBatchFormOpen(true);
   };
 
+  const openCreatePurchaseForm = () => {
+    setPurchaseForm({
+      medicineId: medicines[0] ? String(medicines[0].id) : "",
+      supplierId: suppliers[0] ? String(suppliers[0].id) : "",
+      batchNumber: "",
+      mfgDate: "",
+      expiryDate: "",
+      quantity: "1",
+      purchasePrice: "0",
+      notes: "",
+    });
+    setFormError("");
+    setPurchaseFormOpen(true);
+  };
+
+  const handlePurchaseSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session) return;
+
+    setSaving(true);
+    setFormError("");
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.token}`,
+      };
+      const purchaseResponse = await fetch(
+        "http://localhost:5000/api/v1/purchases",
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            supplierId: Number(purchaseForm.supplierId),
+            notes: purchaseForm.notes,
+            items: [
+              {
+                medicineId: Number(purchaseForm.medicineId),
+                batchNumber: purchaseForm.batchNumber,
+                mfgDate: purchaseForm.mfgDate,
+                expiryDate: purchaseForm.expiryDate,
+                quantity: Number(purchaseForm.quantity),
+                purchasePrice: Number(purchaseForm.purchasePrice),
+              },
+            ],
+          }),
+        },
+      );
+      const purchaseResult = (await purchaseResponse.json()) as {
+        success: boolean;
+        data?: { id: number };
+        error?: string;
+      };
+      if (!purchaseResponse.ok || !purchaseResult.success || !purchaseResult.data) {
+        throw new Error(purchaseResult.error ?? "Unable to create purchase.");
+      }
+
+      const receiveResponse = await fetch(
+        `http://localhost:5000/api/v1/purchases/${purchaseResult.data.id}/receive`,
+        { method: "POST", headers },
+      );
+      const receiveResult = (await receiveResponse.json()) as {
+        success: boolean;
+        error?: string;
+      };
+      if (!receiveResponse.ok || !receiveResult.success) {
+        throw new Error(receiveResult.error ?? "Unable to receive purchase.");
+      }
+
+      const authHeaders = { Authorization: `Bearer ${session.token}` };
+      const [batchResponse, medicineResponse, transactionResponse, alertResponse] =
+        await Promise.all([
+          fetch("http://localhost:5000/api/v1/batches", { headers: authHeaders }),
+          fetch("http://localhost:5000/api/v1/medicines", { headers: authHeaders }),
+          fetch("http://localhost:5000/api/v1/inventory/transactions", {
+            headers: authHeaders,
+          }),
+          fetch("http://localhost:5000/api/v1/alerts", { headers: authHeaders }),
+        ]);
+      setBatches(((await batchResponse.json()) as { data: Batch[] }).data);
+      setMedicines(((await medicineResponse.json()) as ApiResponse).data);
+      setTransactions(
+        ((await transactionResponse.json()) as { data: StockTransaction[] }).data,
+      );
+      setAlerts(((await alertResponse.json()) as { data: InventoryAlert[] }).data);
+      setPurchaseFormOpen(false);
+      await refreshAuditLogs();
+    } catch (requestError) {
+      setFormError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to receive purchase.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleBatchSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!session) return;
@@ -826,6 +938,15 @@ function App() {
         <div className="flex gap-3">
           {canReceiveStock && (
             <button
+              onClick={openCreatePurchaseForm}
+              disabled={medicines.length === 0 || suppliers.length === 0}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50"
+            >
+              Receive purchase
+            </button>
+          )}
+          {canReceiveStock && (
+            <button
               onClick={openCreateBatchForm}
               disabled={medicines.length === 0 || suppliers.length === 0}
               className="border border-blue-300 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition disabled:opacity-50"
@@ -939,6 +1060,179 @@ function App() {
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save movement"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {purchaseFormOpen && (
+        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+          <form
+            onSubmit={handlePurchaseSave}
+            className="w-full max-w-2xl bg-white rounded-xl shadow-xl p-6"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">
+                Receive purchase
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPurchaseFormOpen(false)}
+                className="text-gray-500 hover:text-gray-900"
+              >
+                Close
+              </button>
+            </div>
+            {formError && (
+              <p className="mb-4 p-3 rounded bg-red-50 text-red-700">
+                {formError}
+              </p>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="text-sm font-medium text-gray-700">
+                Medicine
+                <select
+                  value={purchaseForm.medicineId}
+                  onChange={(event) =>
+                    setPurchaseForm({
+                      ...purchaseForm,
+                      medicineId: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                >
+                  {medicines.map((medicine) => (
+                    <option key={medicine.id} value={medicine.id}>
+                      {medicine.genericName} ({medicine.brandName})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Supplier
+                <select
+                  value={purchaseForm.supplierId}
+                  onChange={(event) =>
+                    setPurchaseForm({
+                      ...purchaseForm,
+                      supplierId: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                >
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Batch number
+                <input
+                  value={purchaseForm.batchNumber}
+                  onChange={(event) =>
+                    setPurchaseForm({
+                      ...purchaseForm,
+                      batchNumber: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Quantity received
+                <input
+                  type="number"
+                  min="1"
+                  value={purchaseForm.quantity}
+                  onChange={(event) =>
+                    setPurchaseForm({
+                      ...purchaseForm,
+                      quantity: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Manufacturing date
+                <input
+                  type="date"
+                  value={purchaseForm.mfgDate}
+                  onChange={(event) =>
+                    setPurchaseForm({
+                      ...purchaseForm,
+                      mfgDate: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Expiry date
+                <input
+                  type="date"
+                  value={purchaseForm.expiryDate}
+                  onChange={(event) =>
+                    setPurchaseForm({
+                      ...purchaseForm,
+                      expiryDate: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Purchase price per unit
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={purchaseForm.purchasePrice}
+                  onChange={(event) =>
+                    setPurchaseForm({
+                      ...purchaseForm,
+                      purchasePrice: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+            </div>
+            <label className="block text-sm font-medium text-gray-700 mt-4">
+              Purchase notes
+              <textarea
+                value={purchaseForm.notes}
+                onChange={(event) =>
+                  setPurchaseForm({ ...purchaseForm, notes: event.target.value })
+                }
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                rows={2}
+              />
+            </label>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setPurchaseFormOpen(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Receiving..." : "Create and receive"}
               </button>
             </div>
           </form>
