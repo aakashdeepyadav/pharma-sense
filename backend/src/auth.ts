@@ -68,7 +68,10 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
 }
 
 export function createAccessToken(user: { id: number; role: string }) {
-  return jwt.sign({ userId: user.id, role: user.role }, getJwtSecret(), { expiresIn: '2h' });
+  return jwt.sign({ userId: user.id, role: user.role }, getJwtSecret(), {
+    expiresIn: '2h',
+    jwtid: crypto.randomUUID(),
+  });
 }
 
 export function requireRoles(...allowedRoles: string[]) {

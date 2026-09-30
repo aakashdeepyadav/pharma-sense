@@ -19,6 +19,7 @@ Agent-Based Medicine Stock Management System.
 - Expiry-aware batch ordering and protection against issuing expired stock.
 - Low-stock, out-of-stock, expired, and expiring-soon alerts with acknowledgement.
 - Operational reports, management-only audit logs, and transactional audit events for writes.
+- Read-only replenishment recommendations based on recent OUT demand and reorder levels; recommendations never place purchases automatically.
 - CI checks for migrations, backend tests, research validation, frontend lint, and frontend builds.
 
 The forecasting pipeline currently uses synthetic research data only. It must not be mixed with operational inventory or treated as evidence of production model performance. See [research/data/DATA_CONTRACT.md](research/data/DATA_CONTRACT.md) before using any real or de-identified data.
