@@ -11,8 +11,13 @@ const loginSchema = z.object({
   password: z.string().min(8).max(100),
 });
 const loginAttempts = new Map<string, { count: number; windowStartedAt: number }>();
-const LOGIN_WINDOW_MS = 15 * 60 * 1000;
-const LOGIN_ATTEMPT_LIMIT = 10;
+function positiveIntegerSetting(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+const LOGIN_WINDOW_MS = positiveIntegerSetting('LOGIN_RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000);
+const LOGIN_ATTEMPT_LIMIT = positiveIntegerSetting('LOGIN_RATE_LIMIT_MAX_ATTEMPTS', 10);
 
 router.post('/login', async (req: Request, res: Response) => {
   const address = req.ip ?? 'unknown';

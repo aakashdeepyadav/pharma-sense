@@ -112,6 +112,7 @@ The live browser workflow uses a disposable PostgreSQL database and writes test 
 - The API applies a lightweight request throttle to limit abusive bursts from a single client and returns a structured 429 response with a clear rate-limit code.
 - Forwarded client IPs are ignored unless `TRUST_PROXY=true` is explicitly configured behind a trusted reverse proxy; this prevents spoofed `X-Forwarded-For` headers from bypassing throttling.
 - `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX_REQUESTS` configure the API burst limit; the local defaults are 60 seconds and 40 requests per client/route.
+- `LOGIN_RATE_LIMIT_WINDOW_MS` and `LOGIN_RATE_LIMIT_MAX_ATTEMPTS` configure failed-login throttling; the local defaults are 15 minutes and 10 attempts per client.
 - Stock changes and inventory master-data writes create audit records tied to the authenticated user.
 - Keep `JWT_SECRET`, database credentials, and shared-environment credentials outside source control.
 - The seeded role accounts and Docker database password are for local development only; the seed script refuses to run with `NODE_ENV=production`.
