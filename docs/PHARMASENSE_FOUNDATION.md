@@ -202,7 +202,7 @@ Base path: `/api/v1`.
 | Area       | Endpoints                                                                       |
 | ---------- | ------------------------------------------------------------------------------- |
 | Auth       | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`                         |
-| Medicines  | `GET/POST /medicines`, `GET/PATCH /medicines/:id`, search/barcode filters      |
+| Medicines  | `GET/POST /medicines`, `GET/PATCH /medicines/:id`, search/barcode filters       |
 | Categories | `GET/POST /categories`, `PATCH /categories/:id`                                 |
 | Suppliers  | `GET/POST /suppliers`, `GET/PATCH /suppliers/:id`                               |
 | Batches    | `GET/POST /batches`, `GET/PATCH /batches/:id`                                   |
