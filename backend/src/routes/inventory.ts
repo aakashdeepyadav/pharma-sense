@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import prisma from '../lib/prisma';
 import { AuthenticatedRequest, requireRoles } from '../auth';
 import { stockTransactionSchema } from '../validation/schemas';
-import { calculateStockDelta, minimumQuantityForDelta } from '../domain/stockRules';
+import { calculateStockDelta, isBatchExpired, minimumQuantityForDelta } from '../domain/stockRules';
 
 const router = Router();
 
@@ -34,6 +34,12 @@ router.post('/transactions', requireRoles('Admin', 'Pharmacist', 'Inventory Mana
 
   try {
     const transaction = await prisma.$transaction(async (database) => {
+      const batch = await database.batch.findUnique({ where: { id: result.data.batchId } });
+      if (!batch) throw new Error('BATCH_NOT_FOUND');
+      if (result.data.type === 'OUT' && isBatchExpired(batch.expiryDate)) {
+        throw new Error('EXPIRED_BATCH');
+      }
+
       const adjustment = calculateStockDelta(result.data.type, result.data.quantity);
       const minimumQuantity = minimumQuantityForDelta(adjustment);
       const updatedBatch = await database.batch.updateMany({
@@ -42,8 +48,6 @@ router.post('/transactions', requireRoles('Admin', 'Pharmacist', 'Inventory Mana
       });
 
       if (updatedBatch.count === 0) {
-        const batch = await database.batch.findUnique({ where: { id: result.data.batchId } });
-        if (!batch) throw new Error('BATCH_NOT_FOUND');
         throw new Error('INSUFFICIENT_STOCK');
       }
 
@@ -77,6 +81,10 @@ router.post('/transactions', requireRoles('Admin', 'Pharmacist', 'Inventory Mana
     }
     if (error instanceof Error && error.message === 'INSUFFICIENT_STOCK') {
       res.status(409).json({ success: false, error: 'Insufficient stock for this operation' });
+      return;
+    }
+    if (error instanceof Error && error.message === 'EXPIRED_BATCH') {
+      res.status(409).json({ success: false, error: 'Expired batches cannot be issued' });
       return;
     }
     res.status(500).json({ success: false, error: 'Failed to record stock transaction' });

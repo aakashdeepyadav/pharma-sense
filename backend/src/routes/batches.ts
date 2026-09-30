@@ -9,7 +9,8 @@ const router = Router();
 router.get('/', async (req: Request, res: Response) => {
   try {
     const batches = await prisma.batch.findMany({
-      include: { medicine: true, supplier: true }
+      include: { medicine: true, supplier: true },
+      orderBy: { expiryDate: 'asc' },
     });
     res.json({ success: true, data: batches });
   } catch (error) {

@@ -11,3 +11,7 @@ export function minimumQuantityForDelta(delta: number) {
 export function canApplyStockDelta(currentQuantity: number, delta: number) {
   return currentQuantity + delta >= 0;
 }
+
+export function isBatchExpired(expiryDate: Date, now = new Date()) {
+  return expiryDate.getTime() <= now.getTime();
+}
