@@ -68,6 +68,16 @@ type ReportSummary = {
   }[];
 };
 
+type AuditLog = {
+  id: number;
+  action: string;
+  entity: string;
+  entityId: number | null;
+  details: string | null;
+  createdAt: string;
+  user: { name: string; role: { name: string } };
+};
+
 type MedicineForm = {
   genericName: string;
   brandName: string;
@@ -124,6 +134,7 @@ function App() {
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [report, setReport] = useState<ReportSummary | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -233,6 +244,23 @@ function App() {
         setTransactions(transactionResult.data);
         setAlerts(alertResult.data);
         setReport(reportResult.data);
+        if (
+          session.user.role === "Admin" ||
+          session.user.role === "Inventory Manager"
+        ) {
+          const auditResponse = await fetch(
+            "http://localhost:5000/api/v1/audit-logs",
+            { headers },
+          );
+          if (auditResponse.ok) {
+            const auditResult = (await auditResponse.json()) as {
+              data: AuditLog[];
+            };
+            setAuditLogs(auditResult.data);
+          }
+        } else {
+          setAuditLogs([]);
+        }
         setError("");
       } catch (requestError) {
         setError(
@@ -658,6 +686,26 @@ function App() {
   const expiringSoonCount = alerts.filter(
     (alert) => alert.type === "EXPIRING_SOON" || alert.type === "EXPIRED",
   ).length;
+  const canWriteMedicines = [
+    "Admin",
+    "Pharmacist",
+    "Inventory Manager",
+  ].includes(session.user.role);
+  const canReceiveStock = ["Admin", "Pharmacist", "Inventory Manager"].includes(
+    session.user.role,
+  );
+  const canManageSuppliers = ["Admin", "Inventory Manager"].includes(
+    session.user.role,
+  );
+  const canWriteStock = [
+    "Admin",
+    "Pharmacist",
+    "Inventory Manager",
+    "Staff",
+  ].includes(session.user.role);
+  const canViewAudit = ["Admin", "Inventory Manager"].includes(
+    session.user.role,
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -688,25 +736,31 @@ function App() {
           </button>
         </div>
         <div className="flex gap-3">
-          <button
-            onClick={openCreateBatchForm}
-            disabled={medicines.length === 0 || suppliers.length === 0}
-            className="border border-blue-300 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition disabled:opacity-50"
-          >
-            Receive stock
-          </button>
-          <button
-            onClick={openCreateSupplierForm}
-            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
-          >
-            + Supplier
-          </button>
-          <button
-            onClick={openCreateForm}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
-          >
-            + Add Medicine
-          </button>
+          {canReceiveStock && (
+            <button
+              onClick={openCreateBatchForm}
+              disabled={medicines.length === 0 || suppliers.length === 0}
+              className="border border-blue-300 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition disabled:opacity-50"
+            >
+              Receive stock
+            </button>
+          )}
+          {canManageSuppliers && (
+            <button
+              onClick={openCreateSupplierForm}
+              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
+            >
+              + Supplier
+            </button>
+          )}
+          {canWriteMedicines && (
+            <button
+              onClick={openCreateForm}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+            >
+              + Add Medicine
+            </button>
+          )}
         </div>
       </header>
 
@@ -1210,27 +1264,67 @@ function App() {
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Inventory analytics</h2>
-              <p className="text-sm text-gray-500">Operational metrics from recorded inventory activity.</p>
+              <h2 className="text-xl font-bold text-gray-900">
+                Inventory analytics
+              </h2>
+              <p className="text-sm text-gray-500">
+                Operational metrics from recorded inventory activity.
+              </p>
             </div>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm"><p className="text-sm text-gray-500">Suppliers</p><p className="text-2xl font-bold text-gray-900 mt-1">{report.supplierCount}</p></div>
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm"><p className="text-sm text-gray-500">Batches</p><p className="text-2xl font-bold text-gray-900 mt-1">{report.batchCount}</p></div>
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm"><p className="text-sm text-gray-500">Units available</p><p className="text-2xl font-bold text-gray-900 mt-1">{report.totalUnits}</p></div>
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm"><p className="text-sm text-gray-500">Units issued</p><p className="text-2xl font-bold text-gray-900 mt-1">{report.issuedUnits}</p></div>
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm"><p className="text-sm text-gray-500">Inventory cost</p><p className="text-2xl font-bold text-gray-900 mt-1">{report.inventoryCost.toFixed(2)}</p></div>
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+              <p className="text-sm text-gray-500">Suppliers</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {report.supplierCount}
+              </p>
+            </div>
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+              <p className="text-sm text-gray-500">Batches</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {report.batchCount}
+              </p>
+            </div>
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+              <p className="text-sm text-gray-500">Units available</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {report.totalUnits}
+              </p>
+            </div>
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+              <p className="text-sm text-gray-500">Units issued</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {report.issuedUnits}
+              </p>
+            </div>
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+              <p className="text-sm text-gray-500">Inventory cost</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {report.inventoryCost.toFixed(2)}
+              </p>
+            </div>
           </div>
           <div className="mt-4 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <h3 className="font-bold text-gray-900 mb-4">Most issued medicines</h3>
+            <h3 className="font-bold text-gray-900 mb-4">
+              Most issued medicines
+            </h3>
             {report.topIssuedMedicines.length === 0 ? (
-              <p className="text-gray-500">No stock-out activity has been recorded yet.</p>
+              <p className="text-gray-500">
+                No stock-out activity has been recorded yet.
+              </p>
             ) : (
               <div className="space-y-3">
                 {report.topIssuedMedicines.map((medicine) => (
-                  <div key={medicine.medicineId} className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-gray-700">{medicine.medicineName}</span>
-                    <span className="text-gray-500">{medicine.quantityIssued} units issued</span>
+                  <div
+                    key={medicine.medicineId}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span className="font-medium text-gray-700">
+                      {medicine.medicineName}
+                    </span>
+                    <span className="text-gray-500">
+                      {medicine.quantityIssued} units issued
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1292,12 +1386,14 @@ function App() {
                       / {med.reorderLevel}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => openEditForm(med)}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        Edit
-                      </button>
+                      {canWriteMedicines && (
+                        <button
+                          onClick={() => openEditForm(med)}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Edit
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -1344,12 +1440,14 @@ function App() {
                       {supplier._count?.batches ?? 0}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => openEditSupplierForm(supplier)}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        Edit
-                      </button>
+                      {canManageSuppliers && (
+                        <button
+                          onClick={() => openEditSupplierForm(supplier)}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Edit
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -1404,18 +1502,22 @@ function App() {
                       {batch.quantity}
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => openStockForm(batch, "OUT")}
-                        className="text-blue-600 hover:text-blue-800 font-medium mr-3"
-                      >
-                        Issue
-                      </button>
-                      <button
-                        onClick={() => openStockForm(batch, "ADJ")}
-                        className="text-gray-600 hover:text-gray-900 font-medium"
-                      >
-                        Adjust
-                      </button>
+                      {canWriteStock && (
+                        <>
+                          <button
+                            onClick={() => openStockForm(batch, "OUT")}
+                            className="text-blue-600 hover:text-blue-800 font-medium mr-3"
+                          >
+                            Issue
+                          </button>
+                          <button
+                            onClick={() => openStockForm(batch, "ADJ")}
+                            className="text-gray-600 hover:text-gray-900 font-medium"
+                          >
+                            Adjust
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -1481,6 +1583,63 @@ function App() {
           </table>
         </div>
       </section>
+
+      {canViewAudit && (
+        <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b border-gray-100">
+            <h2 className="text-xl font-bold text-gray-900">Audit log</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Recent operational changes recorded by the system.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                <tr>
+                  <th className="px-6 py-4">Time</th>
+                  <th className="px-6 py-4">Action</th>
+                  <th className="px-6 py-4">Entity</th>
+                  <th className="px-6 py-4">User</th>
+                  <th className="px-6 py-4">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {auditLogs.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-8 text-center text-gray-500"
+                    >
+                      No audit events have been recorded yet.
+                    </td>
+                  </tr>
+                ) : (
+                  auditLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td className="px-6 py-4 text-gray-600">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-gray-900">
+                        {log.action.replaceAll("_", " ")}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {log.entity}
+                        {log.entityId === null ? "" : ` #${log.entityId}`}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {log.user.name} ({log.user.role.name})
+                      </td>
+                      <td className="px-6 py-4 text-gray-600 max-w-sm truncate">
+                        {log.details ?? "-"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
