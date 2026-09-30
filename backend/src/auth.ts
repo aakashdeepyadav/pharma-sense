@@ -118,9 +118,20 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
   try {
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, role: { select: { name: true } } },
+      select: {
+        id: true,
+        active: true,
+        sessionVersion: true,
+        role: { select: { name: true } },
+      },
     });
-    if (!user) {
+    const tokenSessionVersion = payload.sessionVersion ?? 0;
+    if (
+      !user ||
+      !user.active ||
+      typeof tokenSessionVersion !== 'number' ||
+      tokenSessionVersion !== user.sessionVersion
+    ) {
       res.status(401).json({ success: false, error: 'Invalid or expired authentication token' });
       return;
     }
@@ -132,8 +143,12 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
   }
 }
 
-export function createAccessToken(user: { id: number; role: string }) {
-  return jwt.sign({ userId: user.id, role: user.role }, getJwtSecret(), {
+export function createAccessToken(user: { id: number; role: string; sessionVersion?: number }) {
+  return jwt.sign({
+    userId: user.id,
+    role: user.role,
+    sessionVersion: user.sessionVersion ?? 0,
+  }, getJwtSecret(), {
     expiresIn: '2h',
     jwtid: crypto.randomUUID(),
   });

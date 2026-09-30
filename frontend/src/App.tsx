@@ -117,6 +117,7 @@ type ManagedUser = {
   id: number;
   name: string;
   email: string;
+  active: boolean;
   role: { id: number; name: string };
 };
 
@@ -149,6 +150,7 @@ type UserForm = {
   email: string;
   password: string;
   roleId: string;
+  active: boolean;
 };
 
 type BatchForm = {
@@ -343,6 +345,7 @@ function App() {
     email: "",
     password: "",
     roleId: "",
+    active: true,
   });
   const [batchFormOpen, setBatchFormOpen] = useState(false);
   const [batchForm, setBatchForm] = useState<BatchForm>({
@@ -739,6 +742,7 @@ function App() {
       email: "",
       password: "",
       roleId: managedRoles[0] ? String(managedRoles[0].id) : "",
+      active: true,
     });
     setFormError("");
     setUserFormOpen(true);
@@ -751,6 +755,7 @@ function App() {
       email: user.email,
       password: "",
       roleId: String(user.role.id),
+      active: user.active,
     });
     setFormError("");
     setUserFormOpen(true);
@@ -776,6 +781,7 @@ function App() {
           name: userForm.name,
           email: userForm.email,
           roleId: Number(userForm.roleId),
+          ...(editingUser ? { active: userForm.active } : {}),
           ...(editingUser ? {} : { password: userForm.password }),
         }),
       });
@@ -2030,6 +2036,32 @@ function App() {
                   ))}
                 </select>
               </label>
+              {editingUser && (
+                <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={userForm.active}
+                    disabled={
+                      editingUser.id === session.user.id ||
+                      (editingUser.role.name === "Admin" &&
+                        editingUser.active &&
+                        managedUsers.filter(
+                          (user) => user.role.name === "Admin" && user.active,
+                        ).length <= 1)
+                    }
+                    onChange={(event) =>
+                      setUserForm({ ...userForm, active: event.target.checked })
+                    }
+                    className="mt-0.5 h-4 w-4"
+                  />
+                  <span>
+                    Account active
+                    <span className="mt-1 block text-xs font-normal text-slate-500">
+                      Deactivation blocks sign-in and invalidates existing sessions.
+                    </span>
+                  </span>
+                </label>
+              )}
               {!editingUser && (
                 <label className="block text-sm font-medium text-slate-700">
                   Temporary password
@@ -2731,6 +2763,7 @@ function App() {
                       <th className="px-6 py-4">Name</th>
                       <th className="px-6 py-4">Email</th>
                       <th className="px-6 py-4">Role</th>
+                      <th className="px-6 py-4">Account status</th>
                       <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -2738,7 +2771,7 @@ function App() {
                     {managedUsers.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={4}
+                          colSpan={5}
                           className="px-6 py-8 text-center text-gray-500"
                         >
                           No user accounts found.
@@ -2755,6 +2788,9 @@ function App() {
                           </td>
                           <td className="px-6 py-4 text-gray-600">
                             {user.role.name}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600">
+                            {user.active ? "Active" : "Deactivated"}
                           </td>
                           <td className="px-6 py-4 text-right">
                             <button

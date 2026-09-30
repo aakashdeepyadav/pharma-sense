@@ -245,6 +245,42 @@ describe('PharmaSense API', () => {
       });
       assert.equal(updatedRoleResponse.status, 400);
 
+      const userToken = createAccessToken({ id: createdUserId, role: 'Pharmacist' });
+      const deactivateResponse = await fetch(`${baseUrl}/api/v1/users/${createdUserId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ active: false }),
+      });
+      assert.equal(deactivateResponse.status, 200);
+      const deactivatedAccessResponse = await fetch(`${baseUrl}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+      assert.equal(deactivatedAccessResponse.status, 401);
+
+      const inactiveLoginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: 'managed-user-password' }),
+      });
+      assert.equal(inactiveLoginResponse.status, 401);
+
+      const reactivateResponse = await fetch(`${baseUrl}/api/v1/users/${createdUserId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ active: true }),
+      });
+      assert.equal(reactivateResponse.status, 200);
+      const oldTokenAfterReactivation = await fetch(`${baseUrl}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+      assert.equal(oldTokenAfterReactivation.status, 401);
+
       const selfDemotionResponse = await fetch(`${baseUrl}/api/v1/users/1`, {
         method: 'PATCH',
         headers: {
@@ -254,6 +290,15 @@ describe('PharmaSense API', () => {
         body: JSON.stringify({ roleId: staffRole.id }),
       });
       assert.equal(selfDemotionResponse.status, 409);
+      const selfDeactivationResponse = await fetch(`${baseUrl}/api/v1/users/1`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ active: false }),
+      });
+      assert.equal(selfDeactivationResponse.status, 409);
 
       const forbiddenResponse = await fetch(`${baseUrl}/api/v1/users`, {
         headers: { Authorization: `Bearer ${staffToken}` },

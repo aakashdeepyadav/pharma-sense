@@ -10,7 +10,7 @@ Agent-Based Medicine Stock Management System.
 ## Current MVP
 
 - JWT login with server-side role checks for Admin, Pharmacist, Inventory Manager, and Staff.
-- Admin-only user listing, creation, and role updates with audit events; protected requests use the user's current database role.
+- Admin-only user listing, creation, role updates, and account deactivation/reactivation with audit events; protected requests use the user's current database role and session state.
 - Medicine, category, supplier, and batch management through the live API and dashboard, including manufacturer, dosage/form, barcode, and active status fields.
 - Server-side medicine search by name, manufacturer, barcode, and active status.
 - Supplier search by name through the API and dashboard.
@@ -34,7 +34,7 @@ The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase recei
 The current development line adds read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, and basic request throttling. Production readiness is still in progress; the current controls are local single-process implementations, not shared controls for horizontally scaled deployments.
 
 - Expand browser coverage for purchase and alert edge cases; complete a broader responsive and screen-reader accessibility review.
-- Add account lifecycle controls for password reset/change and safe offboarding; user creation and role assignment are now Admin-managed.
+- Add password reset/change and operational account offboarding workflows; Admin-managed deactivation/reactivation is now implemented.
 - Replace file-backed token revocation and process-local rate limiting with shared production storage, and configure trusted proxy handling before deployment.
 - Obtain approved real or de-identified demand data before making model-performance claims; synthetic data remains research/test-only.
 - Add human approval for replenishment, agent safety controls, and a deployment rehearsal including backup and restore.

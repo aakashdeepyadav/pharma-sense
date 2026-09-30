@@ -10,6 +10,7 @@ const safeUserSelect = {
   id: true,
   name: true,
   email: true,
+  active: true,
   role: { select: { id: true, name: true } },
 } as const;
 
@@ -32,6 +33,7 @@ router.get('/', requireRoles('Admin'), async (_req: AuthenticatedRequest, res: R
         id: true,
         name: true,
         email: true,
+        active: true,
         role: { select: { id: true, name: true } },
       },
       orderBy: { name: 'asc' },
@@ -114,11 +116,16 @@ router.patch('/:id', requireRoles('Admin'), async (req: AuthenticatedRequest, re
         : await database.role.findUnique({ where: { id: result.data.roleId } });
       if (!targetRole) throw new Error('ROLE_NOT_FOUND');
 
-      const demotingAdmin = existingUser.role.name === 'Admin' && targetRole.name !== 'Admin';
-      if (demotingAdmin) {
-        if (existingUser.id === req.user!.id) throw new Error('CANNOT_DEMOTE_SELF');
+      const deactivatingUser = existingUser.active && result.data.active === false;
+      const removingAdmin = existingUser.role.name === 'Admin' && (
+        targetRole.name !== 'Admin' || deactivatingUser
+      );
+      if (deactivatingUser && existingUser.id === req.user!.id) {
+        throw new Error('CANNOT_DEACTIVATE_SELF');
+      }
+      if (removingAdmin) {
         const adminCount = await database.user.count({
-          where: { role: { name: 'Admin' } },
+          where: { active: true, role: { name: 'Admin' } },
         });
         if (adminCount <= 1) throw new Error('LAST_ADMIN');
       }
@@ -129,6 +136,8 @@ router.patch('/:id', requireRoles('Admin'), async (req: AuthenticatedRequest, re
           ...(result.data.name === undefined ? {} : { name: result.data.name }),
           ...(result.data.email === undefined ? {} : { email: result.data.email }),
           ...(result.data.roleId === undefined ? {} : { roleId: targetRole.id }),
+          ...(result.data.active === undefined ? {} : { active: result.data.active }),
+          ...(deactivatingUser ? { sessionVersion: { increment: 1 } } : {}),
         },
         select: safeUserSelect,
       });
@@ -157,7 +166,7 @@ router.patch('/:id', requireRoles('Admin'), async (req: AuthenticatedRequest, re
       res.status(400).json({ success: false, error: 'Selected role does not exist' });
       return;
     }
-    if (error instanceof Error && ['CANNOT_DEMOTE_SELF', 'LAST_ADMIN'].includes(error.message)) {
+    if (error instanceof Error && ['CANNOT_DEMOTE_SELF', 'CANNOT_DEACTIVATE_SELF', 'LAST_ADMIN'].includes(error.message)) {
       res.status(409).json({ success: false, error: 'At least one administrator must remain active' });
       return;
     }

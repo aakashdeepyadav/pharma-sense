@@ -15,13 +15,13 @@ The repository began as an early prototype. The current implementation has moved
 - PostgreSQL is available through `docker-compose.yml`.
 - Prisma already models users, roles, categories, medicines, suppliers, batches, and stock transactions.
 - The backend now uses protected, validated routes for inventory, purchases, alerts, reports, and audit logs.
-- Admin-only user listing, account creation, and role updates are available; protected requests resolve the user's current database role so role changes affect existing tokens.
+- Admin-only user listing, account creation, role updates, and account activation controls are available; protected requests resolve the user's current role and session version so role changes and deactivation affect existing tokens.
 - The frontend dashboard reads live API data and supports medicine, category, supplier, batch, purchase, and stock workflows.
 - Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, baseline tests, a read-only replenishment recommendation, and paginated list API hardening are implemented; production deployment and advanced AI features remain open.
 
 The core MVP is released as `v0.1.0`. The current implementation extends it with read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, route-scoped request throttling, current-database-role authorization, newest-first transaction history, and optional-barcode normalization. Local validation includes backend build/tests, frontend lint/build, research validation, mocked Playwright login/role/keyboard/responsive checks, and a live browser workflow against an isolated PostgreSQL database covering Admin user creation/role updates, purchase receiving, stock issue, alert acknowledgement, audit verification, insufficient-stock rejection, and expired-batch rejection. The research validator reports warnings because the dataset is synthetic and does not model stockout censoring or organization groups.
 
-Production readiness is not complete. Additional purchase/alert edge cases and a broader screen-reader/accessibility review, account password reset/change and offboarding, shared token-revocation and rate-limit state, approved operational demand data, human-approved replenishment, and a deployment/backup-restore rehearsal remain open. Camera/mobile scanning, advanced forecasting, and AI agents remain later phases.
+Production readiness is not complete. Additional purchase/alert edge cases and a broader screen-reader/accessibility review, password reset/change and operational offboarding workflows, shared token-revocation and rate-limit state, approved operational demand data, human-approved replenishment, and a deployment/backup-restore rehearsal remain open. Camera/mobile scanning, advanced forecasting, and AI agents remain later phases.
 
 ## A. Executive Summary
 

@@ -39,7 +39,7 @@ router.post('/login', async (req: Request, res: Response) => {
     });
     const validPassword = user ? await bcrypt.compare(result.data.password, user.passwordHash) : false;
 
-    if (!user || !validPassword) {
+    if (!user || !user.active || !validPassword) {
       loginAttempts.set(address, { count: attempts.count + 1, windowStartedAt: attempts.windowStartedAt });
       res.status(401).json({ success: false, error: 'Invalid email or password' });
       return;
@@ -50,7 +50,11 @@ router.post('/login', async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        token: createAccessToken({ id: user.id, role: user.role.name }),
+        token: createAccessToken({
+          id: user.id,
+          role: user.role.name,
+          sessionVersion: user.sessionVersion,
+        }),
         user: { id: user.id, name: user.name, email: user.email, role: user.role.name },
       },
     });

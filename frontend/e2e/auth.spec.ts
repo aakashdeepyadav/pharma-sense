@@ -74,6 +74,7 @@ async function mockDashboardApi(page: Page, role: string) {
             id: 1,
             name: "QA Admin",
             email: "admin@pharmasense.local",
+            active: true,
             role: { id: 1, name: "Admin" },
           },
         ],
