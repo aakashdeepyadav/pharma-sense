@@ -17,3 +17,13 @@ Expected columns:
 - `medicine_name`
 - `quantity_issued`
 - `is_synthetic`
+
+## Baseline evaluation
+
+Run the chronological 80/20 comparison from the backend directory:
+
+```bash
+npm run research:evaluate
+```
+
+The result is written to `research/results/synthetic_baseline_evaluation.json`. The current experiment compares a naive last-value baseline with a seven-day moving average using MAE; the moving average also reports RMSE. The current synthetic run is an engineering baseline only and is not evidence of production forecasting performance.
