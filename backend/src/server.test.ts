@@ -80,4 +80,16 @@ describe('PharmaSense API', () => {
     });
     assert.equal(response.status, 403);
   });
+
+  it('restricts audit visibility to management roles', async () => {
+    const adminResponse = await fetch(`${baseUrl}/api/v1/audit-logs`, {
+      headers: { Authorization: `Bearer ${createAccessToken({ id: 1, role: 'Admin' })}` },
+    });
+    assert.equal(adminResponse.status, 200);
+
+    const staffResponse = await fetch(`${baseUrl}/api/v1/audit-logs`, {
+      headers: { Authorization: `Bearer ${createAccessToken({ id: 1, role: 'Staff' })}` },
+    });
+    assert.equal(staffResponse.status, 403);
+  });
 });

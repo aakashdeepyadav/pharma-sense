@@ -59,6 +59,16 @@ router.post('/transactions', requireRoles('Admin', 'Pharmacist', 'Inventory Mana
       });
     });
 
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: result.data.type === 'OUT' ? 'STOCK_OUT' : 'STOCK_ADJUSTMENT',
+        entity: 'Batch',
+        entityId: result.data.batchId,
+        details: JSON.stringify({ quantity: result.data.quantity, notes: result.data.notes }),
+      },
+    });
+
     res.status(201).json({ success: true, data: transaction });
   } catch (error) {
     if (error instanceof Error && error.message === 'BATCH_NOT_FOUND') {

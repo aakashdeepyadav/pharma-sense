@@ -15,6 +15,7 @@ model User {
   roleId        Int
   role          Role     @relation(fields: [roleId], references: [id])
   transactions  StockTransaction[]
+  auditLogs     AuditLog[]
 }
 
 model Role {
@@ -93,4 +94,18 @@ model Alert {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   acknowledgedAt DateTime?
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  Int?
+  details   String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
 }

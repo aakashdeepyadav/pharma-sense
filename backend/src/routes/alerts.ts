@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
+import { AuthenticatedRequest } from '../auth';
 
 const router = Router();
 const EXPIRY_WARNING_DAYS = 30;
@@ -102,17 +103,32 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-router.patch('/:id/acknowledge', async (req: Request, res: Response) => {
+router.patch('/:id/acknowledge', async (req: AuthenticatedRequest, res: Response) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) {
     res.status(400).json({ success: false, error: 'Alert id must be a positive integer' });
     return;
   }
+  if (!req.user) {
+    res.status(401).json({ success: false, error: 'Authentication required' });
+    return;
+  }
 
   try {
-    const alert = await prisma.alert.update({
-      where: { id },
-      data: { status: 'ACKNOWLEDGED', acknowledgedAt: new Date() },
+    const alert = await prisma.$transaction(async (database) => {
+      const updatedAlert = await database.alert.update({
+        where: { id },
+        data: { status: 'ACKNOWLEDGED', acknowledgedAt: new Date() },
+      });
+      await database.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: 'ALERT_ACKNOWLEDGED',
+          entity: 'Alert',
+          entityId: id,
+        },
+      });
+      return updatedAlert;
     });
     res.json({ success: true, data: alert });
   } catch {
