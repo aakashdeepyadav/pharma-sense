@@ -311,10 +311,9 @@ function App() {
           session.user.role === "Admin" ||
           session.user.role === "Inventory Manager"
         ) {
-          const auditResponse = await apiFetch(
-            "/api/v1/audit-logs",
-            { headers },
-          );
+          const auditResponse = await apiFetch("/api/v1/audit-logs", {
+            headers,
+          });
           if (auditResponse.ok) {
             const auditResult = (await auditResponse.json()) as {
               data: AuditLog[];
@@ -660,27 +659,24 @@ function App() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.token}`,
       };
-      const purchaseResponse = await apiFetch(
-        "/api/v1/purchases",
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            supplierId: Number(purchaseForm.supplierId),
-            notes: purchaseForm.notes,
-            items: [
-              {
-                medicineId: Number(purchaseForm.medicineId),
-                batchNumber: purchaseForm.batchNumber,
-                mfgDate: purchaseForm.mfgDate,
-                expiryDate: purchaseForm.expiryDate,
-                quantity: Number(purchaseForm.quantity),
-                purchasePrice: Number(purchaseForm.purchasePrice),
-              },
-            ],
-          }),
-        },
-      );
+      const purchaseResponse = await apiFetch("/api/v1/purchases", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          supplierId: Number(purchaseForm.supplierId),
+          notes: purchaseForm.notes,
+          items: [
+            {
+              medicineId: Number(purchaseForm.medicineId),
+              batchNumber: purchaseForm.batchNumber,
+              mfgDate: purchaseForm.mfgDate,
+              expiryDate: purchaseForm.expiryDate,
+              quantity: Number(purchaseForm.quantity),
+              purchasePrice: Number(purchaseForm.purchasePrice),
+            },
+          ],
+        }),
+      });
       const purchaseResult = (await purchaseResponse.json()) as {
         success: boolean;
         data?: { id: number };
@@ -818,21 +814,18 @@ function App() {
     setSaving(true);
     setFormError("");
     try {
-      const response = await apiFetch(
-        "/api/v1/inventory/transactions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.token}`,
-          },
-          body: JSON.stringify({
-            ...stockForm,
-            batchId: Number(stockForm.batchId),
-            quantity: Number(stockForm.quantity),
-          }),
+      const response = await apiFetch("/api/v1/inventory/transactions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
         },
-      );
+        body: JSON.stringify({
+          ...stockForm,
+          batchId: Number(stockForm.batchId),
+          quantity: Number(stockForm.quantity),
+        }),
+      });
       const result = (await response.json()) as {
         success: boolean;
         error?: string;
@@ -878,10 +871,10 @@ function App() {
   const receivePurchase = async (purchaseId: number) => {
     if (!session) return;
     const headers = { Authorization: `Bearer ${session.token}` };
-    const response = await apiFetch(
-      `/api/v1/purchases/${purchaseId}/receive`,
-      { method: "POST", headers },
-    );
+    const response = await apiFetch(`/api/v1/purchases/${purchaseId}/receive`, {
+      method: "POST",
+      headers,
+    });
     const result = (await response.json()) as {
       success: boolean;
       error?: string;
@@ -916,13 +909,10 @@ function App() {
 
   const acknowledgeAlert = async (alertId: number) => {
     if (!session) return;
-    const response = await apiFetch(
-      `/api/v1/alerts/${alertId}/acknowledge`,
-      {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${session.token}` },
-      },
-    );
+    const response = await apiFetch(`/api/v1/alerts/${alertId}/acknowledge`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${session.token}` },
+    });
     if (!response.ok) {
       setError("Unable to acknowledge alert.");
       return;
