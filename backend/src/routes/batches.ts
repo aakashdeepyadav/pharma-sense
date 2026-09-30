@@ -44,6 +44,15 @@ router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async
           notes: 'Initial batch receipt',
         },
       });
+      await transaction.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: 'BATCH_RECEIVED',
+          entity: 'Batch',
+          entityId: createdBatch.id,
+          details: JSON.stringify({ quantity: createdBatch.quantity, batchNumber: createdBatch.batchNumber }),
+        },
+      });
       return createdBatch;
     });
     res.status(201).json({ success: true, data: batch });

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { supplierSchema, supplierUpdateSchema } from '../validation/schemas';
-import { requireRoles } from '../auth';
+import { AuthenticatedRequest, requireRoles } from '../auth';
 
 const router = Router();
 
@@ -17,7 +17,7 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-router.post('/', requireRoles('Admin', 'Inventory Manager'), async (req: Request, res: Response) => {
+router.post('/', requireRoles('Admin', 'Inventory Manager'), async (req: AuthenticatedRequest, res: Response) => {
   const result = supplierSchema.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({ success: false, error: result.error.issues });
@@ -25,14 +25,31 @@ router.post('/', requireRoles('Admin', 'Inventory Manager'), async (req: Request
   }
 
   try {
-    const supplier = await prisma.supplier.create({ data: result.data });
+    if (!req.user) {
+      res.status(401).json({ success: false, error: 'Authentication required' });
+      return;
+    }
+
+    const supplier = await prisma.$transaction(async (database) => {
+      const createdSupplier = await database.supplier.create({ data: result.data });
+      await database.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: 'SUPPLIER_CREATED',
+          entity: 'Supplier',
+          entityId: createdSupplier.id,
+          details: JSON.stringify({ name: createdSupplier.name }),
+        },
+      });
+      return createdSupplier;
+    });
     res.status(201).json({ success: true, data: supplier });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to add supplier' });
   }
 });
 
-router.patch('/:id', requireRoles('Admin', 'Inventory Manager'), async (req: Request, res: Response) => {
+router.patch('/:id', requireRoles('Admin', 'Inventory Manager'), async (req: AuthenticatedRequest, res: Response) => {
   const id = Number(req.params.id);
   const result = supplierUpdateSchema.safeParse(req.body);
   if (!Number.isInteger(id) || id < 1) {
@@ -45,7 +62,24 @@ router.patch('/:id', requireRoles('Admin', 'Inventory Manager'), async (req: Req
   }
 
   try {
-    const supplier = await prisma.supplier.update({ where: { id }, data: result.data });
+    if (!req.user) {
+      res.status(401).json({ success: false, error: 'Authentication required' });
+      return;
+    }
+
+    const supplier = await prisma.$transaction(async (database) => {
+      const updatedSupplier = await database.supplier.update({ where: { id }, data: result.data });
+      await database.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: 'SUPPLIER_UPDATED',
+          entity: 'Supplier',
+          entityId: updatedSupplier.id,
+          details: JSON.stringify(result.data),
+        },
+      });
+      return updatedSupplier;
+    });
     res.json({ success: true, data: supplier });
   } catch {
     res.status(404).json({ success: false, error: 'Supplier not found' });
