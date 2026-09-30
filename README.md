@@ -96,6 +96,7 @@ npm run build
 - Passwords are stored as bcrypt hashes and login failures use a generic response.
 - Protected API routes enforce JWT authentication and role authorization on the server; frontend controls are presentation only.
 - Dashboard logout revokes the current access token on the running API instance before clearing the local session, and the backend persists revoked JWT fingerprints to disk so server restarts do not silently re-enable old tokens.
+- The API applies a lightweight request throttle to limit abusive bursts from a single client and returns a structured 429 response with a clear rate-limit code.
 - Stock changes and inventory master-data writes create audit records tied to the authenticated user.
 - Keep `JWT_SECRET`, database credentials, and shared-environment credentials outside source control.
 - The seeded account and Docker database password are for local development only.

@@ -45,6 +45,25 @@ describe('PharmaSense API', () => {
     assert.equal(response.status, 400);
   });
 
+  it('rate limits repeated requests from the same client', async () => {
+    const clientIp = '203.0.113.250';
+    let rateLimited = false;
+
+    for (let index = 0; index < 45; index += 1) {
+      const response = await fetch(`${baseUrl}/health`, {
+        headers: { 'X-Forwarded-For': clientIp },
+      });
+      if (response.status === 429) {
+        rateLimited = true;
+        const body = (await response.json()) as { error?: { code?: string; message?: string } };
+        assert.equal(body.error?.code, 'RATE_LIMIT_EXCEEDED');
+        break;
+      }
+    }
+
+    assert.equal(rateLimited, true);
+  });
+
   it('revokes a token on logout', async () => {
     const token = createAccessToken({ id: 1, role: 'Admin' });
     const logoutResponse = await fetch(`${baseUrl}/api/v1/auth/logout`, {
