@@ -110,6 +110,7 @@ The live browser workflow uses a disposable PostgreSQL database and writes test 
 - Protected API routes enforce JWT authentication and role authorization on the server; frontend controls are presentation only.
 - Dashboard logout revokes the current access token on the running API instance before clearing the local session, and the backend persists revoked JWT fingerprints to disk so server restarts do not silently re-enable old tokens.
 - The API applies a lightweight request throttle to limit abusive bursts from a single client and returns a structured 429 response with a clear rate-limit code.
+- Every API response includes a generated `X-Request-Id` for correlating support reports with server-side request traces.
 - Forwarded client IPs are ignored unless `TRUST_PROXY=true` is explicitly configured behind a trusted reverse proxy; this prevents spoofed `X-Forwarded-For` headers from bypassing throttling.
 - `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX_REQUESTS` configure the API burst limit; the local defaults are 60 seconds and 40 requests per client/route.
 - `LOGIN_RATE_LIMIT_WINDOW_MS` and `LOGIN_RATE_LIMIT_MAX_ATTEMPTS` configure failed-login throttling; the local defaults are 15 minutes and 10 attempts per client.

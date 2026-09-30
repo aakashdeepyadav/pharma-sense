@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import crypto from 'node:crypto';
 import medicineRoutes from './routes/medicines';
 import categoryRoutes from './routes/categories';
 import batchRoutes from './routes/batches';
@@ -31,6 +32,10 @@ const requestCounts = new Map<string, { count: number; windowStart: number }>();
 
 app.disable('x-powered-by');
 app.set('trust proxy', trustProxy);
+app.use((_req, res, next) => {
+  res.setHeader('X-Request-Id', crypto.randomUUID());
+  next();
+});
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');

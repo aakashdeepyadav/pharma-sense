@@ -100,7 +100,7 @@ The tenant boundary for the MVP is one organization per deployment. Multi-tenant
 - **Performance:** normal list and transaction operations should return within 500 ms in the local MVP dataset; measure rather than promise a production SLA.
 - **Maintainability:** modular routes/services, Prisma migrations, typed request/response contracts, and documented decisions.
 - **Usability:** common stock operations require few steps and show clear success/error states.
-- **Observability:** structured server logs, request correlation where practical, health endpoint, and error monitoring before production.
+- **Observability:** generated `X-Request-Id` response headers for request correlation, structured server logs, health endpoint, and error monitoring before production.
 - **Testability:** unit tests for business rules, API integration tests for critical workflows, and a repeatable local environment.
 - **Data integrity:** foreign keys, unique constraints, date checks, decimal money types, and controlled status/type values.
 - **Accessibility:** keyboard-operable forms, labels, readable contrast, and meaningful error messages.

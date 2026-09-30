@@ -29,6 +29,7 @@ describe('PharmaSense API', () => {
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
     assert.equal(response.headers.get('x-frame-options'), 'DENY');
     assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+    assert.match(response.headers.get('x-request-id') ?? '', /^[0-9a-f-]{36}$/);
     assert.equal(response.headers.get('x-powered-by'), null);
   });
 
