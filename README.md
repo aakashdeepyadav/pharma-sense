@@ -26,13 +26,13 @@ Agent-Based Medicine Stock Management System.
 
 ## Completion Status
 
-The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase receiving, stock movement, alerts, reporting, and role-checked API workflows are implemented. Current local validation passes: backend build, 19 backend tests, research dataset validation, frontend lint, and frontend build. The full operator journey is not yet covered by automated browser tests.
+The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase receiving, stock movement, alerts, reporting, and role-checked API workflows are implemented. Current local validation passes: backend build, 19 backend tests, research dataset validation, frontend lint/build, and three Playwright browser smoke tests. The browser suite covers rejected login and Admin/Staff action visibility with mocked API responses; it does not yet cover the complete stock workflow against a live API and database.
 
 ## Next Work
 
 The current development line adds read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, and basic request throttling. Production readiness is still in progress; the current controls are local single-process implementations, not shared controls for horizontally scaled deployments.
 
-- Add browser-level end-to-end tests for the complete stock workflow and role-specific permissions; finish responsive and accessibility review.
+- Expand browser-level tests to cover the complete stock workflow against a live API and database and the full role matrix; finish responsive and accessibility review.
 - Add controlled user and role administration; today, the seeded account is the only documented account-management path.
 - Replace file-backed token revocation and process-local rate limiting with shared production storage, and configure trusted proxy handling before deployment.
 - Obtain approved real or de-identified demand data before making model-performance claims; synthetic data remains research/test-only.
@@ -90,8 +90,10 @@ npm test
 npm run research:validate
 
 cd ../frontend
+npx playwright install chromium
 npm run lint
 npm run build
+npm run test:e2e
 ```
 
 ## Security Notes
