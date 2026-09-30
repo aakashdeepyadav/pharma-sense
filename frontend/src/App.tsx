@@ -853,19 +853,25 @@ function App() {
       return;
     }
 
-    const [batchResponse, medicineResponse, transactionResponse, alertResponse] =
-      await Promise.all([
-        fetch("http://localhost:5000/api/v1/batches", { headers }),
-        fetch("http://localhost:5000/api/v1/medicines", { headers }),
-        fetch("http://localhost:5000/api/v1/inventory/transactions", { headers }),
-        fetch("http://localhost:5000/api/v1/alerts", { headers }),
-      ]);
+    const [
+      batchResponse,
+      medicineResponse,
+      transactionResponse,
+      alertResponse,
+    ] = await Promise.all([
+      fetch("http://localhost:5000/api/v1/batches", { headers }),
+      fetch("http://localhost:5000/api/v1/medicines", { headers }),
+      fetch("http://localhost:5000/api/v1/inventory/transactions", { headers }),
+      fetch("http://localhost:5000/api/v1/alerts", { headers }),
+    ]);
     setBatches(((await batchResponse.json()) as { data: Batch[] }).data);
     setMedicines(((await medicineResponse.json()) as ApiResponse).data);
     setTransactions(
       ((await transactionResponse.json()) as { data: StockTransaction[] }).data,
     );
-    setAlerts(((await alertResponse.json()) as { data: InventoryAlert[] }).data);
+    setAlerts(
+      ((await alertResponse.json()) as { data: InventoryAlert[] }).data,
+    );
     await refreshPurchases();
     await refreshAuditLogs();
   };
@@ -2033,7 +2039,10 @@ function App() {
             <tbody className="divide-y divide-gray-100">
               {purchases.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td
+                    colSpan={6}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
                     No purchases have been recorded yet.
                   </td>
                 </tr>
@@ -2047,7 +2056,12 @@ function App() {
                       {purchase.supplier.name}
                     </td>
                     <td className="px-6 py-4 text-gray-600">
-                      {purchase.items.map((item) => `${item.medicine.genericName} (${item.quantity})`).join(", ")}
+                      {purchase.items
+                        .map(
+                          (item) =>
+                            `${item.medicine.genericName} (${item.quantity})`,
+                        )
+                        .join(", ")}
                     </td>
                     <td className="px-6 py-4 text-gray-600">
                       {new Date(purchase.createdAt).toLocaleString()}
