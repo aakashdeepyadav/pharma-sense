@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { categorySchema } from '../validation/schemas';
-import { requireRoles } from '../auth';
+import { AuthenticatedRequest, requireRoles } from '../auth';
 
 const router = Router();
 
@@ -16,7 +16,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Add a category
-router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async (req: Request, res: Response) => {
+router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const result = categorySchema.safeParse(req.body);
     if (!result.success) {
@@ -29,8 +29,23 @@ router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async
     });
     res.status(201).json({ success: true, data: category });
   } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to add category' });
-  }
+      if (!req.user) {
+        res.status(401).json({ success: false, error: 'Authentication required' });
+        return;
+      }
+
+      const category = await prisma.$transaction(async (database) => {
+        const createdCategory = await database.category.create({ data: result.data });
+        await database.auditLog.create({
+          data: {
+            userId: req.user!.id,
+            action: 'CATEGORY_CREATED',
+            entity: 'Category',
+            entityId: createdCategory.id,
+            details: JSON.stringify({ name: createdCategory.name }),
+          },
+        });
+        return createdCategory;
 });
 
 export default router;
