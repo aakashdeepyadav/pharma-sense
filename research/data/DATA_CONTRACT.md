@@ -14,13 +14,13 @@ One row represents the quantity issued for one medicine on one UTC calendar day 
 
 Required columns:
 
-| Column | Type | Rule |
-|---|---|---|
-| `date` | ISO date | UTC calendar day; no future dates |
-| `medicine_id` | pseudonymous string | Stable within the dataset; must not encode a product name or identifier |
-| `quantity_issued` | non-negative integer | Completed stock OUT quantity after returns policy is applied |
-| `is_stockout_censored` | boolean | True when observed demand may be lower than requested demand because stock was unavailable |
-| `organization_group` | pseudonymous string | Optional for pooled research; never a real organization name |
+| Column                 | Type                 | Rule                                                                                       |
+| ---------------------- | -------------------- | ------------------------------------------------------------------------------------------ |
+| `date`                 | ISO date             | UTC calendar day; no future dates                                                          |
+| `medicine_id`          | pseudonymous string  | Stable within the dataset; must not encode a product name or identifier                    |
+| `quantity_issued`      | non-negative integer | Completed stock OUT quantity after returns policy is applied                               |
+| `is_stockout_censored` | boolean              | True when observed demand may be lower than requested demand because stock was unavailable |
+| `organization_group`   | pseudonymous string  | Optional for pooled research; never a real organization name                               |
 
 Optional explanatory columns:
 
@@ -32,13 +32,13 @@ Optional explanatory columns:
 
 ## Operational mapping
 
-| Operational source | Research field | Treatment |
-|---|---|---|
-| `StockTransaction.timestamp` | `date` | Convert to UTC date |
-| `StockTransaction.type = OUT` | `quantity_issued` | Aggregate by medicine and date |
-| `Batch.medicineId` | `medicine_id` | Replace with a research pseudonym |
-| Stock availability and failed issue events | `is_stockout_censored` | Mark periods where requested demand may be hidden |
-| Batch quantity before the day | `available_units_at_start` | Optional feature, never a target label |
+| Operational source                         | Research field             | Treatment                                         |
+| ------------------------------------------ | -------------------------- | ------------------------------------------------- |
+| `StockTransaction.timestamp`               | `date`                     | Convert to UTC date                               |
+| `StockTransaction.type = OUT`              | `quantity_issued`          | Aggregate by medicine and date                    |
+| `Batch.medicineId`                         | `medicine_id`              | Replace with a research pseudonym                 |
+| Stock availability and failed issue events | `is_stockout_censored`     | Mark periods where requested demand may be hidden |
+| Batch quantity before the day              | `available_units_at_start` | Optional feature, never a target label            |
 
 Adjustments, receipts, and purchases are not demand. Returns must be explicitly removed or represented with a documented negative-demand policy before aggregation.
 
