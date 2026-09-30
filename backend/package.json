@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "tsx src/scripts/seed.ts",
+    "research:demand": "tsx src/scripts/generateSyntheticDemand.ts",
     "test": "tsx --test src/domain/stockRules.test.ts src/domain/forecasting.test.ts src/server.test.ts"
   },
   "keywords": [],
