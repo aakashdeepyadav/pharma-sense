@@ -20,7 +20,19 @@ Agent-Based Medicine Stock Management System.
 - Low-stock, out-of-stock, expired, and expiring-soon alerts with acknowledgement.
 - Operational reports, management-only audit logs, and transactional audit events for writes.
 - Read-only replenishment recommendations based on recent OUT demand and reorder levels; recommendations never place purchases automatically.
+- Pagination metadata and a structured validation error envelope on list endpoints for safer production API contracts.
 - CI checks for migrations, backend tests, research validation, frontend lint, and frontend builds.
+
+## Completion Status
+
+The MVP was released as `v0.1.0` on `master`. The integrated `develop` branch now also contains the first V1 read-only replenishment recommendation feature and the next API-hardening slice: paginated list responses and a structured validation error envelope. The current system is suitable for a local or review demonstration against PostgreSQL.
+
+## Next Work
+
+- Add browser-level end-to-end tests and complete responsive/accessibility review.
+- Move token revocation from in-memory storage to shared production persistence.
+- Improve forecast evaluation with approved real or de-identified data.
+- Add human-approved replenishment workflows, agent safety controls, and deployment rehearsal.
 
 The forecasting pipeline currently uses synthetic research data only. It must not be mixed with operational inventory or treated as evidence of production model performance. See [research/data/DATA_CONTRACT.md](research/data/DATA_CONTRACT.md) before using any real or de-identified data.
 

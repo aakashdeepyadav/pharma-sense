@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
+import { buildPaginationMeta, sendApiError } from '../lib/api';
 import { medicineQuerySchema, medicineSchema, medicineUpdateSchema } from '../validation/schemas';
 import { AuthenticatedRequest, requireRoles } from '../auth';
 
@@ -9,31 +10,49 @@ const router = Router();
 router.get('/', async (req: Request, res: Response) => {
   const query = medicineQuerySchema.safeParse(req.query);
   if (!query.success) {
-    res.status(400).json({ success: false, error: query.error.issues });
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', query.error.issues);
     return;
   }
 
   try {
-    const medicines = await prisma.medicine.findMany({
-      where: {
-        ...(query.data.active === undefined ? {} : { active: query.data.active }),
-        ...(query.data.barcode ? { barcode: query.data.barcode } : {}),
-        ...(query.data.search
-          ? {
-              OR: [
-                { genericName: { contains: query.data.search, mode: 'insensitive' } },
-                { brandName: { contains: query.data.search, mode: 'insensitive' } },
-                { manufacturer: { contains: query.data.search, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      },
-      include: { category: true, batches: true },
-      orderBy: { genericName: 'asc' },
+    const where: any = {
+      ...(query.data.active === undefined ? {} : { active: query.data.active }),
+      ...(query.data.barcode ? { barcode: query.data.barcode } : {}),
+      ...(query.data.search
+        ? {
+            OR: [
+              { genericName: { contains: query.data.search, mode: 'insensitive' as const } },
+              { brandName: { contains: query.data.search, mode: 'insensitive' as const } },
+              { manufacturer: { contains: query.data.search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+
+    const [total, medicines] = await Promise.all([
+      prisma.medicine.count({ where }),
+      prisma.medicine.findMany({
+        where,
+        include: { category: true, batches: true },
+        orderBy: { [query.data.sortBy]: query.data.sortOrder } as Record<string, 'asc' | 'desc'>,
+        skip: (query.data.page - 1) * query.data.pageSize,
+        take: query.data.pageSize,
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: medicines,
+      meta: buildPaginationMeta(
+        total,
+        query.data.page,
+        query.data.pageSize,
+        query.data.sortBy,
+        query.data.sortOrder,
+      ),
     });
-    res.json({ success: true, data: medicines });
   } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to fetch medicines' });
+    sendApiError(res, 500, 'FETCH_MEDICINES_FAILED', 'Failed to fetch medicines');
   }
 });
 

@@ -25,6 +25,10 @@ export const medicineQuerySchema = z.object({
   search: z.string().trim().max(150).optional(),
   barcode: z.string().trim().max(100).optional(),
   active: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  sortBy: z.enum(['genericName', 'brandName', 'manufacturer', 'reorderLevel']).default('genericName'),
+  sortOrder: z.enum(['asc', 'desc']).default('asc'),
 });
 
 export const supplierSchema = z.object({
@@ -36,6 +40,10 @@ export const supplierUpdateSchema = supplierSchema.partial();
 
 export const supplierQuerySchema = z.object({
   search: z.string().trim().max(150).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  sortBy: z.enum(['name', 'contactInfo', 'id']).default('name'),
+  sortOrder: z.enum(['asc', 'desc']).default('asc'),
 });
 
 export const batchSchema = z.object({

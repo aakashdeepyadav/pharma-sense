@@ -16,9 +16,9 @@ The repository began as an early prototype. The current implementation has moved
 - Prisma already models users, roles, categories, medicines, suppliers, batches, and stock transactions.
 - The backend now uses protected, validated routes for inventory, purchases, alerts, reports, and audit logs.
 - The frontend dashboard reads live API data and supports medicine, category, supplier, batch, purchase, and stock workflows.
-- Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, and baseline tests are implemented; production deployment and advanced AI features remain open.
+- Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, baseline tests, a read-only replenishment recommendation, and paginated list API hardening are implemented; production deployment and advanced AI features remain open.
 
-The next work focuses on final release hardening. Camera/mobile scanning, advanced forecasting, AI agents, and replenishment recommendations remain later phases.
+The next work focuses on release hardening, approved-data forecasting, human approval workflows, and production deployment. Camera/mobile scanning, advanced forecasting, and AI agents remain later phases.
 
 ## A. Executive Summary
 
@@ -212,7 +212,7 @@ Base path: `/api/v1`.
 | Audit      | `GET /audit-logs` for authorized administrators                                 |
 | System     | `GET /health`                                                                   |
 
-All endpoints should use a consistent envelope, for example `{ data, meta }` on success and `{ error: { code, message, details } }` on failure. Add pagination, filtering, and sorting before the datasets grow.
+All endpoints should use a consistent envelope, for example `{ data, meta }` on success and `{ error: { code, message, details } }` on failure. The medicine and supplier list endpoints now include validated pagination metadata and structured validation error responses, and the remaining routes can follow the same contract as the dataset grows.
 
 Every write endpoint must define its permission, validation schema, transaction boundary, and audit behavior. Avoid exposing raw Prisma errors to clients.
 
@@ -332,6 +332,8 @@ MVP is not complete if it depends on mock frontend data, unauthenticated writes,
 ## S. V1 Features
 
 After MVP hardening: richer reports, configurable alert thresholds, supplier purchase history, FEFO suggestions, export, dashboard trends, reconciliation tools, better audit search, and a read-only forecasting baseline.
+
+The first V1 slice is implemented: read-only replenishment recommendations use recent completed OUT demand and reorder levels and never create purchases automatically.
 
 ## T. Future Features
 
