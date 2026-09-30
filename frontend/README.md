@@ -4,7 +4,7 @@ The frontend is a React, TypeScript, and Vite dashboard for pharmacy inventory o
 
 ## Local development
 
-Start PostgreSQL and the backend first. See the repository [README](../README.md) for database setup, migrations, and the development administrator account.
+Start PostgreSQL and the backend first. See the repository [README](../README.md) for database setup, migrations, and local role-test accounts.
 
 ```powershell
 npm install

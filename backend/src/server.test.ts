@@ -114,6 +114,40 @@ describe('PharmaSense API', () => {
     assert.equal(typeof result.data.medicineCount, 'number');
   });
 
+  it('allows each seeded development role to sign in with its assigned role', async () => {
+    const developmentAccounts = [
+      { email: 'admin@pharmasense.local', password: 'admin12345', role: 'Admin' },
+      { email: 'pharmacist@pharmasense.local', password: 'pharmacist12345', role: 'Pharmacist' },
+      { email: 'manager@pharmasense.local', password: 'manager12345', role: 'Inventory Manager' },
+      { email: 'staff@pharmasense.local', password: 'staff12345', role: 'Staff' },
+    ];
+
+    for (const account of developmentAccounts) {
+      const response = await fetch(`${baseUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: account.email, password: account.password }),
+      });
+      assert.equal(response.status, 200);
+      const result = (await response.json()) as {
+        data: { token: string; user: { role: string } };
+      };
+      assert.equal(result.data.user.role, account.role);
+
+      if (account.role === 'Staff') {
+        const writeResponse = await fetch(`${baseUrl}/api/v1/medicines`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${result.data.token}`,
+          },
+          body: JSON.stringify({}),
+        });
+        assert.equal(writeResponse.status, 403);
+      }
+    }
+  });
+
   it('rejects invalid forecast parameters', async () => {
     const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
       method: 'POST',

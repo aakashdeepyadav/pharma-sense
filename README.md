@@ -60,14 +60,16 @@ npm run dev
 
 Before starting the backend, copy `backend/.env.example` to `backend/.env` and replace `JWT_SECRET` with a long random value. Copy `frontend/.env.example` to `frontend/.env` if the API is not running at the local default URL.
 
-The development seed creates this local administrator account:
+The development seed creates these local role-test accounts:
 
 ```text
-Email: admin@pharmasense.local
-Password: admin12345
+Admin: admin@pharmasense.local / admin12345
+Pharmacist: pharmacist@pharmasense.local / pharmacist12345
+Inventory Manager: manager@pharmasense.local / manager12345
+Staff: staff@pharmasense.local / staff12345
 ```
 
-Change these credentials before using any shared or deployed environment.
+These accounts are for local development only. The seed exits when `NODE_ENV=production`; never use these credentials in shared or deployed environments.
 
 ### 3. Frontend
 
@@ -85,6 +87,7 @@ Run these checks from the repository root:
 
 ```bash
 cd backend
+npm run seed
 npm run build
 npm test
 npm run research:validate
@@ -106,7 +109,7 @@ The live browser workflow uses a disposable PostgreSQL database and writes test 
 - The API applies a lightweight request throttle to limit abusive bursts from a single client and returns a structured 429 response with a clear rate-limit code.
 - Stock changes and inventory master-data writes create audit records tied to the authenticated user.
 - Keep `JWT_SECRET`, database credentials, and shared-environment credentials outside source control.
-- The seeded account and Docker database password are for local development only.
+- The seeded role accounts and Docker database password are for local development only; the seed script refuses to run with `NODE_ENV=production`.
 
 ## Branch Workflow
 
