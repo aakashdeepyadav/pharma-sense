@@ -5,6 +5,10 @@ type Medicine = {
   genericName: string;
   brandName: string;
   categoryId: number;
+  manufacturer: string | null;
+  dosageForm: string | null;
+  barcode: string | null;
+  active: boolean;
   unit: string;
   reorderLevel: number;
   batches: { quantity: number }[];
@@ -97,6 +101,10 @@ type MedicineForm = {
   genericName: string;
   brandName: string;
   categoryId: string;
+  manufacturer: string;
+  dosageForm: string;
+  barcode: string;
+  active: boolean;
   unit: string;
   reorderLevel: string;
 };
@@ -211,6 +219,10 @@ function App() {
     genericName: "",
     brandName: "",
     categoryId: "",
+    manufacturer: "",
+    dosageForm: "",
+    barcode: "",
+    active: true,
     unit: "Tablet",
     reorderLevel: "0",
   });
@@ -397,6 +409,10 @@ function App() {
       genericName: "",
       brandName: "",
       categoryId: categories[0] ? String(categories[0].id) : "",
+      manufacturer: "",
+      dosageForm: "",
+      barcode: "",
+      active: true,
       unit: "Tablet",
       reorderLevel: "0",
     });
@@ -410,6 +426,10 @@ function App() {
       genericName: medicine.genericName,
       brandName: medicine.brandName,
       categoryId: String(medicine.categoryId),
+      manufacturer: medicine.manufacturer ?? "",
+      dosageForm: medicine.dosageForm ?? "",
+      barcode: medicine.barcode ?? "",
+      active: medicine.active,
       unit: medicine.unit,
       reorderLevel: String(medicine.reorderLevel),
     });
@@ -1693,6 +1713,37 @@ function App() {
                 />
               </label>
               <label className="text-sm font-medium text-gray-700">
+                Manufacturer
+                <input
+                  value={form.manufacturer}
+                  onChange={(event) =>
+                    setForm({ ...form, manufacturer: event.target.value })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Dosage / form
+                <input
+                  value={form.dosageForm}
+                  onChange={(event) =>
+                    setForm({ ...form, dosageForm: event.target.value })
+                  }
+                  placeholder="e.g. 500 mg tablet"
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Barcode
+                <input
+                  value={form.barcode}
+                  onChange={(event) =>
+                    setForm({ ...form, barcode: event.target.value })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
                 Category
                 <select
                   value={form.categoryId}
@@ -1735,6 +1786,17 @@ function App() {
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
                   required
                 />
+              </label>
+              <label className="flex items-center gap-3 text-sm font-medium text-gray-700 md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={form.active}
+                  onChange={(event) =>
+                    setForm({ ...form, active: event.target.checked })
+                  }
+                  className="h-4 w-4"
+                />
+                Active medicine
               </label>
             </div>
             <div className="flex justify-end gap-3 mt-6">
@@ -1927,7 +1989,9 @@ function App() {
               <tr>
                 <th className="px-6 py-4">Generic Name</th>
                 <th className="px-6 py-4">Brand Name</th>
+                <th className="px-6 py-4">Manufacturer</th>
                 <th className="px-6 py-4">Unit</th>
+                <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Reorder Level</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -1936,7 +2000,7 @@ function App() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={7}
                     className="px-6 py-8 text-center text-gray-500"
                   >
                     Loading inventory data...
@@ -1960,7 +2024,13 @@ function App() {
                       {med.genericName}
                     </td>
                     <td className="px-6 py-4 text-gray-600">{med.brandName}</td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {med.manufacturer || "-"}
+                    </td>
                     <td className="px-6 py-4 text-gray-600">{med.unit}</td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {med.active ? "Active" : "Inactive"}
+                    </td>
                     <td className="px-6 py-4 text-gray-600">
                       {med.batches.reduce(
                         (total, batch) => total + batch.quantity,
@@ -2002,7 +2072,10 @@ function App() {
             <tbody className="divide-y divide-gray-100">
               {categories.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
+                  <td
+                    colSpan={3}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
                     No categories have been added yet.
                   </td>
                 </tr>
