@@ -5,6 +5,8 @@ export const categorySchema = z.object({
   description: z.string().trim().max(500).optional(),
 });
 
+export const categoryUpdateSchema = categorySchema.partial();
+
 export const medicineSchema = z.object({
   genericName: z.string().trim().min(1).max(150),
   brandName: z.string().trim().min(1).max(150),
