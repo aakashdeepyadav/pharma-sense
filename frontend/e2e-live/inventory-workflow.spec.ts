@@ -67,4 +67,50 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
   await expect(
     page.getByText(new RegExp(`"notes":"${issueReason}"`)),
   ).toBeVisible();
+
+  await batchRow.getByRole("button", { name: "Issue" }).click();
+  await page.getByLabel("Quantity issued").fill("4");
+  await page.getByLabel("Reason or notes").fill(`Over-issue check ${suffix}`);
+  await page.getByRole("button", { name: "Save movement" }).click();
+  await expect(
+    page.getByText("Insufficient stock for this operation", { exact: true }),
+  ).toBeVisible();
+  await expect(batchRow.getByRole("cell", { name: "3", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  const expiredBatchNumber = `E2E-EXPIRED-${suffix}`;
+  const expiredManufacturingDate = new Date(Date.now() - 730 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const pastExpiryDate = new Date(Date.now() - 365 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  await page.getByRole("button", { name: "Receive stock" }).click();
+  await page
+    .getByRole("combobox", { name: "Medicine" })
+    .selectOption({ label: `${medicineName} (${brandName})` });
+  await page
+    .getByRole("combobox", { name: "Supplier" })
+    .selectOption({ label: supplierName });
+  await page.getByLabel("Batch number").fill(expiredBatchNumber);
+  await page.getByLabel("Quantity received").fill("5");
+  await page.getByLabel("Manufacturing date").fill(expiredManufacturingDate);
+  await page.getByLabel("Expiry date").fill(pastExpiryDate);
+  await page.getByRole("button", { name: "Receive stock" }).last().click();
+
+  const expiredBatchRow = page
+    .getByRole("row")
+    .filter({ hasText: expiredBatchNumber });
+  await expect(expiredBatchRow).toBeVisible();
+  await expiredBatchRow.getByRole("button", { name: "Issue" }).click();
+  await page.getByLabel("Quantity issued").fill("1");
+  await page.getByLabel("Reason or notes").fill(`Expired issue check ${suffix}`);
+  await page.getByRole("button", { name: "Save movement" }).click();
+  await expect(
+    page.getByText("Expired batches cannot be issued", { exact: true }),
+  ).toBeVisible();
+  await expect(expiredBatchRow.getByRole("cell", { name: "5", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("row").filter({ hasText: expiredBatchNumber }).filter({ hasText: "OUT" }),
+  ).toHaveCount(0);
 });

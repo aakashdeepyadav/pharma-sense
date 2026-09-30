@@ -13,6 +13,49 @@ async function mockDashboardApi(page: Page, role: string) {
           user: { name: "QA User", role },
         },
       };
+    } else if (pathname.endsWith("/medicines")) {
+      response = {
+        success: true,
+        data: [
+          {
+            id: 1,
+            genericName: "QA medicine",
+            brandName: "QA brand",
+            categoryId: 1,
+            manufacturer: null,
+            dosageForm: null,
+            barcode: null,
+            active: true,
+            unit: "Tablet",
+            reorderLevel: 2,
+            batches: [{ quantity: 10 }],
+          },
+        ],
+      };
+    } else if (pathname.endsWith("/suppliers")) {
+      response = {
+        success: true,
+        data: [{ id: 1, name: "QA supplier", contactInfo: null, _count: { batches: 1 } }],
+      };
+    } else if (pathname.endsWith("/batches")) {
+      response = {
+        success: true,
+        data: [
+          {
+            id: 1,
+            medicineId: 1,
+            supplierId: 1,
+            batchNumber: "QA-BATCH-1",
+            mfgDate: "2026-01-01",
+            expiryDate: "2028-01-01",
+            quantity: 10,
+            purchasePrice: 1,
+            sellingPrice: 2,
+            medicine: { genericName: "QA medicine", brandName: "QA brand" },
+            supplier: { name: "QA supplier" },
+          },
+        ],
+      };
     } else if (pathname.endsWith("/reports/summary")) {
       response = {
         success: true,
@@ -79,6 +122,36 @@ test("shows management and receiving actions to Admin", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Receive purchase" }),
   ).toBeVisible();
+  await page.getByText("Management and history", { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
+});
+
+test("shows medicine and receiving actions to Pharmacist", async ({ page }) => {
+  await mockDashboardApi(page, "Pharmacist");
+  await signIn(page);
+
+  await expect(page.getByRole("button", { name: "+ Category" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "+ Add Medicine" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Receive purchase" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ Supplier" })).toHaveCount(0);
+  await page.getByText("Management and history", { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Audit log" })).toHaveCount(0);
+});
+
+test("shows supplier and audit tools to Inventory Manager", async ({ page }) => {
+  await mockDashboardApi(page, "Inventory Manager");
+  await signIn(page);
+
+  await expect(page.getByRole("button", { name: "+ Supplier" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Receive purchase" }),
+  ).toBeVisible();
+  await page.getByText("Management and history", { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
 });
 
 test("hides management and receiving actions from Staff", async ({ page }) => {
@@ -97,4 +170,9 @@ test("hides management and receiving actions from Staff", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Receive purchase" }),
   ).toHaveCount(0);
+  await page.getByText("Management and history", { exact: true }).click();
+  const batchRow = page.getByRole("row").filter({ hasText: "QA-BATCH-1" });
+  await expect(batchRow.getByRole("button", { name: "Issue" })).toBeVisible();
+  await expect(batchRow.getByRole("button", { name: "Adjust" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Audit log" })).toHaveCount(0);
 });
