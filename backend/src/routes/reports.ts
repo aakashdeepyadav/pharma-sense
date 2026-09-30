@@ -3,7 +3,9 @@ import prisma from '../lib/prisma';
 import { AuthenticatedRequest } from '../auth';
 import { demandHistoryQuerySchema } from '../validation/schemas';
 import { forecastQuerySchema } from '../validation/schemas';
+import { replenishmentQuerySchema } from '../validation/schemas';
 import { assessForecastReadiness, movingAverageForecast, movingAverageMae } from '../domain/forecasting';
+import { calculateReplenishment } from '../domain/replenishment';
 
 const router = Router();
 
@@ -167,6 +169,62 @@ router.get('/forecast-baseline', async (req: AuthenticatedRequest, res: Response
     });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to calculate forecast baseline' });
+  }
+});
+
+router.get('/replenishment', async (req: AuthenticatedRequest, res: Response) => {
+  const result = replenishmentQuerySchema.safeParse(req.query);
+  if (!result.success) {
+    res.status(400).json({ success: false, error: result.error.issues });
+    return;
+  }
+
+  const to = new Date();
+  const from = new Date(to.getTime() - result.data.window * 24 * 60 * 60 * 1000);
+  try {
+    const [medicines, transactions] = await Promise.all([
+      prisma.medicine.findMany({
+        where: { active: true },
+        select: {
+          id: true,
+          genericName: true,
+          reorderLevel: true,
+          batches: { select: { quantity: true } },
+        },
+        orderBy: { genericName: 'asc' },
+      }),
+      prisma.stockTransaction.findMany({
+        where: { type: 'OUT', timestamp: { gte: from, lte: to } },
+        select: { quantity: true, batch: { select: { medicineId: true } } },
+      }),
+    ]);
+
+    const issuedByMedicine = new Map<number, number>();
+    for (const transaction of transactions) {
+      issuedByMedicine.set(
+        transaction.batch.medicineId,
+        (issuedByMedicine.get(transaction.batch.medicineId) ?? 0) + transaction.quantity,
+      );
+    }
+
+    const recommendations = medicines.map((medicine) => {
+      const currentUnits = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
+      const averageDailyDemand = (issuedByMedicine.get(medicine.id) ?? 0) / result.data.window;
+      return {
+        medicineId: medicine.id,
+        medicineName: medicine.genericName,
+        ...calculateReplenishment(currentUnits, medicine.reorderLevel, averageDailyDemand, result.data.targetDays),
+        explanation: 'Read-only estimate using completed OUT transactions and the medicine reorder level.',
+      };
+    });
+
+    res.json({
+      success: true,
+      data: recommendations,
+      meta: { from: from.toISOString(), to: to.toISOString(), model: 'rule_based_average_demand' },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to calculate replenishment recommendations' });
   }
 });
 

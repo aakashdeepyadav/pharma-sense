@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { apiFetch } from "./api";
+import "./App.css";
 
 type Medicine = {
   id: number;
@@ -89,6 +90,19 @@ type ReportSummary = {
   }[];
 };
 
+type ReplenishmentRecommendation = {
+  medicineId: number;
+  medicineName: string;
+  currentUnits: number;
+  reorderLevel: number;
+  averageDailyDemand: number;
+  targetDays: number;
+  targetStock: number;
+  recommendedUnits: number;
+  status: "REPLENISH" | "NO_ACTION";
+  explanation: string;
+};
+
 type AuditLog = {
   id: number;
   action: string;
@@ -153,13 +167,91 @@ type Session = {
   user: { name: string; role: string };
 };
 
-function App() {
-  const [session, setSession] = useState<Session | null>(() => {
+type ApiErrorPayload = {
+  code?: string;
+  message?: string;
+  details?: unknown[];
+};
+
+function extractErrorMessage(payload: unknown, fallback: string): string {
+  if (!payload || typeof payload !== "object") {
+    return fallback;
+  }
+
+  const candidate = payload as {
+    error?: string | ApiErrorPayload;
+  };
+
+  if (typeof candidate.error === "string") {
+    return candidate.error;
+  }
+
+  if (candidate.error && typeof candidate.error === "object") {
+    const message = (candidate.error as ApiErrorPayload).message;
+    if (typeof message === "string" && message.trim().length > 0) {
+      return message;
+    }
+  }
+
+  return fallback;
+}
+
+function readStoredSession(): Session | null {
+  try {
     const storedSession = sessionStorage.getItem("pharmasense-session");
-    return storedSession ? (JSON.parse(storedSession) as Session) : null;
-  });
-  const [email, setEmail] = useState("admin@pharmasense.local");
-  const [password, setPassword] = useState("admin12345");
+    if (!storedSession) return null;
+
+    const parsed = JSON.parse(storedSession) as Partial<Session>;
+    if (
+      typeof parsed.token !== "string" ||
+      typeof parsed.user?.name !== "string" ||
+      typeof parsed.user?.role !== "string"
+    ) {
+      sessionStorage.removeItem("pharmasense-session");
+      return null;
+    }
+
+    return parsed as Session;
+  } catch {
+    sessionStorage.removeItem("pharmasense-session");
+    return null;
+  }
+}
+
+const roleThemeMap: Record<
+  string,
+  { tone: string; accent: string; description: string }
+> = {
+  Admin: {
+    tone: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    accent: "text-emerald-700",
+    description:
+      "Full operational control across inventory, purchasing, and reporting.",
+  },
+  Pharmacist: {
+    tone: "bg-cyan-100 text-cyan-800 border-cyan-200",
+    accent: "text-cyan-700",
+    description:
+      "Medication and stock management with read-write dispensing controls.",
+  },
+  "Inventory Manager": {
+    tone: "bg-violet-100 text-violet-800 border-violet-200",
+    accent: "text-violet-700",
+    description:
+      "Vendor, batch, and stock integrity oversight for the supply chain.",
+  },
+  Staff: {
+    tone: "bg-amber-100 text-amber-800 border-amber-200",
+    accent: "text-amber-700",
+    description:
+      "Operational access for daily stock movement and issue monitoring.",
+  },
+};
+
+function App() {
+  const [session, setSession] = useState<Session | null>(readStoredSession);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
@@ -170,6 +262,9 @@ function App() {
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [report, setReport] = useState<ReportSummary | null>(null);
+  const [replenishment, setReplenishment] = useState<
+    ReplenishmentRecommendation[]
+  >([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(() => session !== null);
   const [error, setError] = useState("");
@@ -233,6 +328,12 @@ function App() {
     reorderLevel: "0",
   });
 
+  const roleMeta = roleThemeMap[session?.user.role ?? "Staff"] ?? {
+    tone: "bg-slate-100 text-slate-700 border-slate-200",
+    accent: "text-slate-700",
+    description: "Operational access across the PharmaSense workspace.",
+  };
+
   useEffect(() => {
     if (!session) {
       return;
@@ -250,6 +351,7 @@ function App() {
           transactionResponse,
           alertResponse,
           reportResponse,
+          replenishmentResponse,
         ] = await Promise.all([
           apiFetch("/api/v1/medicines", { headers }),
           apiFetch("/api/v1/categories", { headers }),
@@ -261,6 +363,7 @@ function App() {
           }),
           apiFetch("/api/v1/alerts", { headers }),
           apiFetch("/api/v1/reports/summary", { headers }),
+          apiFetch("/api/v1/reports/replenishment", { headers }),
         ]);
         if (
           !medicineResponse.ok ||
@@ -270,48 +373,94 @@ function App() {
           !purchaseResponse.ok ||
           !transactionResponse.ok ||
           !alertResponse.ok ||
-          !reportResponse.ok
+          !reportResponse.ok ||
+          !replenishmentResponse.ok
         ) {
           throw new Error("The inventory service returned an error.");
         }
 
-        const medicineResult = (await medicineResponse.json()) as ApiResponse;
+        const medicineResult = (await medicineResponse.json()) as {
+          success?: boolean;
+          data?: Medicine[];
+          error?: string | ApiErrorPayload;
+        };
         const categoryResult = (await categoryResponse.json()) as {
-          success: boolean;
-          data: Category[];
+          success?: boolean;
+          data?: Category[];
+          error?: string | ApiErrorPayload;
         };
         const supplierResult = (await supplierResponse.json()) as {
-          success: boolean;
-          data: Supplier[];
+          success?: boolean;
+          data?: Supplier[];
+          error?: string | ApiErrorPayload;
         };
         const batchResult = (await batchResponse.json()) as {
-          success: boolean;
-          data: Batch[];
+          success?: boolean;
+          data?: Batch[];
+          error?: string | ApiErrorPayload;
         };
         const purchaseResult = (await purchaseResponse.json()) as {
-          success: boolean;
-          data: Purchase[];
+          success?: boolean;
+          data?: Purchase[];
+          error?: string | ApiErrorPayload;
         };
         const transactionResult = (await transactionResponse.json()) as {
-          success: boolean;
-          data: StockTransaction[];
+          success?: boolean;
+          data?: StockTransaction[];
+          error?: string | ApiErrorPayload;
         };
         const alertResult = (await alertResponse.json()) as {
-          success: boolean;
-          data: InventoryAlert[];
+          success?: boolean;
+          data?: InventoryAlert[];
+          error?: string | ApiErrorPayload;
         };
         const reportResult = (await reportResponse.json()) as {
-          success: boolean;
-          data: ReportSummary;
+          success?: boolean;
+          data?: ReportSummary;
+          error?: string | ApiErrorPayload;
         };
-        setMedicines(medicineResult.data);
-        setCategories(categoryResult.data);
-        setSuppliers(supplierResult.data);
-        setBatches(batchResult.data);
-        setPurchases(purchaseResult.data);
-        setTransactions(transactionResult.data);
-        setAlerts(alertResult.data);
-        setReport(reportResult.data);
+        const replenishmentResult = (await replenishmentResponse.json()) as {
+          success?: boolean;
+          data?: ReplenishmentRecommendation[];
+          error?: string | ApiErrorPayload;
+        };
+
+        if (
+          !medicineResult.success ||
+          !categoryResult.success ||
+          !supplierResult.success ||
+          !batchResult.success ||
+          !purchaseResult.success ||
+          !transactionResult.success ||
+          !alertResult.success ||
+          !reportResult.success ||
+          !replenishmentResult.success
+        ) {
+          throw new Error(
+            extractErrorMessage(
+              medicineResult.error ??
+                categoryResult.error ??
+                supplierResult.error ??
+                batchResult.error ??
+                purchaseResult.error ??
+                transactionResult.error ??
+                alertResult.error ??
+                reportResult.error ??
+                replenishmentResult.error,
+              "Unable to load inventory.",
+            ),
+          );
+        }
+
+        setMedicines(medicineResult.data ?? []);
+        setCategories(categoryResult.data ?? []);
+        setSuppliers(supplierResult.data ?? []);
+        setBatches(batchResult.data ?? []);
+        setPurchases(purchaseResult.data ?? []);
+        setTransactions(transactionResult.data ?? []);
+        setAlerts(alertResult.data ?? []);
+        setReport(reportResult.data ?? null);
+        setReplenishment(replenishmentResult.data ?? []);
         if (
           session.user.role === "Admin" ||
           session.user.role === "Inventory Manager"
@@ -355,12 +504,12 @@ function App() {
         body: JSON.stringify({ email, password }),
       });
       const result = (await response.json()) as {
-        success: boolean;
+        success?: boolean;
         data?: Session;
-        error?: string;
+        error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success || !result.data) {
-        throw new Error(result.error ?? "Unable to sign in.");
+        throw new Error(extractErrorMessage(result, "Unable to sign in."));
       }
 
       sessionStorage.setItem(
@@ -465,14 +614,12 @@ function App() {
         }),
       });
       const result = (await response.json()) as {
-        success: boolean;
-        error?: string;
+        success?: boolean;
+        error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success) {
         throw new Error(
-          typeof result.error === "string"
-            ? result.error
-            : "Unable to save medicine.",
+          extractErrorMessage(result, "Unable to save medicine."),
         );
       }
 
@@ -531,14 +678,12 @@ function App() {
         body: JSON.stringify(supplierForm),
       });
       const result = (await response.json()) as {
-        success: boolean;
-        error?: string;
+        success?: boolean;
+        error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success) {
         throw new Error(
-          typeof result.error === "string"
-            ? result.error
-            : "Unable to save supplier.",
+          extractErrorMessage(result, "Unable to save supplier."),
         );
       }
 
@@ -590,15 +735,13 @@ function App() {
         body: JSON.stringify(categoryForm),
       });
       const result = (await response.json()) as {
-        success: boolean;
+        success?: boolean;
         data?: Category;
-        error?: string;
+        error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success || !result.data) {
         throw new Error(
-          typeof result.error === "string"
-            ? result.error
-            : "Unable to save category.",
+          extractErrorMessage(result, "Unable to save category."),
         );
       }
 
@@ -686,16 +829,18 @@ function App() {
         }),
       });
       const purchaseResult = (await purchaseResponse.json()) as {
-        success: boolean;
+        success?: boolean;
         data?: { id: number };
-        error?: string;
+        error?: string | ApiErrorPayload;
       };
       if (
         !purchaseResponse.ok ||
         !purchaseResult.success ||
         !purchaseResult.data
       ) {
-        throw new Error(purchaseResult.error ?? "Unable to create purchase.");
+        throw new Error(
+          extractErrorMessage(purchaseResult, "Unable to create purchase."),
+        );
       }
 
       const receiveResponse = await apiFetch(
@@ -703,11 +848,13 @@ function App() {
         { method: "POST", headers },
       );
       const receiveResult = (await receiveResponse.json()) as {
-        success: boolean;
-        error?: string;
+        success?: boolean;
+        error?: string | ApiErrorPayload;
       };
       if (!receiveResponse.ok || !receiveResult.success) {
-        throw new Error(receiveResult.error ?? "Unable to receive purchase.");
+        throw new Error(
+          extractErrorMessage(receiveResult, "Unable to receive purchase."),
+        );
       }
 
       const authHeaders = { Authorization: `Bearer ${session.token}` };
@@ -772,14 +919,12 @@ function App() {
         }),
       });
       const result = (await response.json()) as {
-        success: boolean;
-        error?: string;
+        success?: boolean;
+        error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success) {
         throw new Error(
-          typeof result.error === "string"
-            ? result.error
-            : "Unable to receive batch.",
+          extractErrorMessage(result, "Unable to receive batch."),
         );
       }
 
@@ -836,14 +981,12 @@ function App() {
         }),
       });
       const result = (await response.json()) as {
-        success: boolean;
-        error?: string;
+        success?: boolean;
+        error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success) {
         throw new Error(
-          typeof result.error === "string"
-            ? result.error
-            : "Unable to record stock movement.",
+          extractErrorMessage(result, "Unable to record stock movement."),
         );
       }
 
@@ -885,11 +1028,11 @@ function App() {
       headers,
     });
     const result = (await response.json()) as {
-      success: boolean;
-      error?: string;
+      success?: boolean;
+      error?: string | ApiErrorPayload;
     };
     if (!response.ok || !result.success) {
-      setError(result.error ?? "Unable to receive purchase.");
+      setError(extractErrorMessage(result, "Unable to receive purchase."));
       return;
     }
 
@@ -935,71 +1078,123 @@ function App() {
   };
 
   const handleLogout = async () => {
-    if (session) {
-      await apiFetch("/api/v1/auth/logout", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${session.token}` },
-      });
+    try {
+      if (session) {
+        const response = await apiFetch("/api/v1/auth/logout", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session.token}` },
+        });
+        if (!response.ok) {
+          setLoginError(
+            "Signed out on this device, but server revocation could not be confirmed.",
+          );
+        }
+      }
+    } catch {
+      setLoginError(
+        "Signed out on this device, but server revocation could not be confirmed.",
+      );
+    } finally {
+      sessionStorage.removeItem("pharmasense-session");
+      setSession(null);
     }
-    sessionStorage.removeItem("pharmasense-session");
-    setSession(null);
   };
 
   if (!session) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
-        <form
-          onSubmit={handleLogin}
-          className="w-full max-w-md bg-white p-8 rounded-xl shadow-sm border border-gray-200"
-        >
-          <p className="text-sm font-semibold text-blue-600 mb-2">
-            PHARMASENSE
-          </p>
-          <h1 className="text-3xl font-bold text-gray-900">Sign in</h1>
-          <p className="text-gray-600 mt-2 mb-6">
-            Manage your pharmacy inventory securely.
-          </p>
-          {loginError && (
-            <p className="mb-4 p-3 rounded bg-red-50 text-red-700">
-              {loginError}
+      <main className="auth-shell min-h-screen">
+        <div className="auth-card">
+          <section className="auth-hero">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.22em] text-cyan-50 backdrop-blur-sm">
+              PHARMASENSE
+            </div>
+            <h1 className="mt-6 text-4xl font-black leading-tight text-white">
+              Better pharmacy operations,
+              <span className="block text-cyan-200">
+                in one secure workspace.
+              </span>
+            </h1>
+            <p className="mt-4 max-w-md text-sm leading-6 text-slate-200">
+              Monitor stock, receive purchase orders, manage suppliers, and keep
+              your medicine flow compliant across every role.
             </p>
-          )}
-          <label
-            className="block text-sm font-medium text-gray-700 mb-2"
-            htmlFor="email"
-          >
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4"
-            required
-          />
-          <label
-            className="block text-sm font-medium text-gray-700 mb-2"
-            htmlFor="password"
-          >
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-6"
-            required
-          />
-          <button
-            type="submit"
-            disabled={loggingIn}
-            className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loggingIn ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+
+            <div className="mt-8 grid gap-3 text-sm text-slate-100 sm:grid-cols-2">
+              {[
+                "Live medicine visibility",
+                "Audit-ready transactions",
+                "Role-aware approvals",
+                "Forecast and reorder support",
+              ].map((feature) => (
+                <div
+                  key={feature}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5"
+                >
+                  {feature}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="auth-form-shell">
+            <div className="mb-6">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">
+                Sign in
+              </p>
+              <h2 className="mt-2 text-3xl font-bold text-slate-900">
+                Welcome back
+              </h2>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-5">
+              {loginError && (
+                <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {loginError}
+                </p>
+              )}
+
+              <label
+                className="block text-sm font-medium text-slate-700"
+                htmlFor="email"
+              >
+                Email address
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="username"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100"
+                  required
+                />
+              </label>
+
+              <label
+                className="block text-sm font-medium text-slate-700"
+                htmlFor="password"
+              >
+                Password
+                <input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100"
+                  required
+                />
+              </label>
+
+              <button
+                type="submit"
+                disabled={loggingIn}
+                className="w-full rounded-xl bg-cyan-700 px-4 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {loggingIn ? "Signing in..." : "Sign in to dashboard"}
+              </button>
+            </form>
+          </section>
+        </div>
       </main>
     );
   }
@@ -1048,36 +1243,58 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <header className="mb-8 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            PharmaSense Dashboard
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Agent-Based Medicine Stock Management System
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-sm font-medium text-gray-900">
-              {session.user.name}
+    <div className="min-h-screen bg-slate-100 p-4 md:p-8">
+      <header className="mb-8 rounded-[28px] border border-slate-200 bg-white/80 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur md:p-7">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-cyan-700">
+              PharmaSense
+            </div>
+            <h1 className="text-2xl font-black text-slate-900 md:text-3xl">
+              Inventory command center
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Agent-based medicine stock and replenishment operations
             </p>
-            <p className="text-xs text-gray-500">{session.user.role}</p>
+            <p
+              className={`mt-3 max-w-2xl text-sm font-medium ${roleMeta.accent}`}
+            >
+              {roleMeta.description}
+            </p>
           </div>
-          <button
-            onClick={() => void handleLogout()}
-            className="text-gray-600 hover:text-gray-900 font-medium"
-          >
-            Sign out
-          </button>
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-700 font-bold text-white">
+                {session.user.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-semibold text-slate-900">
+                  {session.user.name}
+                </p>
+                <span
+                  className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${roleMeta.tone}`}
+                >
+                  {session.user.role}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => void handleLogout()}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
-        <div className="flex gap-3">
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
           {canReceiveStock && (
             <button
               onClick={openCreatePurchaseForm}
               disabled={medicines.length === 0 || suppliers.length === 0}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50"
+              className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Receive purchase
             </button>
@@ -1086,7 +1303,7 @@ function App() {
             <button
               onClick={openCreateBatchForm}
               disabled={medicines.length === 0 || suppliers.length === 0}
-              className="border border-blue-300 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition disabled:opacity-50"
+              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Receive stock
             </button>
@@ -1094,7 +1311,7 @@ function App() {
           {canManageSuppliers && (
             <button
               onClick={openCreateSupplierForm}
-              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               + Supplier
             </button>
@@ -1107,7 +1324,7 @@ function App() {
                 setFormError("");
                 setCategoryFormOpen(true);
               }}
-              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               + Category
             </button>
@@ -1115,7 +1332,7 @@ function App() {
           {canWriteMedicines && (
             <button
               onClick={openCreateForm}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+              className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
               + Add Medicine
             </button>
@@ -1939,77 +2156,128 @@ function App() {
         )}
       </section>
 
-      {report && (
-        <section className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">
-                Inventory analytics
-              </h2>
-              <p className="text-sm text-gray-500">
-                Operational metrics from recorded inventory activity.
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <p className="text-sm text-gray-500">Suppliers</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {report.supplierCount}
-              </p>
-            </div>
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <p className="text-sm text-gray-500">Batches</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {report.batchCount}
-              </p>
-            </div>
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <p className="text-sm text-gray-500">Units available</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {report.totalUnits}
-              </p>
-            </div>
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <p className="text-sm text-gray-500">Units issued</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {report.issuedUnits}
-              </p>
-            </div>
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <p className="text-sm text-gray-500">Inventory cost</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {report.inventoryCost.toFixed(2)}
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <h3 className="font-bold text-gray-900 mb-4">
-              Most issued medicines
-            </h3>
-            {report.topIssuedMedicines.length === 0 ? (
-              <p className="text-gray-500">
-                No stock-out activity has been recorded yet.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {report.topIssuedMedicines.map((medicine) => (
-                  <div
-                    key={medicine.medicineId}
-                    className="flex items-center justify-between text-sm"
-                  >
-                    <span className="font-medium text-gray-700">
-                      {medicine.medicineName}
-                    </span>
-                    <span className="text-gray-500">
-                      {medicine.quantityIssued} units issued
-                    </span>
+      <section className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900">
+            Replenishment recommendations
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Read-only estimates based on recent stock OUT activity and reorder
+            levels.
+          </p>
+        </div>
+        {replenishment.filter((item) => item.status === "REPLENISH").length ===
+        0 ? (
+          <p className="p-6 text-gray-500">
+            No replenishment review is suggested right now.
+          </p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {replenishment
+              .filter((item) => item.status === "REPLENISH")
+              .map((item) => (
+                <div
+                  key={item.medicineId}
+                  className="p-4 flex items-center justify-between gap-4"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {item.medicineName}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {item.currentUnits} available,{" "}
+                      {item.averageDailyDemand.toFixed(2)} units/day average
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {item.explanation}
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-blue-700">
+                      {item.recommendedUnits}
+                    </p>
+                    <p className="text-xs text-gray-500">units to review</p>
+                  </div>
+                </div>
+              ))}
           </div>
-        </section>
+        )}
+      </section>
+
+      {report && (
+        <details className="workspace-disclosure mb-8">
+          <summary>Reports and analytics</summary>
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Inventory analytics
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Operational metrics from recorded inventory activity.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                <p className="text-sm text-gray-500">Suppliers</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {report.supplierCount}
+                </p>
+              </div>
+              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                <p className="text-sm text-gray-500">Batches</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {report.batchCount}
+                </p>
+              </div>
+              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                <p className="text-sm text-gray-500">Units available</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {report.totalUnits}
+                </p>
+              </div>
+              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                <p className="text-sm text-gray-500">Units issued</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {report.issuedUnits}
+                </p>
+              </div>
+              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                <p className="text-sm text-gray-500">Inventory cost</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {report.inventoryCost.toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-gray-900 mb-4">
+                Most issued medicines
+              </h3>
+              {report.topIssuedMedicines.length === 0 ? (
+                <p className="text-gray-500">
+                  No stock-out activity has been recorded yet.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {report.topIssuedMedicines.map((medicine) => (
+                    <div
+                      key={medicine.medicineId}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="font-medium text-gray-700">
+                        {medicine.medicineName}
+                      </span>
+                      <span className="text-gray-500">
+                        {medicine.quantityIssued} units issued
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </details>
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -2102,372 +2370,381 @@ function App() {
         </div>
       </div>
 
-      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">Categories</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Category</th>
-                <th className="px-6 py-4">Description</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {categories.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={3}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    No categories have been added yet.
-                  </td>
-                </tr>
-              ) : (
-                categories.map((category) => (
-                  <tr key={category.id}>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {category.name}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {category.description || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {canWriteMedicines && (
-                        <button
-                          onClick={() => openEditCategoryForm(category)}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          Edit
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-xl font-bold text-gray-900">Suppliers</h2>
-          <label>
-            <span className="sr-only">Search suppliers</span>
-            <input
-              type="search"
-              value={supplierSearch}
-              onChange={(event) => setSupplierSearch(event.target.value)}
-              placeholder="Search suppliers"
-              className="w-full md:w-72 border border-gray-300 rounded-lg px-3 py-2"
-            />
-          </label>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Supplier</th>
-                <th className="px-6 py-4">Contact</th>
-                <th className="px-6 py-4">Batches</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredSuppliers.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    {suppliers.length === 0
-                      ? "No suppliers have been added yet."
-                      : "No suppliers match this search."}
-                  </td>
-                </tr>
-              ) : (
-                filteredSuppliers.map((supplier) => (
-                  <tr key={supplier.id}>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {supplier.name}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {supplier.contactInfo || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {supplier._count?.batches ?? 0}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {canManageSuppliers && (
-                        <button
-                          onClick={() => openEditSupplierForm(supplier)}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          Edit
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">Purchase history</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Purchase</th>
-                <th className="px-6 py-4">Supplier</th>
-                <th className="px-6 py-4">Items</th>
-                <th className="px-6 py-4">Created</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {purchases.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    No purchases have been recorded yet.
-                  </td>
-                </tr>
-              ) : (
-                purchases.map((purchase) => (
-                  <tr key={purchase.id}>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      #{purchase.id}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {purchase.supplier.name}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {purchase.items
-                        .map(
-                          (item) =>
-                            `${item.medicine.genericName} (${item.quantity})`,
-                        )
-                        .join(", ")}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {new Date(purchase.createdAt).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {purchase.status}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {purchase.status === "DRAFT" && canReceiveStock && (
-                        <button
-                          onClick={() => void receivePurchase(purchase.id)}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          Receive
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">Received batches</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Batch</th>
-                <th className="px-6 py-4">Medicine</th>
-                <th className="px-6 py-4">Supplier</th>
-                <th className="px-6 py-4">Expiry</th>
-                <th className="px-6 py-4 text-right">Quantity</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {batches.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    No batches have been received yet.
-                  </td>
-                </tr>
-              ) : (
-                batches.map((batch) => (
-                  <tr key={batch.id}>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {batch.batchNumber}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {batch.medicine.genericName}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {batch.supplier.name}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {new Date(batch.expiryDate).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600 text-right">
-                      {batch.quantity}
-                    </td>
-                    <td className="px-6 py-4 text-right whitespace-nowrap">
-                      {canWriteStock && (
-                        <>
-                          <button
-                            onClick={() => openStockForm(batch, "OUT")}
-                            className="text-blue-600 hover:text-blue-800 font-medium mr-3"
-                          >
-                            Issue
-                          </button>
-                          <button
-                            onClick={() => openStockForm(batch, "ADJ")}
-                            className="text-gray-600 hover:text-gray-900 font-medium"
-                          >
-                            Adjust
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">
-            Stock transaction history
-          </h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Time</th>
-                <th className="px-6 py-4">Medicine</th>
-                <th className="px-6 py-4">Batch</th>
-                <th className="px-6 py-4">Type</th>
-                <th className="px-6 py-4">Quantity</th>
-                <th className="px-6 py-4">Recorded by</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {transactions.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    No stock movements have been recorded yet.
-                  </td>
-                </tr>
-              ) : (
-                transactions.map((transaction) => (
-                  <tr key={transaction.id}>
-                    <td className="px-6 py-4 text-gray-600">
-                      {new Date(transaction.timestamp).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {transaction.batch.medicine.genericName}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {transaction.batch.batchNumber}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {transaction.type}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {transaction.quantity}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {transaction.user.name}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {canViewAudit && (
-        <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100">
-            <h2 className="text-xl font-bold text-gray-900">Audit log</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Recent operational changes recorded by the system.
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-                <tr>
-                  <th className="px-6 py-4">Time</th>
-                  <th className="px-6 py-4">Action</th>
-                  <th className="px-6 py-4">Entity</th>
-                  <th className="px-6 py-4">User</th>
-                  <th className="px-6 py-4">Details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {auditLogs.length === 0 ? (
+      <details className="workspace-disclosure mb-8">
+        <summary>Management and history</summary>
+        <div className="workspace-disclosure-content">
+          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900">Categories</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="px-6 py-8 text-center text-gray-500"
-                    >
-                      No audit events have been recorded yet.
-                    </td>
+                    <th className="px-6 py-4">Category</th>
+                    <th className="px-6 py-4">Description</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
-                ) : (
-                  auditLogs.map((log) => (
-                    <tr key={log.id}>
-                      <td className="px-6 py-4 text-gray-600">
-                        {new Date(log.createdAt).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 font-medium text-gray-900">
-                        {log.action.replaceAll("_", " ")}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {log.entity}
-                        {log.entityId === null ? "" : ` #${log.entityId}`}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {log.user.name} ({log.user.role.name})
-                      </td>
-                      <td className="px-6 py-4 text-gray-600 max-w-sm truncate">
-                        {log.details ?? "-"}
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {categories.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="px-6 py-8 text-center text-gray-500"
+                      >
+                        No categories have been added yet.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+                  ) : (
+                    categories.map((category) => (
+                      <tr key={category.id}>
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                          {category.name}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {category.description || "-"}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {canWriteMedicines && (
+                            <button
+                              onClick={() => openEditCategoryForm(category)}
+                              className="text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Suppliers</h2>
+              <label>
+                <span className="sr-only">Search suppliers</span>
+                <input
+                  type="search"
+                  value={supplierSearch}
+                  onChange={(event) => setSupplierSearch(event.target.value)}
+                  placeholder="Search suppliers"
+                  className="w-full md:w-72 border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </label>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4">Supplier</th>
+                    <th className="px-6 py-4">Contact</th>
+                    <th className="px-6 py-4">Batches</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredSuppliers.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="px-6 py-8 text-center text-gray-500"
+                      >
+                        {suppliers.length === 0
+                          ? "No suppliers have been added yet."
+                          : "No suppliers match this search."}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSuppliers.map((supplier) => (
+                      <tr key={supplier.id}>
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                          {supplier.name}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {supplier.contactInfo || "-"}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {supplier._count?.batches ?? 0}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {canManageSuppliers && (
+                            <button
+                              onClick={() => openEditSupplierForm(supplier)}
+                              className="text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900">
+                Purchase history
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4">Purchase</th>
+                    <th className="px-6 py-4">Supplier</th>
+                    <th className="px-6 py-4">Items</th>
+                    <th className="px-6 py-4">Created</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {purchases.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-6 py-8 text-center text-gray-500"
+                      >
+                        No purchases have been recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    purchases.map((purchase) => (
+                      <tr key={purchase.id}>
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                          #{purchase.id}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {purchase.supplier.name}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {purchase.items
+                            .map(
+                              (item) =>
+                                `${item.medicine.genericName} (${item.quantity})`,
+                            )
+                            .join(", ")}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {new Date(purchase.createdAt).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {purchase.status}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {purchase.status === "DRAFT" && canReceiveStock && (
+                            <button
+                              onClick={() => void receivePurchase(purchase.id)}
+                              className="text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              Receive
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900">
+                Received batches
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4">Batch</th>
+                    <th className="px-6 py-4">Medicine</th>
+                    <th className="px-6 py-4">Supplier</th>
+                    <th className="px-6 py-4">Expiry</th>
+                    <th className="px-6 py-4 text-right">Quantity</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {batches.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-6 py-8 text-center text-gray-500"
+                      >
+                        No batches have been received yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    batches.map((batch) => (
+                      <tr key={batch.id}>
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                          {batch.batchNumber}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {batch.medicine.genericName}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {batch.supplier.name}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {new Date(batch.expiryDate).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600 text-right">
+                          {batch.quantity}
+                        </td>
+                        <td className="px-6 py-4 text-right whitespace-nowrap">
+                          {canWriteStock && (
+                            <>
+                              <button
+                                onClick={() => openStockForm(batch, "OUT")}
+                                className="text-blue-600 hover:text-blue-800 font-medium mr-3"
+                              >
+                                Issue
+                              </button>
+                              <button
+                                onClick={() => openStockForm(batch, "ADJ")}
+                                className="text-gray-600 hover:text-gray-900 font-medium"
+                              >
+                                Adjust
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900">
+                Stock transaction history
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4">Time</th>
+                    <th className="px-6 py-4">Medicine</th>
+                    <th className="px-6 py-4">Batch</th>
+                    <th className="px-6 py-4">Type</th>
+                    <th className="px-6 py-4">Quantity</th>
+                    <th className="px-6 py-4">Recorded by</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {transactions.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-6 py-8 text-center text-gray-500"
+                      >
+                        No stock movements have been recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    transactions.map((transaction) => (
+                      <tr key={transaction.id}>
+                        <td className="px-6 py-4 text-gray-600">
+                          {new Date(transaction.timestamp).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                          {transaction.batch.medicine.genericName}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {transaction.batch.batchNumber}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {transaction.type}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {transaction.quantity}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {transaction.user.name}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {canViewAudit && (
+            <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-xl font-bold text-gray-900">Audit log</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Recent operational changes recorded by the system.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                    <tr>
+                      <th className="px-6 py-4">Time</th>
+                      <th className="px-6 py-4">Action</th>
+                      <th className="px-6 py-4">Entity</th>
+                      <th className="px-6 py-4">User</th>
+                      <th className="px-6 py-4">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {auditLogs.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-6 py-8 text-center text-gray-500"
+                        >
+                          No audit events have been recorded yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      auditLogs.map((log) => (
+                        <tr key={log.id}>
+                          <td className="px-6 py-4 text-gray-600">
+                            {new Date(log.createdAt).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 font-medium text-gray-900">
+                            {log.action.replaceAll("_", " ")}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600">
+                            {log.entity}
+                            {log.entityId === null ? "" : ` #${log.entityId}`}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600">
+                            {log.user.name} ({log.user.role.name})
+                          </td>
+                          <td className="px-6 py-4 text-gray-600 max-w-sm truncate">
+                            {log.details ?? "-"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+        </div>
+      </details>
     </div>
   );
 }

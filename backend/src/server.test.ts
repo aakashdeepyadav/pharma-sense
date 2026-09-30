@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import type { AddressInfo } from 'node:net';
 import { app } from './server';
-import { createAccessToken } from './auth';
+import { configureRevokedTokensStorage, createAccessToken, revokeAccessToken } from './auth';
 
 let server: ReturnType<typeof app.listen>;
 let baseUrl = '';
@@ -43,6 +45,25 @@ describe('PharmaSense API', () => {
     assert.equal(response.status, 400);
   });
 
+  it('rate limits repeated requests from the same client', async () => {
+    const clientIp = '203.0.113.250';
+    let rateLimited = false;
+
+    for (let index = 0; index < 45; index += 1) {
+      const response = await fetch(`${baseUrl}/health`, {
+        headers: { 'X-Forwarded-For': clientIp },
+      });
+      if (response.status === 429) {
+        rateLimited = true;
+        const body = (await response.json()) as { error?: { code?: string; message?: string } };
+        assert.equal(body.error?.code, 'RATE_LIMIT_EXCEEDED');
+        break;
+      }
+    }
+
+    assert.equal(rateLimited, true);
+  });
+
   it('revokes a token on logout', async () => {
     const token = createAccessToken({ id: 1, role: 'Admin' });
     const logoutResponse = await fetch(`${baseUrl}/api/v1/auth/logout`, {
@@ -55,6 +76,18 @@ describe('PharmaSense API', () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(protectedResponse.status, 401);
+  });
+
+  it('persists revoked tokens to disk for server restarts', () => {
+    const storagePath = path.join(process.cwd(), '.tmp-revoked-tokens.json');
+    configureRevokedTokensStorage(storagePath);
+    const token = createAccessToken({ id: 2, role: 'Admin' });
+    revokeAccessToken(token);
+
+    const saved = JSON.parse(fs.readFileSync(storagePath, 'utf8')) as Record<string, number>;
+    assert.ok(Object.keys(saved).length >= 1);
+    const tokens = Object.values(saved);
+    assert.ok(tokens.some((value) => typeof value === 'number' && value > Date.now()));
   });
 
   it('allows the seeded admin to read reports', async () => {
@@ -124,6 +157,61 @@ describe('PharmaSense API', () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(response.status, 400);
+  });
+
+  it('returns paginated medicine metadata', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const response = await fetch(`${baseUrl}/api/v1/medicines?page=1&pageSize=2`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.status, 200);
+    const result = (await response.json()) as {
+      success: boolean;
+      data: unknown[];
+      meta: { page: number; pageSize: number; total: number; totalPages: number };
+    };
+    assert.equal(result.success, true);
+    assert.equal(result.meta.page, 1);
+    assert.equal(result.meta.pageSize, 2);
+    assert.ok(Array.isArray(result.data));
+    assert.ok(result.data.length <= 2);
+    assert.ok(result.meta.total >= 0);
+    assert.ok(result.meta.totalPages >= 0);
+  });
+
+  it('returns structured validation errors', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const response = await fetch(`${baseUrl}/api/v1/medicines?active=maybe`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.status, 400);
+    const result = (await response.json()) as {
+      success: boolean;
+      error: { code: string; message: string; details: unknown[] };
+    };
+    assert.equal(result.success, false);
+    assert.equal(result.error.code, 'VALIDATION_ERROR');
+    assert.equal(result.error.message, 'Request validation failed');
+    assert.ok(result.error.details.length > 0);
+  });
+
+  it('returns paginated category metadata', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const response = await fetch(`${baseUrl}/api/v1/categories?page=1&pageSize=5`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.status, 200);
+    const result = (await response.json()) as {
+      success: boolean;
+      data: unknown[];
+      meta: { page: number; pageSize: number; total: number; totalPages: number };
+    };
+    assert.equal(result.success, true);
+    assert.equal(result.meta.page, 1);
+    assert.equal(result.meta.pageSize, 5);
+    assert.ok(Array.isArray(result.data));
+    assert.ok(result.meta.total >= 0);
+    assert.ok(result.meta.totalPages >= 0);
   });
 
   it('denies Staff medicine writes', async () => {

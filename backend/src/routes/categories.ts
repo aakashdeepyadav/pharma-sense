@@ -1,17 +1,37 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
-import { categorySchema, categoryUpdateSchema } from '../validation/schemas';
+import { buildPaginationMeta, sendApiError } from '../lib/api';
+import { categorySchema, categoryUpdateSchema, listQuerySchema } from '../validation/schemas';
 import { AuthenticatedRequest, requireRoles } from '../auth';
 
 const router = Router();
 
 // Get all categories
 router.get('/', async (req: Request, res: Response) => {
+  const query = listQuerySchema.safeParse(req.query);
+  if (!query.success) {
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', query.error.issues);
+    return;
+  }
+
   try {
-    const categories = await prisma.category.findMany();
-    res.json({ success: true, data: categories });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to fetch categories' });
+    const sortBy = query.data.sortBy ?? 'name';
+    const [total, categories] = await Promise.all([
+      prisma.category.count(),
+      prisma.category.findMany({
+        orderBy: { [sortBy]: query.data.sortOrder } as Record<string, 'asc' | 'desc'>,
+        skip: (query.data.page - 1) * query.data.pageSize,
+        take: query.data.pageSize,
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: categories,
+      meta: buildPaginationMeta(total, query.data.page, query.data.pageSize, sortBy, query.data.sortOrder),
+    });
+  } catch {
+    sendApiError(res, 500, 'FETCH_CATEGORIES_FAILED', 'Failed to fetch categories');
   }
 });
 

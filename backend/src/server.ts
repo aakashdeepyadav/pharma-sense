@@ -18,12 +18,48 @@ dotenv.config();
 
 export const app = express();
 const port = process.env.PORT || 5000;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 40;
+const requestCounts = new Map<string, { count: number; windowStart: number }>();
 
 app.disable('x-powered-by');
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  next();
+});
+app.use((req, res, next) => {
+  const forwarded = req.headers['x-forwarded-for'];
+  const clientKey = Array.isArray(forwarded)
+    ? forwarded[0]
+    : typeof forwarded === 'string'
+      ? forwarded.split(',')[0].trim()
+      : req.socket.remoteAddress ?? 'unknown';
+
+  const now = Date.now();
+  const currentWindow = requestCounts.get(clientKey) ?? { count: 0, windowStart: now };
+
+  if (now - currentWindow.windowStart > RATE_LIMIT_WINDOW_MS) {
+    requestCounts.set(clientKey, { count: 1, windowStart: now });
+    next();
+    return;
+  }
+
+  currentWindow.count += 1;
+  requestCounts.set(clientKey, currentWindow);
+
+  if (currentWindow.count > RATE_LIMIT_MAX_REQUESTS) {
+    res.status(429).json({
+      success: false,
+      error: {
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Too many requests. Please retry later.',
+      },
+    });
+    return;
+  }
+
   next();
 });
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));

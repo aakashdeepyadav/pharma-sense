@@ -19,7 +19,24 @@ Agent-Based Medicine Stock Management System.
 - Expiry-aware batch ordering and protection against issuing expired stock.
 - Low-stock, out-of-stock, expired, and expiring-soon alerts with acknowledgement.
 - Operational reports, management-only audit logs, and transactional audit events for writes.
+- Read-only replenishment recommendations based on recent OUT demand and reorder levels; recommendations never place purchases automatically.
+- Pagination metadata and a structured validation error envelope on list endpoints for safer production API contracts.
+- Dashboard error handling aligned with the structured API envelope so login, submit, and inventory actions show actionable server messages.
 - CI checks for migrations, backend tests, research validation, frontend lint, and frontend builds.
+
+## Completion Status
+
+The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase receiving, stock movement, alerts, reporting, and role-checked API workflows are implemented. Current local validation passes: backend build, 19 backend tests, research dataset validation, frontend lint/build, and three Playwright browser smoke tests. The browser suite covers rejected login and Admin/Staff action visibility with mocked API responses; it does not yet cover the complete stock workflow against a live API and database.
+
+## Next Work
+
+The current development line adds read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, and basic request throttling. Production readiness is still in progress; the current controls are local single-process implementations, not shared controls for horizontally scaled deployments.
+
+- Expand browser-level tests to cover the complete stock workflow against a live API and database and the full role matrix; finish responsive and accessibility review.
+- Add controlled user and role administration; today, the seeded account is the only documented account-management path.
+- Replace file-backed token revocation and process-local rate limiting with shared production storage, and configure trusted proxy handling before deployment.
+- Obtain approved real or de-identified demand data before making model-performance claims; synthetic data remains research/test-only.
+- Add human approval for replenishment, agent safety controls, and a deployment rehearsal including backup and restore.
 
 The forecasting pipeline currently uses synthetic research data only. It must not be mixed with operational inventory or treated as evidence of production model performance. See [research/data/DATA_CONTRACT.md](research/data/DATA_CONTRACT.md) before using any real or de-identified data.
 
@@ -73,15 +90,18 @@ npm test
 npm run research:validate
 
 cd ../frontend
+npx playwright install chromium
 npm run lint
 npm run build
+npm run test:e2e
 ```
 
 ## Security Notes
 
 - Passwords are stored as bcrypt hashes and login failures use a generic response.
 - Protected API routes enforce JWT authentication and role authorization on the server; frontend controls are presentation only.
-- Dashboard logout revokes the current access token on the running API instance before clearing the local session.
+- Dashboard logout revokes the current access token on the running API instance before clearing the local session, and the backend persists revoked JWT fingerprints to disk so server restarts do not silently re-enable old tokens.
+- The API applies a lightweight request throttle to limit abusive bursts from a single client and returns a structured 429 response with a clear rate-limit code.
 - Stock changes and inventory master-data writes create audit records tied to the authenticated user.
 - Keep `JWT_SECRET`, database credentials, and shared-environment credentials outside source control.
 - The seeded account and Docker database password are for local development only.

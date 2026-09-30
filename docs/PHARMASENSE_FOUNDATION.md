@@ -16,9 +16,11 @@ The repository began as an early prototype. The current implementation has moved
 - Prisma already models users, roles, categories, medicines, suppliers, batches, and stock transactions.
 - The backend now uses protected, validated routes for inventory, purchases, alerts, reports, and audit logs.
 - The frontend dashboard reads live API data and supports medicine, category, supplier, batch, purchase, and stock workflows.
-- Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, and baseline tests are implemented; production deployment and advanced AI features remain open.
+- Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, baseline tests, a read-only replenishment recommendation, and paginated list API hardening are implemented; production deployment and advanced AI features remain open.
 
-The next work focuses on final release hardening. Camera/mobile scanning, advanced forecasting, AI agents, and replenishment recommendations remain later phases.
+The core MVP is released as `v0.1.0`. The current implementation extends it with read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, and basic request throttling. Local CI-equivalent build, test, lint, and research-validation commands pass; three Playwright browser smoke tests cover rejected login and Admin/Staff action visibility using mocked API responses. The research validator reports warnings because the dataset is synthetic and does not model stockout censoring or organization groups.
+
+Production readiness is not complete. Browser coverage for the full operator workflow against a live API/database and the complete role matrix, user/role administration, shared token-revocation and rate-limit state, approved operational demand data, human-approved replenishment, and a deployment/backup-restore rehearsal remain open. Camera/mobile scanning, advanced forecasting, and AI agents remain later phases.
 
 ## A. Executive Summary
 
@@ -90,7 +92,7 @@ The tenant boundary for the MVP is one organization per deployment. Multi-tenant
 ## F. Non-Functional Requirements
 
 - **Correctness:** stock changes use atomic database transactions and reject negative quantities.
-- **Security:** hashed passwords, validated input, least privilege, secure secrets, audit records, and protected production transport.
+- **Security:** hashed passwords, validated input, least privilege, secure secrets, audit records, request throttling, and protected production transport.
 - **Availability:** core inventory remains operational if ML or agent services are down.
 - **Performance:** normal list and transaction operations should return within 500 ms in the local MVP dataset; measure rather than promise a production SLA.
 - **Maintainability:** modular routes/services, Prisma migrations, typed request/response contracts, and documented decisions.
@@ -119,7 +121,7 @@ PostgreSQL via Prisma
           +--> Optional agent service (later)
 ```
 
-The API is the authority for inventory state. The frontend never directly writes to PostgreSQL. ML and agent services consume approved API/data contracts and return predictions or recommendations; they do not mutate stock directly.
+The API is the authority for inventory state. The frontend never directly writes to PostgreSQL, and its forms are now aligned with the API's structured validation envelope and paginated list responses. ML and agent services consume approved API/data contracts and return predictions or recommendations; they do not mutate stock directly.
 
 Recommended backend layers:
 
@@ -212,7 +214,7 @@ Base path: `/api/v1`.
 | Audit      | `GET /audit-logs` for authorized administrators                                 |
 | System     | `GET /health`                                                                   |
 
-All endpoints should use a consistent envelope, for example `{ data, meta }` on success and `{ error: { code, message, details } }` on failure. Add pagination, filtering, and sorting before the datasets grow.
+All endpoints should use a consistent envelope, for example `{ data, meta }` on success and `{ error: { code, message, details } }` on failure. The medicine and supplier list endpoints now include validated pagination metadata and structured validation error responses, and the remaining routes can follow the same contract as the dataset grows.
 
 Every write endpoint must define its permission, validation schema, transaction boundary, and audit behavior. Avoid exposing raw Prisma errors to clients.
 
@@ -332,6 +334,8 @@ MVP is not complete if it depends on mock frontend data, unauthenticated writes,
 ## S. V1 Features
 
 After MVP hardening: richer reports, configurable alert thresholds, supplier purchase history, FEFO suggestions, export, dashboard trends, reconciliation tools, better audit search, and a read-only forecasting baseline.
+
+The first V1 slice is implemented: read-only replenishment recommendations use recent completed OUT demand and reorder levels and never create purchases automatically.
 
 ## T. Future Features
 
