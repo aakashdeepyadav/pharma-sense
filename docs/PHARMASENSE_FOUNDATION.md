@@ -10,13 +10,13 @@
 
 This document is the working contract for the six-member team. It defines what the first release is, what is deliberately postponed, who owns each workstream, and how the current repository will be advanced.
 
-The repository is currently an early prototype:
+The repository began as an early prototype. The current implementation has moved beyond that baseline:
 
 - PostgreSQL is available through `docker-compose.yml`.
 - Prisma already models users, roles, categories, medicines, suppliers, batches, and stock transactions.
-- The backend currently exposes basic unauthenticated list/create routes for medicines, categories, and batches.
-- The frontend dashboard still renders mock medicine data.
-- Authentication, validation, authorization, purchases, alerts, audit logging, tests, and production deployment are not complete.
+- The backend now uses protected, validated routes for inventory, purchases, alerts, reports, and audit logs.
+- The frontend dashboard reads live API data and supports medicine, category, supplier, batch, purchase, and stock workflows.
+- Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, and baseline tests are implemented; production deployment and advanced AI features remain open.
 
 The next work therefore starts with core correctness and security. AI agents, forecasting, mobile, and barcode features remain later phases.
 
@@ -179,10 +179,10 @@ No recommendation changes inventory or creates a purchase without explicit autho
 ### Required schema corrections before MVP
 
 - Add `sellingPrice` to `Batch`.
-- Add manufacturer, dosage/form, barcode, and active status to `Medicine`.
-- Add `Purchase`, `PurchaseItem`, `Alert`, and `AuditLog` models.
+- Manufacturer, dosage/form, barcode, and active status are implemented for `Medicine`.
+- `Purchase`, `PurchaseItem`, `Alert`, and `AuditLog` models are implemented.
 - Prefer enums for role, transaction type, purchase status, alert type, and alert status.
-- Use `Decimal` for money instead of floating point.
+- Use `Decimal` for money instead of floating point. Purchase prices now use `Decimal(12,2)`.
 - Add unique constraints such as `(medicineId, batchNumber)` and supplier contact identifiers where appropriate.
 - Add checks for positive quantities, non-negative prices, expiry after manufacturing date, and valid dates.
 - Add indexes for medicine search fields, batch expiry, batch medicine, transaction timestamp, and alert status/type.
