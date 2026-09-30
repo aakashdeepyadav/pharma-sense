@@ -268,6 +268,7 @@ Unknown, duplicate, expired, and ambiguous barcodes must produce recoverable err
 ## N. Security Architecture
 
 - Hash passwords with a current adaptive password hash; never store plaintext passwords.
+- Refuse production startup when `JWT_SECRET` is missing, a placeholder, or shorter than 32 characters, or when database/CORS configuration is absent.
 - Use short-lived JWT access tokens, secure secret storage, and a documented logout/revocation strategy.
 - Enforce authorization server-side on every protected route; the frontend role check is only presentation.
 - Validate and normalize all request bodies, query parameters, and path IDs with Zod.

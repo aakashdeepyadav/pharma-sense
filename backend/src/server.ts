@@ -18,6 +18,23 @@ import { requireAuth } from './auth';
 
 dotenv.config();
 
+function validateRuntimeConfiguration() {
+  if (process.env.NODE_ENV !== 'production') return;
+
+  const jwtSecret = process.env.JWT_SECRET ?? '';
+  if (jwtSecret.length < 32 || jwtSecret === 'replace-with-a-long-random-secret') {
+    throw new Error('Production JWT_SECRET must be a unique secret of at least 32 characters');
+  }
+  if (!process.env.DATABASE_URL) {
+    throw new Error('Production DATABASE_URL is required');
+  }
+  if (!process.env.FRONTEND_URLS && !process.env.FRONTEND_URL) {
+    throw new Error('Production FRONTEND_URLS or FRONTEND_URL is required');
+  }
+}
+
+validateRuntimeConfiguration();
+
 export const app = express();
 const port = process.env.PORT || 5000;
 const trustProxy = process.env.TRUST_PROXY === 'true';
