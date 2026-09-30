@@ -10,7 +10,7 @@ type Medicine = {
   batches: { quantity: number }[];
 };
 
-type Category = { id: number; name: string };
+type Category = { id: number; name: string; description: string | null };
 
 type Supplier = {
   id: number;
@@ -174,6 +174,7 @@ function App() {
     contactInfo: "",
   });
   const [categoryFormOpen, setCategoryFormOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryForm, setCategoryForm] = useState<CategoryForm>({
     name: "",
     description: "",
@@ -535,6 +536,16 @@ function App() {
     }
   };
 
+  const openEditCategoryForm = (category: Category) => {
+    setEditingCategory(category);
+    setCategoryForm({
+      name: category.name,
+      description: category.description ?? "",
+    });
+    setFormError("");
+    setCategoryFormOpen(true);
+  };
+
   const handleCategorySave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!session) return;
@@ -542,8 +553,11 @@ function App() {
     setSaving(true);
     setFormError("");
     try {
-      const response = await fetch("http://localhost:5000/api/v1/categories", {
-        method: "POST",
+      const endpoint = editingCategory
+        ? `http://localhost:5000/api/v1/categories/${editingCategory.id}`
+        : "http://localhost:5000/api/v1/categories";
+      const response = await fetch(endpoint, {
+        method: editingCategory ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.token}`,
@@ -563,12 +577,15 @@ function App() {
         );
       }
 
-      setCategories((current) =>
-        [...current, result.data!].sort((left, right) =>
-          left.name.localeCompare(right.name),
-        ),
-      );
+      const refreshed = await fetch("http://localhost:5000/api/v1/categories", {
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
+      const refreshedResult = (await refreshed.json()) as {
+        data: Category[];
+      };
+      setCategories(refreshedResult.data);
       setCategoryFormOpen(false);
+      setEditingCategory(null);
       setCategoryForm({ name: "", description: "" });
       await refreshAuditLogs();
     } catch (requestError) {
@@ -1053,6 +1070,7 @@ function App() {
           {canWriteMedicines && (
             <button
               onClick={() => {
+                setEditingCategory(null);
                 setCategoryForm({ name: "", description: "" });
                 setFormError("");
                 setCategoryFormOpen(true);
@@ -1567,7 +1585,9 @@ function App() {
             className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Add category</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingCategory ? "Edit category" : "Add category"}
+              </h2>
               <button
                 type="button"
                 onClick={() => setCategoryFormOpen(false)}
@@ -1965,6 +1985,53 @@ function App() {
           </table>
         </div>
       </div>
+
+      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900">Categories</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4">Category</th>
+                <th className="px-6 py-4">Description</th>
+                <th className="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {categories.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
+                    No categories have been added yet.
+                  </td>
+                </tr>
+              ) : (
+                categories.map((category) => (
+                  <tr key={category.id}>
+                    <td className="px-6 py-4 font-medium text-gray-900">
+                      {category.name}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {category.description || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {canWriteMedicines && (
+                        <button
+                          onClick={() => openEditCategoryForm(category)}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
