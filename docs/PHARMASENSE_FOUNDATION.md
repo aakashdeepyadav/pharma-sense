@@ -18,7 +18,9 @@ The repository began as an early prototype. The current implementation has moved
 - The frontend dashboard reads live API data and supports medicine, category, supplier, batch, purchase, and stock workflows.
 - Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, baseline tests, a read-only replenishment recommendation, and paginated list API hardening are implemented; production deployment and advanced AI features remain open.
 
-The next work focuses on release hardening, approved-data forecasting, human approval workflows, and production deployment. Camera/mobile scanning, advanced forecasting, and AI agents remain later phases.
+The core MVP is released as `v0.1.0`. The current implementation extends it with read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, and basic request throttling. Local CI-equivalent build, test, lint, and research-validation commands pass; the research validator reports warnings because the dataset is synthetic and does not model stockout censoring or organization groups.
+
+Production readiness is not complete. Automated browser coverage for the full operator workflow and role matrix, user/role administration, shared token-revocation and rate-limit state, approved operational demand data, human-approved replenishment, and a deployment/backup-restore rehearsal remain open. Camera/mobile scanning, advanced forecasting, and AI agents remain later phases.
 
 ## A. Executive Summary
 

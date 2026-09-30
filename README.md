@@ -26,14 +26,17 @@ Agent-Based Medicine Stock Management System.
 
 ## Completion Status
 
-The MVP was released as `v0.1.0` on `master`. The integrated `develop` branch now also contains the first V1 read-only replenishment recommendation feature and the next API-hardening slice: paginated list responses and a structured validation error envelope. The current system is suitable for a local or review demonstration against PostgreSQL.
+The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase receiving, stock movement, alerts, reporting, and role-checked API workflows are implemented. Current local validation passes: backend build, 19 backend tests, research dataset validation, frontend lint, and frontend build. The full operator journey is not yet covered by automated browser tests.
 
 ## Next Work
 
-- Add browser-level end-to-end tests and complete responsive/accessibility review.
-- Move token revocation from in-memory storage to shared production persistence.
-- Improve forecast evaluation with approved real or de-identified data.
-- Add human-approved replenishment workflows, agent safety controls, and deployment rehearsal.
+The current development line adds read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, and basic request throttling. Production readiness is still in progress; the current controls are local single-process implementations, not shared controls for horizontally scaled deployments.
+
+- Add browser-level end-to-end tests for the complete stock workflow and role-specific permissions; finish responsive and accessibility review.
+- Add controlled user and role administration; today, the seeded account is the only documented account-management path.
+- Replace file-backed token revocation and process-local rate limiting with shared production storage, and configure trusted proxy handling before deployment.
+- Obtain approved real or de-identified demand data before making model-performance claims; synthetic data remains research/test-only.
+- Add human approval for replenishment, agent safety controls, and a deployment rehearsal including backup and restore.
 
 The forecasting pipeline currently uses synthetic research data only. It must not be mixed with operational inventory or treated as evidence of production model performance. See [research/data/DATA_CONTRACT.md](research/data/DATA_CONTRACT.md) before using any real or de-identified data.
 
