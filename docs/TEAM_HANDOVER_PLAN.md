@@ -22,11 +22,59 @@ The leader owns:
 
 The leader should not implement every task alone. Each member must own and demonstrate their assigned workstream.
 
+## How Every Member Should Work
+
+1. Pull the latest `develop` branch and confirm the application starts before editing.
+2. Create the assigned branch from `develop`, for example `git switch -c feature/frontend-ux`.
+3. Read the relevant existing route, component, test, and documentation before changing code.
+4. Make one focused change at a time. Do not mix unrelated formatting or refactoring into the feature.
+5. Run the smallest relevant check after the first edit, then run the full checks before opening a pull request.
+6. Commit with a clear human message such as `add purchase smoke tests`.
+7. Push the branch and open a pull request into `develop`.
+8. In the pull request, explain what changed, how it was tested, migration impact, security impact, and known limitations.
+9. Demonstrate the workflow to the leader or reviewer using a short script, screenshots, test output, or a result file.
+
+### Standard setup
+
+```bash
+docker compose up -d
+cd backend
+npm install
+npx prisma migrate deploy
+npm run seed
+npm run dev
+```
+
+In another terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Standard validation
+
+```bash
+cd backend
+npm run build
+npm test
+npm run research:validate
+
+cd ../frontend
+npm run lint
+npm run build
+```
+
+Do not commit `backend/.env`, frontend environment files containing secrets, database dumps, or generated confidential data.
+
 ## Member 1: Frontend and User Experience
 
 **Branch:** `feature/frontend-ux`
 
 **Mission:** make the operator dashboard complete, accessible, and easy to use.
+
+**How to do it:** start in `frontend/src/App.tsx`, `frontend/src/api.ts`, and the existing Vite configuration. Test the real API with the seeded admin account and at least one restricted role. Use browser developer tools to check network failures, keyboard focus, narrow widths, and console errors.
 
 **Tasks:**
 
@@ -57,6 +105,8 @@ The leader should not implement every task alone. Each member must own and demon
 
 **Mission:** strengthen API completeness, validation, and inventory workflows.
 
+**How to do it:** start in `backend/src/routes`, `backend/src/validation/schemas.ts`, and `backend/src/server.test.ts`. For every endpoint, write down the allowed roles, input schema, success response, error responses, transaction boundary, and audit event before editing. Use non-destructive tests when possible and clean up any data created by a test.
+
 **Tasks:**
 
 - Complete supplier search and filtering.
@@ -85,6 +135,8 @@ The leader should not implement every task alone. Each member must own and demon
 **Branch:** `feature/database-quality`
 
 **Mission:** protect data integrity and make operational data reliable for reporting and forecasting.
+
+**How to do it:** start in `backend/prisma/schema.prisma`, `backend/prisma/migrations`, `backend/src/scripts`, and `research/data`. Apply migrations to a disposable database, inspect the generated SQL, and compare database quantities with the transaction ledger before proposing repairs. Never silently modify production-like data from a reconciliation report.
 
 **Tasks:**
 
@@ -115,6 +167,8 @@ The leader should not implement every task alone. Each member must own and demon
 
 **Mission:** maintain a reproducible, evidence-based forecasting workstream that remains separate from operational inventory.
 
+**How to do it:** start in `research/data/DATA_CONTRACT.md`, `backend/src/domain/forecasting.ts`, and `backend/src/scripts`. Run the deterministic generator and evaluator, preserve result artifacts, record the date range and split strategy, and label every result as synthetic until an approved real or de-identified dataset exists.
+
 **Tasks:**
 
 - Maintain the approved demand data contract.
@@ -144,6 +198,8 @@ The leader should not implement every task alone. Each member must own and demon
 **Branch:** `feature/devops-security`
 
 **Mission:** make the project reproducible, reviewable, and safer to demonstrate or deploy.
+
+**How to do it:** start in `.github/workflows/ci.yml`, `docker-compose.yml`, `.env.example` files, and the security notes in `README.md`. Test the setup from a clean terminal or disposable database, verify that migrations and seed scripts work, and inspect CI output rather than relying only on local success.
 
 **Tasks:**
 
