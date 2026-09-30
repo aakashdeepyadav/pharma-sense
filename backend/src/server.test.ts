@@ -38,6 +38,14 @@ describe('PharmaSense API', () => {
     assert.equal(response.status, 401);
   });
 
+  it('does not grant CORS access to an unknown origin', async () => {
+    const response = await fetch(`${baseUrl}/health`, {
+      headers: { Origin: 'https://untrusted.example' },
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('access-control-allow-origin'), null);
+  });
+
   it('rejects invalid login input', async () => {
     const response = await fetch(`${baseUrl}/api/v1/auth/login`, {
       method: 'POST',

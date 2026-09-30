@@ -21,6 +21,12 @@ dotenv.config();
 export const app = express();
 const port = process.env.PORT || 5000;
 const trustProxy = process.env.TRUST_PROXY === 'true';
+const allowedOrigins = (
+  process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? 'http://localhost:5173'
+)
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 function positiveIntegerSetting(name: string, fallback: number) {
   const value = Number(process.env[name]);
   return Number.isInteger(value) && value > 0 ? value : fallback;
@@ -42,7 +48,15 @@ app.use((_req, res, next) => {
   res.setHeader('Referrer-Policy', 'no-referrer');
   next();
 });
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(null, false);
+  },
+}));
 app.use((req, res, next) => {
   const forwarded = req.headers['x-forwarded-for'];
   const clientKey = trustProxy && Array.isArray(forwarded)
