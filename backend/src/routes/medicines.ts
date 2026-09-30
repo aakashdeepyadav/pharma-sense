@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { medicineSchema, medicineUpdateSchema } from '../validation/schemas';
+import { requireRoles } from '../auth';
 
 const router = Router();
 
@@ -39,7 +40,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // Add a new medicine
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async (req: Request, res: Response) => {
   try {
     const result = medicineSchema.safeParse(req.body);
     if (!result.success) {
@@ -56,7 +57,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/:id', async (req: Request, res: Response) => {
+router.patch('/:id', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const result = medicineUpdateSchema.safeParse(req.body);
   if (!Number.isInteger(id) || id < 1) {

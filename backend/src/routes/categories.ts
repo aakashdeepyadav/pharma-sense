@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { categorySchema } from '../validation/schemas';
+import { requireRoles } from '../auth';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Add a category
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async (req: Request, res: Response) => {
   try {
     const result = categorySchema.safeParse(req.body);
     if (!result.success) {

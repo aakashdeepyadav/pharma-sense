@@ -42,3 +42,13 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
 export function createAccessToken(user: { id: number; role: string }) {
   return jwt.sign({ userId: user.id, role: user.role }, getJwtSecret(), { expiresIn: '2h' });
 }
+
+export function requireRoles(...allowedRoles: string[]) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      res.status(403).json({ success: false, error: 'You do not have permission for this action' });
+      return;
+    }
+    next();
+  };
+}

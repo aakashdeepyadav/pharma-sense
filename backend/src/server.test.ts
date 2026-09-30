@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import type { AddressInfo } from 'node:net';
 import { app } from './server';
+import { createAccessToken } from './auth';
 
 let server: ReturnType<typeof app.listen>;
 let baseUrl = '';
@@ -66,5 +67,17 @@ describe('PharmaSense API', () => {
       headers: { Authorization: `Bearer ${login.data.token}` },
     });
     assert.equal(response.status, 400);
+  });
+
+  it('denies Staff medicine writes', async () => {
+    const response = await fetch(`${baseUrl}/api/v1/medicines`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${createAccessToken({ id: 1, role: 'Staff' })}`,
+      },
+      body: JSON.stringify({ genericName: 'Test', brandName: 'Test', categoryId: 1, unit: 'Tablet', reorderLevel: 1 }),
+    });
+    assert.equal(response.status, 403);
   });
 });

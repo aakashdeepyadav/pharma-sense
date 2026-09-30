@@ -2,11 +2,19 @@ import bcrypt from 'bcrypt';
 import prisma from '../lib/prisma';
 
 async function seed() {
-  const role = await prisma.role.upsert({
-    where: { name: 'Admin' },
-    update: { permissions: 'all' },
-    create: { name: 'Admin', permissions: 'all' },
-  });
+  const roles = [
+    { name: 'Admin', permissions: 'all' },
+    { name: 'Pharmacist', permissions: 'medicine:write,stock:write' },
+    { name: 'Inventory Manager', permissions: 'medicine:write,supplier:write,stock:write' },
+    { name: 'Staff', permissions: 'inventory:read' },
+  ];
+  const savedRoles = await Promise.all(roles.map((role) => prisma.role.upsert({
+    where: { name: role.name },
+    update: { permissions: role.permissions },
+    create: role,
+  })));
+  const role = savedRoles.find((savedRole) => savedRole.name === 'Admin');
+  if (!role) throw new Error('Admin role was not created');
   await prisma.category.upsert({
     where: { name: 'General' },
     update: {},

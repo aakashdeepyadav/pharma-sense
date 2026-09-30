@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import prisma from '../lib/prisma';
-import { AuthenticatedRequest } from '../auth';
+import { AuthenticatedRequest, requireRoles } from '../auth';
 import { stockTransactionSchema } from '../validation/schemas';
 import { calculateStockDelta, minimumQuantityForDelta } from '../domain/stockRules';
 
@@ -21,7 +21,7 @@ router.get('/transactions', async (_req: AuthenticatedRequest, res: Response) =>
   }
 });
 
-router.post('/transactions', async (req: AuthenticatedRequest, res: Response) => {
+router.post('/transactions', requireRoles('Admin', 'Pharmacist', 'Inventory Manager', 'Staff'), async (req: AuthenticatedRequest, res: Response) => {
   const result = stockTransactionSchema.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({ success: false, error: result.error.issues });

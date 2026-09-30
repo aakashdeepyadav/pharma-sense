@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { batchSchema } from '../validation/schemas';
-import { AuthenticatedRequest } from '../auth';
+import { AuthenticatedRequest, requireRoles } from '../auth';
 
 const router = Router();
 
@@ -18,7 +18,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Add a new batch
-router.post('/', async (req: AuthenticatedRequest, res: Response) => {
+router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const result = batchSchema.safeParse(req.body);
     if (!result.success) {
