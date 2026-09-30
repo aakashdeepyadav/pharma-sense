@@ -47,13 +47,15 @@ describe('PharmaSense API', () => {
   });
 
   it('rate limits repeated requests per client and route with CORS headers', async () => {
-    const clientIp = '203.0.113.250';
     const origin = 'http://localhost:5173';
     let rateLimited = false;
 
     for (let index = 0; index < 45; index += 1) {
       const response = await fetch(`${baseUrl}/health`, {
-        headers: { 'X-Forwarded-For': clientIp, Origin: origin },
+        headers: {
+          'X-Forwarded-For': `203.0.113.${index + 1}`,
+          Origin: origin,
+        },
       });
       if (response.status === 429) {
         rateLimited = true;
@@ -66,7 +68,7 @@ describe('PharmaSense API', () => {
 
     assert.equal(rateLimited, true);
     const otherRouteResponse = await fetch(`${baseUrl}/`, {
-      headers: { 'X-Forwarded-For': clientIp, Origin: origin },
+      headers: { 'X-Forwarded-For': '203.0.113.250', Origin: origin },
     });
     assert.equal(otherRouteResponse.status, 200);
   });

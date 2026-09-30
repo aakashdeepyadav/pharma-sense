@@ -19,11 +19,13 @@ dotenv.config();
 
 export const app = express();
 const port = process.env.PORT || 5000;
+const trustProxy = process.env.TRUST_PROXY === 'true';
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 40;
 const requestCounts = new Map<string, { count: number; windowStart: number }>();
 
 app.disable('x-powered-by');
+app.set('trust proxy', trustProxy);
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -33,9 +35,9 @@ app.use((_req, res, next) => {
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
 app.use((req, res, next) => {
   const forwarded = req.headers['x-forwarded-for'];
-  const clientKey = Array.isArray(forwarded)
+  const clientKey = trustProxy && Array.isArray(forwarded)
     ? forwarded[0]
-    : typeof forwarded === 'string'
+    : trustProxy && typeof forwarded === 'string'
       ? forwarded.split(',')[0].trim()
       : req.socket.remoteAddress ?? 'unknown';
   const rateLimitKey = `${clientKey}:${req.path}`;
