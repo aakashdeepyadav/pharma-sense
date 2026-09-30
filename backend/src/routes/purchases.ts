@@ -22,6 +22,32 @@ router.get('/', async (_req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+router.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
+  const purchaseId = Number(req.params.id);
+  if (!Number.isInteger(purchaseId) || purchaseId < 1) {
+    res.status(400).json({ success: false, error: 'Purchase id must be a positive integer' });
+    return;
+  }
+
+  try {
+    const purchase = await prisma.purchase.findUnique({
+      where: { id: purchaseId },
+      include: {
+        supplier: true,
+        createdBy: { select: { name: true, email: true } },
+        items: { include: { medicine: true } },
+      },
+    });
+    if (!purchase) {
+      res.status(404).json({ success: false, error: 'Purchase not found' });
+      return;
+    }
+    res.json({ success: true, data: purchase });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to fetch purchase' });
+  }
+});
+
 router.post('/', requireRoles(...receivingRoles), async (req: AuthenticatedRequest, res: Response) => {
   const result = purchaseSchema.safeParse(req.body);
   if (!result.success) {
