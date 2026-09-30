@@ -91,6 +91,11 @@ type SupplierForm = {
   contactInfo: string;
 };
 
+type CategoryForm = {
+  name: string;
+  description: string;
+};
+
 type BatchForm = {
   medicineId: string;
   supplierId: string;
@@ -147,6 +152,11 @@ function App() {
   const [supplierForm, setSupplierForm] = useState<SupplierForm>({
     name: "",
     contactInfo: "",
+  });
+  const [categoryFormOpen, setCategoryFormOpen] = useState(false);
+  const [categoryForm, setCategoryForm] = useState<CategoryForm>({
+    name: "",
+    description: "",
   });
   const [batchFormOpen, setBatchFormOpen] = useState(false);
   const [batchForm, setBatchForm] = useState<BatchForm>({
@@ -450,6 +460,50 @@ function App() {
         requestError instanceof Error
           ? requestError.message
           : "Unable to save supplier.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCategorySave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session) return;
+
+    setSaving(true);
+    setFormError("");
+    try {
+      const response = await fetch("http://localhost:5000/api/v1/categories", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify(categoryForm),
+      });
+      const result = (await response.json()) as {
+        success: boolean;
+        data?: Category;
+        error?: string;
+      };
+      if (!response.ok || !result.success || !result.data) {
+        throw new Error(
+          typeof result.error === "string"
+            ? result.error
+            : "Unable to save category.",
+        );
+      }
+
+      setCategories((current) => [...current, result.data!].sort((left, right) =>
+        left.name.localeCompare(right.name),
+      ));
+      setCategoryFormOpen(false);
+      setCategoryForm({ name: "", description: "" });
+    } catch (requestError) {
+      setFormError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to save category.",
       );
     } finally {
       setSaving(false);
@@ -760,6 +814,18 @@ function App() {
               className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
             >
               + Supplier
+            </button>
+          )}
+          {canWriteMedicines && (
+            <button
+              onClick={() => {
+                setCategoryForm({ name: "", description: "" });
+                setFormError("");
+                setCategoryFormOpen(true);
+              }}
+              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition"
+            >
+              + Category
             </button>
           )}
           {canWriteMedicines && (
@@ -1078,6 +1144,74 @@ function App() {
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save supplier"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {categoryFormOpen && (
+        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+          <form
+            onSubmit={handleCategorySave}
+            className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">
+                Add category
+              </h2>
+              <button
+                type="button"
+                onClick={() => setCategoryFormOpen(false)}
+                className="text-gray-500 hover:text-gray-900"
+              >
+                Close
+              </button>
+            </div>
+            {formError && (
+              <p className="mb-4 p-3 rounded bg-red-50 text-red-700">
+                {formError}
+              </p>
+            )}
+            <label className="block text-sm font-medium text-gray-700 mb-4">
+              Category name
+              <input
+                value={categoryForm.name}
+                onChange={(event) =>
+                  setCategoryForm({ ...categoryForm, name: event.target.value })
+                }
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                required
+              />
+            </label>
+            <label className="block text-sm font-medium text-gray-700">
+              Description
+              <textarea
+                value={categoryForm.description}
+                onChange={(event) =>
+                  setCategoryForm({
+                    ...categoryForm,
+                    description: event.target.value,
+                  })
+                }
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                rows={3}
+              />
+            </label>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setCategoryFormOpen(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save category"}
               </button>
             </div>
           </form>
