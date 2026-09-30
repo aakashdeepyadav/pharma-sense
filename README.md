@@ -34,7 +34,7 @@ The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase recei
 The current development line adds read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, and basic request throttling. Production readiness is still in progress; the current controls are local single-process implementations, not shared controls for horizontally scaled deployments.
 
 - Expand browser coverage for purchase and alert edge cases; complete a broader responsive and screen-reader accessibility review.
-- Add self-service password change and operational account offboarding workflows; Admin-managed password reset and deactivation/reactivation are implemented.
+- Complete broader account/accessibility hardening; self-service password change, Admin-managed reset, and safe deactivation/reactivation are implemented.
 - Replace file-backed token revocation and process-local rate limiting with shared production storage, and configure trusted proxy handling before deployment.
 - Obtain approved real or de-identified demand data before making model-performance claims; synthetic data remains research/test-only.
 - Add human approval for replenishment, agent safety controls, and a deployment rehearsal including backup and restore.
@@ -82,7 +82,7 @@ npm run dev
 
 Open the frontend at the Vite URL and sign in with the seeded administrator account. Inventory routes require a valid JWT issued by the backend.
 
-To manage accounts, open **Management and history** and use **User access**. Admins can create users, update their name/email/role, deactivate/reactivate accounts, and optionally reset a managed user’s password. The app prevents demoting or deactivating the signed-in last Admin.
+To manage accounts, open **Management and history** and use **User access**. Admins can create users, update their name/email/role, deactivate/reactivate accounts, and optionally reset a managed user’s password. Signed-in users can use **Change password** in the header. The app prevents demoting or deactivating the signed-in last Admin.
 
 ## Validation
 

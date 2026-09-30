@@ -21,7 +21,7 @@ The repository began as an early prototype. The current implementation has moved
 
 The core MVP is released as `v0.1.0`. The current implementation extends it with read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, route-scoped request throttling, current-database-role authorization, newest-first transaction history, and optional-barcode normalization. Local validation includes backend build/tests, frontend lint/build, research validation, mocked Playwright login/role/keyboard/responsive checks, and a live browser workflow against an isolated PostgreSQL database covering Admin user creation/role updates, purchase receiving, stock issue, alert acknowledgement, audit verification, insufficient-stock rejection, and expired-batch rejection. The research validator reports warnings because the dataset is synthetic and does not model stockout censoring or organization groups.
 
-Production readiness is not complete. Additional purchase/alert edge cases and a broader screen-reader/accessibility review, self-service password change and operational offboarding workflows, shared token-revocation and rate-limit state, approved operational demand data, human-approved replenishment, and a deployment/backup-restore rehearsal remain open. Camera/mobile scanning, advanced forecasting, and AI agents remain later phases.
+Production readiness is not complete. Additional purchase/alert edge cases and a broader screen-reader/accessibility review, shared token-revocation and rate-limit state, approved operational demand data, human-approved replenishment, and a deployment/backup-restore rehearsal remain open. Camera/mobile scanning, advanced forecasting, and AI agents remain later phases.
 
 ## A. Executive Summary
 
@@ -66,7 +66,7 @@ The tenant boundary for the MVP is one organization per deployment. Multi-tenant
 
 - Authenticate users with login and logout behavior; issue short-lived JWT access tokens and support revocation/session invalidation.
 - Authorize actions for Admin, Pharmacist, Inventory Manager, and Staff roles.
-- Allow Admins to list/create users, update names/emails/roles, reset managed passwords, and deactivate/reactivate accounts; prevent self-demotion, self-deactivation, or removal of the last active Admin.
+- Allow Admins to list/create users, update names/emails/roles, reset managed passwords, and deactivate/reactivate accounts; allow users to change their own passwords; prevent self-demotion, self-deactivation, or removal of the last active Admin.
 - Create, read, update, search, and filter medicines.
 - Store generic name, brand name, category, manufacturer, dosage/form, unit, reorder level, barcode, and active status.
 - Create, read, update, and search categories and suppliers.

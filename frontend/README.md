@@ -17,7 +17,7 @@ By default, the frontend calls `http://localhost:5000`. To use a different API o
 VITE_API_URL=http://localhost:5000
 ```
 
-Admins manage accounts under **Management and history → User access**. They can create accounts, update names/emails/roles, reset a managed password, and deactivate or reactivate accounts. Deactivation blocks login and invalidates existing sessions. Self-service password change is not available yet.
+Admins manage accounts under **Management and history → User access**. They can create accounts, update names/emails/roles, reset a managed password, and deactivate or reactivate accounts. Signed-in users can use **Change password** in the header. Deactivation blocks login and invalidates existing sessions.
 
 ## Checks
 

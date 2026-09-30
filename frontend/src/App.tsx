@@ -153,6 +153,12 @@ type UserForm = {
   active: boolean;
 };
 
+type PasswordChangeForm = {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
 type BatchForm = {
   medicineId: string;
   supplierId: string;
@@ -346,6 +352,12 @@ function App() {
     password: "",
     roleId: "",
     active: true,
+  });
+  const [passwordChangeOpen, setPasswordChangeOpen] = useState(false);
+  const [passwordChangeForm, setPasswordChangeForm] = useState<PasswordChangeForm>({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
   const [batchFormOpen, setBatchFormOpen] = useState(false);
   const [batchForm, setBatchForm] = useState<BatchForm>({
@@ -1272,6 +1284,52 @@ function App() {
     }
   };
 
+  const handlePasswordChange = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session) return;
+    if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
+      setFormError("New passwords do not match.");
+      return;
+    }
+
+    setSaving(true);
+    setFormError("");
+    try {
+      const response = await apiFetch("/api/v1/auth/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify({
+          currentPassword: passwordChangeForm.currentPassword,
+          newPassword: passwordChangeForm.newPassword,
+        }),
+      });
+      const result = (await response.json()) as {
+        success?: boolean;
+        error?: string | ApiErrorPayload;
+      };
+      if (!response.ok || !result.success) {
+        throw new Error(extractErrorMessage(result, "Unable to change password."));
+      }
+
+      sessionStorage.removeItem("pharmasense-session");
+      setPasswordChangeOpen(false);
+      setPasswordChangeForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setSession(null);
+      setLoginError("Password changed. Sign in again with your new password.");
+    } catch (requestError) {
+      setFormError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to change password.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!session) {
     return (
       <main className="auth-shell min-h-screen">
@@ -1456,6 +1514,20 @@ function App() {
               </div>
             </div>
 
+            <button
+              onClick={() => {
+                setFormError("");
+                setPasswordChangeForm({
+                  currentPassword: "",
+                  newPassword: "",
+                  confirmPassword: "",
+                });
+                setPasswordChangeOpen(true);
+              }}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Change password
+            </button>
             <button
               onClick={() => void handleLogout()}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
@@ -2087,25 +2159,27 @@ function App() {
                 </label>
               )}
               <label className="block text-sm font-medium text-slate-700">
-                  {editingUser ? "Reset password (optional)" : "Temporary password"}
-                  <input
-                    type="password"
-                    value={userForm.password}
-                    onChange={(event) =>
-                      setUserForm({ ...userForm, password: event.target.value })
-                    }
-                    autoComplete="new-password"
-                    minLength={12}
-                    maxLength={100}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                    required={!editingUser}
-                  />
-                  <span className="mt-1 block text-xs font-normal text-slate-500">
-                    {editingUser
-                      ? "Leave blank to keep the current password."
-                      : "Use at least 12 characters."}
-                  </span>
-                </label>
+                {editingUser
+                  ? "Reset password (optional)"
+                  : "Temporary password"}
+                <input
+                  type="password"
+                  value={userForm.password}
+                  onChange={(event) =>
+                    setUserForm({ ...userForm, password: event.target.value })
+                  }
+                  autoComplete="new-password"
+                  minLength={12}
+                  maxLength={100}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required={!editingUser}
+                />
+                <span className="mt-1 block text-xs font-normal text-slate-500">
+                  {editingUser
+                    ? "Leave blank to keep the current password."
+                    : "Use at least 12 characters."}
+                </span>
+              </label>
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button
@@ -2125,6 +2199,104 @@ function App() {
                   : editingUser
                     ? "Save changes"
                     : "Create user"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {passwordChangeOpen && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-950/40 p-4">
+          <form
+            onSubmit={handlePasswordChange}
+            aria-labelledby="password-change-title"
+            aria-modal="true"
+            role="dialog"
+            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+          >
+            <div className="mb-6 flex items-center justify-between">
+              <h2 id="password-change-title" className="text-xl font-bold text-slate-900">
+                Change password
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPasswordChangeOpen(false)}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+            {formError && (
+              <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                {formError}
+              </p>
+            )}
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Current password
+                <input
+                  type="password"
+                  value={passwordChangeForm.currentPassword}
+                  onChange={(event) =>
+                    setPasswordChangeForm({
+                      ...passwordChangeForm,
+                      currentPassword: event.target.value,
+                    })
+                  }
+                  autoComplete="current-password"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                New password
+                <input
+                  type="password"
+                  value={passwordChangeForm.newPassword}
+                  onChange={(event) =>
+                    setPasswordChangeForm({
+                      ...passwordChangeForm,
+                      newPassword: event.target.value,
+                    })
+                  }
+                  autoComplete="new-password"
+                  minLength={12}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Confirm new password
+                <input
+                  type="password"
+                  value={passwordChangeForm.confirmPassword}
+                  onChange={(event) =>
+                    setPasswordChangeForm({
+                      ...passwordChangeForm,
+                      confirmPassword: event.target.value,
+                    })
+                  }
+                  autoComplete="new-password"
+                  minLength={12}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required
+                />
+              </label>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPasswordChangeOpen(false)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? "Changing..." : "Change password"}
               </button>
             </div>
           </form>
