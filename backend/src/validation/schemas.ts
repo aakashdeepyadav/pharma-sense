@@ -7,6 +7,13 @@ export const categorySchema = z.object({
 
 export const categoryUpdateSchema = categorySchema.partial();
 
+export const listQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  sortBy: z.string().trim().min(1).max(50).optional(),
+  sortOrder: z.enum(['asc', 'desc']).default('asc'),
+});
+
 export const medicineSchema = z.object({
   genericName: z.string().trim().min(1).max(150),
   brandName: z.string().trim().min(1).max(150),

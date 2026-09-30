@@ -162,6 +162,25 @@ describe('PharmaSense API', () => {
     assert.ok(result.error.details.length > 0);
   });
 
+  it('returns paginated category metadata', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const response = await fetch(`${baseUrl}/api/v1/categories?page=1&pageSize=5`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.status, 200);
+    const result = (await response.json()) as {
+      success: boolean;
+      data: unknown[];
+      meta: { page: number; pageSize: number; total: number; totalPages: number };
+    };
+    assert.equal(result.success, true);
+    assert.equal(result.meta.page, 1);
+    assert.equal(result.meta.pageSize, 5);
+    assert.ok(Array.isArray(result.data));
+    assert.ok(result.meta.total >= 0);
+    assert.ok(result.meta.totalPages >= 0);
+  });
+
   it('denies Staff medicine writes', async () => {
     const response = await fetch(`${baseUrl}/api/v1/medicines`, {
       method: 'POST',

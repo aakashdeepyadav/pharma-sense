@@ -1,21 +1,39 @@
 import { Router, Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
-import { batchSchema } from '../validation/schemas';
+import { buildPaginationMeta, sendApiError } from '../lib/api';
+import { batchSchema, listQuerySchema } from '../validation/schemas';
 import { AuthenticatedRequest, requireRoles } from '../auth';
 
 const router = Router();
 
 // Get all batches
 router.get('/', async (req: Request, res: Response) => {
+  const query = listQuerySchema.safeParse(req.query);
+  if (!query.success) {
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', query.error.issues);
+    return;
+  }
+
   try {
-    const batches = await prisma.batch.findMany({
-      include: { medicine: true, supplier: true },
-      orderBy: { expiryDate: 'asc' },
+    const sortBy = query.data.sortBy ?? 'expiryDate';
+    const [total, batches] = await Promise.all([
+      prisma.batch.count(),
+      prisma.batch.findMany({
+        include: { medicine: true, supplier: true },
+        orderBy: { [sortBy]: query.data.sortOrder } as Record<string, 'asc' | 'desc'>,
+        skip: (query.data.page - 1) * query.data.pageSize,
+        take: query.data.pageSize,
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: batches,
+      meta: buildPaginationMeta(total, query.data.page, query.data.pageSize, sortBy, query.data.sortOrder),
     });
-    res.json({ success: true, data: batches });
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to fetch batches' });
+  } catch {
+    sendApiError(res, 500, 'FETCH_BATCHES_FAILED', 'Failed to fetch batches');
   }
 });
 
