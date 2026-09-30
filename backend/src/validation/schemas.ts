@@ -42,6 +42,7 @@ export const batchSchema = z.object({
   expiryDate: z.coerce.date(),
   quantity: z.coerce.number().int().nonnegative(),
   purchasePrice: z.coerce.number().nonnegative(),
+  sellingPrice: z.coerce.number().nonnegative(),
 }).refine((value) => value.expiryDate > value.mfgDate, {
   message: 'Expiry date must be after manufacturing date',
   path: ['expiryDate'],
@@ -87,6 +88,7 @@ const purchaseItemSchema = z.object({
   expiryDate: z.coerce.date(),
   quantity: z.coerce.number().int().positive(),
   purchasePrice: z.coerce.number().nonnegative(),
+  sellingPrice: z.coerce.number().nonnegative(),
 }).refine((value) => value.expiryDate > value.mfgDate, {
   message: 'Expiry date must be after manufacturing date',
   path: ['expiryDate'],

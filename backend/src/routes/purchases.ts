@@ -117,6 +117,7 @@ router.post('/:id/receive', requireRoles(...receivingRoles), async (req: Authent
             expiryDate: item.expiryDate,
             quantity: item.quantity,
             purchasePrice: item.purchasePrice,
+            sellingPrice: item.sellingPrice,
           },
         });
         await database.stockTransaction.create({
