@@ -51,6 +51,19 @@ export const supplierSchema = z.object({
 
 export const supplierUpdateSchema = supplierSchema.partial();
 
+export const userCreateSchema = z.object({
+  name: z.string().trim().min(1).max(150),
+  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
+  password: z.string().min(12).max(100),
+  roleId: z.coerce.number().int().positive(),
+});
+
+export const userUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(150).optional(),
+  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()).optional(),
+  roleId: z.coerce.number().int().positive().optional(),
+}).refine((value) => Object.keys(value).length > 0);
+
 export const supplierQuerySchema = z.object({
   search: z.string().trim().max(150).optional(),
   page: z.coerce.number().int().min(1).default(1),

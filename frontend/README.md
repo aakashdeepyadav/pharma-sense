@@ -1,6 +1,6 @@
 # PharmaSense Frontend
 
-The frontend is a React, TypeScript, and Vite dashboard for pharmacy inventory operations. It uses the backend API for authentication, inventory, purchasing, alerts, and reports; the browser does not connect directly to PostgreSQL.
+The frontend is a React, TypeScript, and Vite dashboard for pharmacy inventory operations. It uses the backend API for authentication, inventory, purchasing, alerts, reports, and Admin-only user/role management; the browser does not connect directly to PostgreSQL.
 
 ## Local development
 

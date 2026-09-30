@@ -11,6 +11,7 @@ import alertRoutes from './routes/alerts';
 import reportRoutes from './routes/reports';
 import auditRoutes from './routes/audit';
 import purchaseRoutes from './routes/purchases';
+import userRoutes from './routes/users';
 import prisma from './lib/prisma';
 import { requireAuth } from './auth';
 
@@ -67,6 +68,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '100kb' }));
 
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', requireAuth, userRoutes);
 app.use('/api/v1/medicines', requireAuth, medicineRoutes);
 app.use('/api/v1/categories', requireAuth, categoryRoutes);
 app.use('/api/v1/batches', requireAuth, batchRoutes);

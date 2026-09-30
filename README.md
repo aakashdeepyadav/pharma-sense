@@ -10,6 +10,7 @@ Agent-Based Medicine Stock Management System.
 ## Current MVP
 
 - JWT login with server-side role checks for Admin, Pharmacist, Inventory Manager, and Staff.
+- Admin-only user listing, creation, and role updates with audit events; protected requests use the user's current database role.
 - Medicine, category, supplier, and batch management through the live API and dashboard, including manufacturer, dosage/form, barcode, and active status fields.
 - Server-side medicine search by name, manufacturer, barcode, and active status.
 - Supplier search by name through the API and dashboard.
@@ -26,14 +27,14 @@ Agent-Based Medicine Stock Management System.
 
 ## Completion Status
 
-The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase receiving, stock movement, alerts, reporting, and role-checked API workflows are implemented. Browser coverage includes six mocked login/role/keyboard/responsive checks plus a live PostgreSQL workflow for medicine/supplier creation, batch and purchase receiving, stock issue, alert acknowledgement, quantity verification, audit logging, insufficient-stock rejection, and expired-batch rejection. Local validation passes; dataset validation reports documented synthetic-data warnings.
+The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase receiving, stock movement, alerts, reporting, and role-checked API workflows are implemented. Admins can list users, create accounts, and update name/email/role; password hashes are never returned, and role changes apply to already-issued tokens. Browser coverage includes login/role/keyboard/responsive checks plus a live PostgreSQL workflow for user management, purchasing, stock, alerts, and rejection paths. Local validation passes; dataset validation reports documented synthetic-data warnings.
 
 ## Next Work
 
 The current development line adds read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, and basic request throttling. Production readiness is still in progress; the current controls are local single-process implementations, not shared controls for horizontally scaled deployments.
 
 - Expand browser coverage for purchase and alert edge cases; complete a broader responsive and screen-reader accessibility review.
-- Add controlled user and role administration; today, the seeded account is the only documented account-management path.
+- Add account lifecycle controls for password reset/change and safe offboarding; user creation and role assignment are now Admin-managed.
 - Replace file-backed token revocation and process-local rate limiting with shared production storage, and configure trusted proxy handling before deployment.
 - Obtain approved real or de-identified demand data before making model-performance claims; synthetic data remains research/test-only.
 - Add human approval for replenishment, agent safety controls, and a deployment rehearsal including backup and restore.

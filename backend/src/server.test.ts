@@ -148,6 +148,127 @@ describe('PharmaSense API', () => {
     }
   });
 
+  it('allows Admin to manage users without exposing password hashes', async () => {
+    const adminToken = createAccessToken({ id: 1, role: 'Admin' });
+    const staffAccount = await prisma.user.findUnique({
+      where: { email: 'staff@pharmasense.local' },
+    });
+    assert.ok(staffAccount);
+    const staffToken = createAccessToken({ id: staffAccount.id, role: 'Staff' });
+    const usersResponse = await fetch(`${baseUrl}/api/v1/users`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(usersResponse.status, 200);
+    const usersResult = (await usersResponse.json()) as {
+      data: Array<{ id: number; name: string; email: string; role: { name: string }; passwordHash?: string }>;
+    };
+    assert.ok(usersResult.data.length >= 4);
+    assert.ok(usersResult.data.every((user) => user.passwordHash === undefined));
+
+    const rolesResponse = await fetch(`${baseUrl}/api/v1/users/roles`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(rolesResponse.status, 200);
+    const rolesResult = (await rolesResponse.json()) as {
+      data: Array<{ id: number; name: string }>;
+    };
+    const pharmacistRole = rolesResult.data.find((role) => role.name === 'Pharmacist');
+    const staffRole = rolesResult.data.find((role) => role.name === 'Staff');
+    assert.ok(pharmacistRole);
+    assert.ok(staffRole);
+
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const email = `managed-user-${suffix}@pharmasense.local`;
+    let createdUserId: number | undefined;
+
+    try {
+      const createResponse = await fetch(`${baseUrl}/api/v1/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({
+          name: 'Managed Test User',
+          email,
+          password: 'managed-user-password',
+          roleId: staffRole.id,
+        }),
+      });
+      assert.equal(createResponse.status, 201);
+      const created = (await createResponse.json()) as {
+        data: { id: number; email: string; role: { name: string }; passwordHash?: string };
+      };
+      createdUserId = created.data.id;
+      assert.equal(created.data.email, email);
+      assert.equal(created.data.role.name, 'Staff');
+      assert.equal(created.data.passwordHash, undefined);
+
+      const duplicateResponse = await fetch(`${baseUrl}/api/v1/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({
+          name: 'Duplicate User',
+          email,
+          password: 'managed-user-password',
+          roleId: staffRole.id,
+        }),
+      });
+      assert.equal(duplicateResponse.status, 409);
+
+      const updateResponse = await fetch(`${baseUrl}/api/v1/users/${createdUserId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ roleId: pharmacistRole.id }),
+      });
+      assert.equal(updateResponse.status, 200);
+      const updated = (await updateResponse.json()) as {
+        data: { role: { name: string }; passwordHash?: string };
+      };
+      assert.equal(updated.data.role.name, 'Pharmacist');
+      assert.equal(updated.data.passwordHash, undefined);
+
+      const staleStaffToken = createAccessToken({ id: createdUserId, role: 'Staff' });
+      const updatedRoleResponse = await fetch(`${baseUrl}/api/v1/medicines`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${staleStaffToken}`,
+        },
+        body: JSON.stringify({}),
+      });
+      assert.equal(updatedRoleResponse.status, 400);
+
+      const selfDemotionResponse = await fetch(`${baseUrl}/api/v1/users/1`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ roleId: staffRole.id }),
+      });
+      assert.equal(selfDemotionResponse.status, 409);
+
+      const forbiddenResponse = await fetch(`${baseUrl}/api/v1/users`, {
+        headers: { Authorization: `Bearer ${staffToken}` },
+      });
+      assert.equal(forbiddenResponse.status, 403);
+    } finally {
+      if (createdUserId) {
+        await prisma.auditLog.deleteMany({
+          where: { entity: 'User', entityId: createdUserId },
+        });
+        await prisma.user.delete({ where: { id: createdUserId } });
+      }
+    }
+  });
+
   it('rejects invalid forecast parameters', async () => {
     const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
       method: 'POST',
@@ -313,11 +434,15 @@ describe('PharmaSense API', () => {
   });
 
   it('denies Staff medicine writes', async () => {
+    const staffAccount = await prisma.user.findUnique({
+      where: { email: 'staff@pharmasense.local' },
+    });
+    assert.ok(staffAccount);
     const response = await fetch(`${baseUrl}/api/v1/medicines`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${createAccessToken({ id: 1, role: 'Staff' })}`,
+        Authorization: `Bearer ${createAccessToken({ id: staffAccount.id, role: 'Staff' })}`,
       },
       body: JSON.stringify({ genericName: 'Test', brandName: 'Test', categoryId: 1, unit: 'Tablet', reorderLevel: 1 }),
     });
@@ -325,13 +450,17 @@ describe('PharmaSense API', () => {
   });
 
   it('restricts audit visibility to management roles', async () => {
+    const staffAccount = await prisma.user.findUnique({
+      where: { email: 'staff@pharmasense.local' },
+    });
+    assert.ok(staffAccount);
     const adminResponse = await fetch(`${baseUrl}/api/v1/audit-logs`, {
       headers: { Authorization: `Bearer ${createAccessToken({ id: 1, role: 'Admin' })}` },
     });
     assert.equal(adminResponse.status, 200);
 
     const staffResponse = await fetch(`${baseUrl}/api/v1/audit-logs`, {
-      headers: { Authorization: `Bearer ${createAccessToken({ id: 1, role: 'Staff' })}` },
+      headers: { Authorization: `Bearer ${createAccessToken({ id: staffAccount.id, role: 'Staff' })}` },
     });
     assert.equal(staffResponse.status, 403);
   });

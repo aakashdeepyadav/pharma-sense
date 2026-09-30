@@ -15,12 +15,13 @@ The repository began as an early prototype. The current implementation has moved
 - PostgreSQL is available through `docker-compose.yml`.
 - Prisma already models users, roles, categories, medicines, suppliers, batches, and stock transactions.
 - The backend now uses protected, validated routes for inventory, purchases, alerts, reports, and audit logs.
+- Admin-only user listing, account creation, and role updates are available; protected requests resolve the user's current database role so role changes affect existing tokens.
 - The frontend dashboard reads live API data and supports medicine, category, supplier, batch, purchase, and stock workflows.
 - Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, baseline tests, a read-only replenishment recommendation, and paginated list API hardening are implemented; production deployment and advanced AI features remain open.
 
-The core MVP is released as `v0.1.0`. The current implementation extends it with read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, route-scoped request throttling, newest-first transaction history, and optional-barcode normalization. Local validation includes backend build/tests, frontend lint/build, research validation, mocked Playwright login/role/keyboard/responsive checks, and a live browser workflow against an isolated PostgreSQL database covering purchase receiving, stock issue, alert acknowledgement, audit verification, insufficient-stock rejection, and expired-batch rejection. The research validator reports warnings because the dataset is synthetic and does not model stockout censoring or organization groups.
+The core MVP is released as `v0.1.0`. The current implementation extends it with read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, route-scoped request throttling, current-database-role authorization, newest-first transaction history, and optional-barcode normalization. Local validation includes backend build/tests, frontend lint/build, research validation, mocked Playwright login/role/keyboard/responsive checks, and a live browser workflow against an isolated PostgreSQL database covering Admin user creation/role updates, purchase receiving, stock issue, alert acknowledgement, audit verification, insufficient-stock rejection, and expired-batch rejection. The research validator reports warnings because the dataset is synthetic and does not model stockout censoring or organization groups.
 
-Production readiness is not complete. Additional purchase/alert edge cases and a broader screen-reader/accessibility review, user/role administration, shared token-revocation and rate-limit state, approved operational demand data, human-approved replenishment, and a deployment/backup-restore rehearsal remain open. Camera/mobile scanning, advanced forecasting, and AI agents remain later phases.
+Production readiness is not complete. Additional purchase/alert edge cases and a broader screen-reader/accessibility review, account password reset/change and offboarding, shared token-revocation and rate-limit state, approved operational demand data, human-approved replenishment, and a deployment/backup-restore rehearsal remain open. Camera/mobile scanning, advanced forecasting, and AI agents remain later phases.
 
 ## A. Executive Summary
 
@@ -93,6 +94,7 @@ The tenant boundary for the MVP is one organization per deployment. Multi-tenant
 
 - **Correctness:** stock changes use atomic database transactions and reject negative quantities.
 - **Security:** hashed passwords, validated input, least privilege, secure secrets, audit records, request throttling, and protected production transport.
+- **Authorization:** each authenticated request resolves the user's current role from PostgreSQL; changing a role invalidates the old authorization claim without waiting for the JWT to expire.
 - **Availability:** core inventory remains operational if ML or agent services are down.
 - **Performance:** normal list and transaction operations should return within 500 ms in the local MVP dataset; measure rather than promise a production SLA.
 - **Maintainability:** modular routes/services, Prisma migrations, typed request/response contracts, and documented decisions.
@@ -204,6 +206,7 @@ Base path: `/api/v1`.
 | Area       | Endpoints                                                                       |
 | ---------- | ------------------------------------------------------------------------------- |
 | Auth       | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`                         |
+| Users      | `GET/POST /users`, `PATCH /users/:id`, `GET /users/roles` (Admin only)          |
 | Medicines  | `GET/POST /medicines`, `GET/PATCH /medicines/:id`, search/barcode filters       |
 | Categories | `GET/POST /categories`, `PATCH /categories/:id`                                 |
 | Suppliers  | `GET/POST /suppliers`, `GET/PATCH /suppliers/:id`                               |
@@ -345,6 +348,7 @@ Stockout prediction, replenishment recommendations, agent summaries, human appro
 
 - **Unit:** stock quantity rules, alert thresholds, FEFO ordering, permissions, validation, forecast metrics.
 - **API integration:** login, role restrictions, medicine CRUD, purchase receiving, stock IN/OUT, rollback on failure, alerts.
+- **User administration:** Admin-only listing/creation/role updates, safe response fields, duplicate emails, last-Admin protection, and immediate role enforcement.
 - **Database:** migration application, constraints, transaction rollback, reconciliation query.
 - **Frontend:** loading/error/empty states, protected navigation, forms, filtering, API failure behavior.
 - **End-to-end:** login -> create medicine -> create supplier -> receive batch -> issue stock -> observe alert/history.

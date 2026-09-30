@@ -56,6 +56,28 @@ async function mockDashboardApi(page: Page, role: string) {
           },
         ],
       };
+    } else if (pathname.endsWith("/users/roles")) {
+      response = {
+        success: true,
+        data: [
+          { id: 1, name: "Admin" },
+          { id: 2, name: "Inventory Manager" },
+          { id: 3, name: "Pharmacist" },
+          { id: 4, name: "Staff" },
+        ],
+      };
+    } else if (pathname.endsWith("/users")) {
+      response = {
+        success: true,
+        data: [
+          {
+            id: 1,
+            name: "QA Admin",
+            email: "admin@pharmasense.local",
+            role: { id: 1, name: "Admin" },
+          },
+        ],
+      };
     } else if (pathname.endsWith("/reports/summary")) {
       response = {
         success: true,
@@ -134,7 +156,9 @@ test("shows management and receiving actions to Admin", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Inventory command center" }),
   ).toBeVisible();
-  await expect(page.getByText("Admin", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("banner").getByText("Admin", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "+ Supplier" })).toBeVisible();
   await expect(page.getByRole("button", { name: "+ Category" })).toBeVisible();
   await expect(
@@ -145,6 +169,22 @@ test("shows management and receiving actions to Admin", async ({ page }) => {
   ).toBeVisible();
   await page.getByText("Management and history", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
+});
+
+test("lets Admin open the user form with available roles", async ({ page }) => {
+  await mockDashboardApi(page, "Admin");
+  await signIn(page);
+  await page.getByText("Management and history", { exact: true }).click();
+
+  await expect(page.getByRole("heading", { name: "User access" })).toBeVisible();
+  await expect(page.getByText("admin@pharmasense.local")).toBeVisible();
+  await page.getByRole("button", { name: "Add user" }).click();
+  await expect(page.getByRole("dialog", { name: "Add user" })).toBeVisible();
+  await expect(page.getByLabel("Temporary password")).toHaveAttribute(
+    "minlength",
+    "12",
+  );
+  await expect(page.getByRole("option", { name: "Staff" })).toBeAttached();
 });
 
 test("shows medicine and receiving actions to Pharmacist", async ({ page }) => {
@@ -159,6 +199,7 @@ test("shows medicine and receiving actions to Pharmacist", async ({ page }) => {
     page.getByRole("button", { name: "Receive purchase" }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "+ Supplier" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ User" })).toHaveCount(0);
   await page.getByText("Management and history", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Audit log" })).toHaveCount(0);
 });
@@ -168,6 +209,7 @@ test("shows supplier and audit tools to Inventory Manager", async ({ page }) => 
   await signIn(page);
 
   await expect(page.getByRole("button", { name: "+ Supplier" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ User" })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Receive purchase" }),
   ).toBeVisible();
@@ -184,6 +226,7 @@ test("hides management and receiving actions from Staff", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText("Staff", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "+ Supplier" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ User" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "+ Category" })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "+ Add Medicine" }),

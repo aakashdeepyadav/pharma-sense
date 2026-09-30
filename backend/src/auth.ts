@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import jwt from 'jsonwebtoken';
+import prisma from './lib/prisma';
 
 export type AuthenticatedRequest = Request & {
   user?: {
@@ -87,7 +88,7 @@ export function revokeAccessToken(token: string) {
 
 loadRevokedTokens();
 
-export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authorization = req.header('authorization');
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
 
@@ -101,17 +102,33 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
     return;
   }
 
+  let payload: string | jwt.JwtPayload;
   try {
-    const payload = jwt.verify(token, getJwtSecret());
-    if (typeof payload === 'string' || typeof payload.userId !== 'number' || typeof payload.role !== 'string') {
-      res.status(401).json({ success: false, error: 'Invalid authentication token' });
+    payload = jwt.verify(token, getJwtSecret());
+  } catch {
+    res.status(401).json({ success: false, error: 'Invalid or expired authentication token' });
+    return;
+  }
+
+  if (typeof payload === 'string' || typeof payload.userId !== 'number') {
+    res.status(401).json({ success: false, error: 'Invalid authentication token' });
+    return;
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { id: true, role: { select: { name: true } } },
+    });
+    if (!user) {
+      res.status(401).json({ success: false, error: 'Invalid or expired authentication token' });
       return;
     }
 
-    req.user = { id: payload.userId, role: payload.role };
+    req.user = { id: user.id, role: user.role.name };
     next();
   } catch {
-    res.status(401).json({ success: false, error: 'Invalid or expired authentication token' });
+    res.status(503).json({ success: false, error: 'Authentication service unavailable' });
   }
 }
 

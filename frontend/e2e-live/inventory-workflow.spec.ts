@@ -34,6 +34,33 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
     page.getByRole("heading", { name: "Inventory command center" }),
   ).toBeVisible();
 
+  const managedUserEmail = `browser.user.${suffix}@pharmasense.local`;
+  await page.getByRole("button", { name: "+ User" }).click();
+  await page.getByLabel("Name", { exact: true }).fill(`Browser User ${suffix}`);
+  await page.getByLabel("Email", { exact: true }).fill(managedUserEmail);
+  await page
+    .getByRole("combobox", { name: "Role" })
+    .selectOption({ label: "Staff" });
+  await page
+    .getByLabel("Temporary password")
+    .fill(`Browser-user-${suffix}`);
+  await page.getByRole("button", { name: "Create user" }).click();
+  await openManagementHistory(page);
+  const userAccessSection = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "User access" }) });
+  const managedUserRow = userAccessSection
+    .getByRole("row")
+    .filter({ hasText: managedUserEmail });
+  await expect(managedUserRow).toContainText("Staff");
+  await managedUserRow.getByRole("button", { name: "Edit" }).click();
+  await page
+    .getByRole("combobox", { name: "Role" })
+    .selectOption({ label: "Pharmacist" });
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await openManagementHistory(page);
+  await expect(managedUserRow).toContainText("Pharmacist");
+
   await page.getByRole("button", { name: "+ Supplier" }).click();
   await page.getByLabel("Supplier name").fill(supplierName);
   await page.getByRole("button", { name: "Save supplier" }).click();
@@ -103,9 +130,6 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
   await page
     .getByRole("combobox", { name: "Medicine" })
     .selectOption({ label: `${medicineName} (${brandName})` });
-  await page
-    .getByRole("combobox", { name: "Supplier" })
-    .selectOption({ label: supplierName });
   await page.getByLabel("Batch number").fill(expiredBatchNumber);
   await page.getByLabel("Quantity received").fill("5");
   await page.getByLabel("Manufacturing date").fill(expiredManufacturingDate);
