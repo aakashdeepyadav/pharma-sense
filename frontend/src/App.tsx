@@ -33,6 +33,7 @@ type Batch = {
   expiryDate: string;
   quantity: number;
   purchasePrice: number;
+  sellingPrice: number;
   medicine: { genericName: string; brandName: string };
   supplier: { name: string };
 };
@@ -128,6 +129,7 @@ type BatchForm = {
   expiryDate: string;
   quantity: string;
   purchasePrice: string;
+  sellingPrice: string;
 };
 
 type PurchaseForm = BatchForm & {
@@ -197,6 +199,7 @@ function App() {
     expiryDate: "",
     quantity: "0",
     purchasePrice: "0",
+    sellingPrice: "0",
   });
   const [purchaseFormOpen, setPurchaseFormOpen] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState<PurchaseForm>({
@@ -207,6 +210,7 @@ function App() {
     expiryDate: "",
     quantity: "0",
     purchasePrice: "0",
+    sellingPrice: "0",
     notes: "",
   });
   const [stockFormOpen, setStockFormOpen] = useState(false);
@@ -628,6 +632,7 @@ function App() {
       expiryDate: "",
       quantity: "0",
       purchasePrice: "0",
+      sellingPrice: "0",
     });
     setFormError("");
     setBatchFormOpen(true);
@@ -642,6 +647,7 @@ function App() {
       expiryDate: "",
       quantity: "1",
       purchasePrice: "0",
+      sellingPrice: "0",
       notes: "",
     });
     setFormError("");
@@ -673,6 +679,7 @@ function App() {
               expiryDate: purchaseForm.expiryDate,
               quantity: Number(purchaseForm.quantity),
               purchasePrice: Number(purchaseForm.purchasePrice),
+                sellingPrice: Number(purchaseForm.sellingPrice),
             },
           ],
         }),
@@ -760,6 +767,7 @@ function App() {
           supplierId: Number(batchForm.supplierId),
           quantity: Number(batchForm.quantity),
           purchasePrice: Number(batchForm.purchasePrice),
+          sellingPrice: Number(batchForm.sellingPrice),
         }),
       });
       const result = (await response.json()) as {
@@ -1325,6 +1333,23 @@ function App() {
                   required
                 />
               </label>
+              <label className="text-sm font-medium text-gray-700">
+                Selling price per unit
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={purchaseForm.sellingPrice}
+                  onChange={(event) =>
+                    setPurchaseForm({
+                      ...purchaseForm,
+                      sellingPrice: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
             </div>
             <label className="block text-sm font-medium text-gray-700 mt-4">
               Purchase notes
@@ -1495,6 +1520,23 @@ function App() {
                     setBatchForm({
                       ...batchForm,
                       purchasePrice: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Selling price per unit
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={batchForm.sellingPrice}
+                  onChange={(event) =>
+                    setBatchForm({
+                      ...batchForm,
+                      sellingPrice: event.target.value,
                     })
                   }
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
