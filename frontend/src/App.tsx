@@ -1019,7 +1019,8 @@ function App() {
     return (
       search.length === 0 ||
       medicine.genericName.toLowerCase().includes(search) ||
-      medicine.brandName.toLowerCase().includes(search)
+      medicine.brandName.toLowerCase().includes(search) ||
+      medicine.barcode?.toLowerCase().includes(search)
     );
   });
 
@@ -1968,7 +1969,7 @@ function App() {
               type="search"
               value={medicineSearch}
               onChange={(event) => setMedicineSearch(event.target.value)}
-              placeholder="Search by generic or brand name"
+              placeholder="Search by name or barcode"
               className="w-full md:w-80 border border-gray-300 rounded-lg px-3 py-2"
             />
           </label>
