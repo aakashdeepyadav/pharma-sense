@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import type { AddressInfo } from 'node:net';
 import { app } from './server';
-import { createAccessToken } from './auth';
+import { configureRevokedTokensStorage, createAccessToken, revokeAccessToken } from './auth';
 
 let server: ReturnType<typeof app.listen>;
 let baseUrl = '';
@@ -55,6 +57,18 @@ describe('PharmaSense API', () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(protectedResponse.status, 401);
+  });
+
+  it('persists revoked tokens to disk for server restarts', () => {
+    const storagePath = path.join(process.cwd(), '.tmp-revoked-tokens.json');
+    configureRevokedTokensStorage(storagePath);
+    const token = createAccessToken({ id: 2, role: 'Admin' });
+    revokeAccessToken(token);
+
+    const saved = JSON.parse(fs.readFileSync(storagePath, 'utf8')) as Record<string, number>;
+    assert.ok(Object.keys(saved).length >= 1);
+    const tokens = Object.values(saved);
+    assert.ok(tokens.some((value) => typeof value === 'number' && value > Date.now()));
   });
 
   it('allows the seeded admin to read reports', async () => {

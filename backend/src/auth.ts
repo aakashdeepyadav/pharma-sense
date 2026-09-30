@@ -1,5 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import jwt from 'jsonwebtoken';
 
 export type AuthenticatedRequest = Request & {
@@ -19,9 +21,51 @@ function getJwtSecret() {
 
 const revokedAccessTokens = new Map<string, number>();
 const ACCESS_TOKEN_LIFETIME_MS = 2 * 60 * 60 * 1000;
+let revokedTokensStoragePath = process.env.REVOKED_TOKENS_PATH ?? path.resolve(process.cwd(), '.data', 'revoked-tokens.json');
 
 function tokenFingerprint(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function ensureRevokedTokensStoragePath() {
+  const directory = path.dirname(revokedTokensStoragePath);
+  fs.mkdirSync(directory, { recursive: true });
+  if (!fs.existsSync(revokedTokensStoragePath)) {
+    fs.writeFileSync(revokedTokensStoragePath, '{}');
+  }
+}
+
+function persistRevokedTokens() {
+  ensureRevokedTokensStoragePath();
+  const activeTokens = Object.fromEntries(
+    [...revokedAccessTokens.entries()].filter(([, expiresAt]) => expiresAt > Date.now()),
+  );
+  fs.writeFileSync(revokedTokensStoragePath, JSON.stringify(activeTokens));
+}
+
+function loadRevokedTokens() {
+  if (!fs.existsSync(revokedTokensStoragePath)) {
+    return;
+  }
+
+  try {
+    const raw = fs.readFileSync(revokedTokensStoragePath, 'utf8');
+    const data = raw ? JSON.parse(raw) : {};
+    for (const [fingerprint, expiresAt] of Object.entries(data as Record<string, number>)) {
+      if (typeof expiresAt === 'number' && expiresAt > Date.now()) {
+        revokedAccessTokens.set(fingerprint, expiresAt);
+      }
+    }
+  } catch {
+    revokedAccessTokens.clear();
+  }
+}
+
+export function configureRevokedTokensStorage(storagePath?: string) {
+  revokedTokensStoragePath = storagePath ?? process.env.REVOKED_TOKENS_PATH ?? path.resolve(process.cwd(), '.data', 'revoked-tokens.json');
+  revokedAccessTokens.clear();
+  loadRevokedTokens();
+  persistRevokedTokens();
 }
 
 function isTokenRevoked(token: string) {
@@ -30,6 +74,7 @@ function isTokenRevoked(token: string) {
   if (!expiresAt) return false;
   if (expiresAt <= Date.now()) {
     revokedAccessTokens.delete(fingerprint);
+    persistRevokedTokens();
     return false;
   }
   return true;
@@ -37,7 +82,10 @@ function isTokenRevoked(token: string) {
 
 export function revokeAccessToken(token: string) {
   revokedAccessTokens.set(tokenFingerprint(token), Date.now() + ACCESS_TOKEN_LIFETIME_MS);
+  persistRevokedTokens();
 }
+
+loadRevokedTokens();
 
 export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authorization = req.header('authorization');
