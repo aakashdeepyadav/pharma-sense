@@ -89,6 +89,19 @@ type ReportSummary = {
   }[];
 };
 
+type ReplenishmentRecommendation = {
+  medicineId: number;
+  medicineName: string;
+  currentUnits: number;
+  reorderLevel: number;
+  averageDailyDemand: number;
+  targetDays: number;
+  targetStock: number;
+  recommendedUnits: number;
+  status: "REPLENISH" | "NO_ACTION";
+  explanation: string;
+};
+
 type AuditLog = {
   id: number;
   action: string;
@@ -170,6 +183,7 @@ function App() {
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [report, setReport] = useState<ReportSummary | null>(null);
+    const [replenishment, setReplenishment] = useState<ReplenishmentRecommendation[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(() => session !== null);
   const [error, setError] = useState("");
@@ -250,6 +264,7 @@ function App() {
           transactionResponse,
           alertResponse,
           reportResponse,
+          replenishmentResponse,
         ] = await Promise.all([
           apiFetch("/api/v1/medicines", { headers }),
           apiFetch("/api/v1/categories", { headers }),
@@ -261,6 +276,7 @@ function App() {
           }),
           apiFetch("/api/v1/alerts", { headers }),
           apiFetch("/api/v1/reports/summary", { headers }),
+          apiFetch("/api/v1/reports/replenishment", { headers }),
         ]);
         if (
           !medicineResponse.ok ||
@@ -270,7 +286,8 @@ function App() {
           !purchaseResponse.ok ||
           !transactionResponse.ok ||
           !alertResponse.ok ||
-          !reportResponse.ok
+            !reportResponse.ok ||
+            !replenishmentResponse.ok
         ) {
           throw new Error("The inventory service returned an error.");
         }
@@ -304,6 +321,10 @@ function App() {
           success: boolean;
           data: ReportSummary;
         };
+        const replenishmentResult = (await replenishmentResponse.json()) as {
+          success: boolean;
+          data: ReplenishmentRecommendation[];
+        };
         setMedicines(medicineResult.data);
         setCategories(categoryResult.data);
         setSuppliers(supplierResult.data);
@@ -312,6 +333,7 @@ function App() {
         setTransactions(transactionResult.data);
         setAlerts(alertResult.data);
         setReport(reportResult.data);
+          setReplenishment(replenishmentResult.data);
         if (
           session.user.role === "Admin" ||
           session.user.role === "Inventory Manager"
@@ -1935,6 +1957,40 @@ function App() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900">
+            Replenishment recommendations
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Read-only estimates based on recent stock OUT activity and reorder levels.
+          </p>
+        </div>
+        {replenishment.filter((item) => item.status === "REPLENISH").length === 0 ? (
+          <p className="p-6 text-gray-500">No replenishment review is suggested right now.</p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {replenishment
+              .filter((item) => item.status === "REPLENISH")
+              .map((item) => (
+                <div key={item.medicineId} className="p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-gray-900">{item.medicineName}</p>
+                    <p className="text-sm text-gray-500">
+                      {item.currentUnits} available, {item.averageDailyDemand.toFixed(2)} units/day average
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">{item.explanation}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-blue-700">{item.recommendedUnits}</p>
+                    <p className="text-xs text-gray-500">units to review</p>
+                  </div>
+                </div>
+              ))}
           </div>
         )}
       </section>

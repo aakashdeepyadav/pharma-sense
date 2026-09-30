@@ -103,3 +103,8 @@ export const purchaseSchema = z.object({
   notes: z.string().trim().max(500).optional(),
   items: z.array(purchaseItemSchema).min(1).max(100),
 });
+
+export const replenishmentQuerySchema = z.object({
+  window: z.coerce.number().int().min(7).max(90).default(30),
+  targetDays: z.coerce.number().int().min(1).max(60).default(14),
+});
