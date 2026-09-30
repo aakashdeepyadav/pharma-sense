@@ -69,6 +69,24 @@ describe('PharmaSense API', () => {
     assert.equal(response.status, 400);
   });
 
+  it('rejects invalid purchase requests', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const createResponse = await fetch(`${baseUrl}/api/v1/purchases`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ supplierId: 1, items: [] }),
+    });
+    assert.equal(createResponse.status, 400);
+
+    const detailResponse = await fetch(`${baseUrl}/api/v1/purchases/not-an-id`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(detailResponse.status, 400);
+  });
+
   it('denies Staff medicine writes', async () => {
     const response = await fetch(`${baseUrl}/api/v1/medicines`, {
       method: 'POST',
