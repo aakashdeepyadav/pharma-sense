@@ -536,4 +536,23 @@ describe('PharmaSense API', () => {
     });
     assert.equal(staffResponse.status, 403);
   });
+
+  it('paginates and searches audit logs for management roles', async () => {
+    const response = await fetch(
+      `${baseUrl}/api/v1/audit-logs?page=1&pageSize=1&search=USER`,
+      { headers: { Authorization: `Bearer ${createAccessToken({ id: 1, role: 'Admin' })}` } },
+    );
+    assert.equal(response.status, 200);
+    const result = (await response.json()) as {
+      success: boolean;
+      data: Array<{ action: string }>;
+      meta: { page: number; pageSize: number; total: number; totalPages: number };
+    };
+    assert.equal(result.success, true);
+    assert.equal(result.meta.page, 1);
+    assert.equal(result.meta.pageSize, 1);
+    assert.ok(result.meta.total >= 0);
+    assert.ok(result.meta.totalPages >= 0);
+    assert.ok(result.data.length <= 1);
+  });
 });

@@ -69,6 +69,12 @@ export const userPasswordResetSchema = z.object({
   password: z.string().min(12).max(100),
 });
 
+export const auditQuerySchema = z.object({
+  search: z.string().trim().max(150).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
+
 export const passwordChangeSchema = z.object({
   currentPassword: z.string().min(8).max(100),
   newPassword: z.string().min(12).max(100),

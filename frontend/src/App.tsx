@@ -354,11 +354,12 @@ function App() {
     active: true,
   });
   const [passwordChangeOpen, setPasswordChangeOpen] = useState(false);
-  const [passwordChangeForm, setPasswordChangeForm] = useState<PasswordChangeForm>({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
+  const [passwordChangeForm, setPasswordChangeForm] =
+    useState<PasswordChangeForm>({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
   const [batchFormOpen, setBatchFormOpen] = useState(false);
   const [batchForm, setBatchForm] = useState<BatchForm>({
     medicineId: "",
@@ -538,7 +539,7 @@ function App() {
           session.user.role === "Admin" ||
           session.user.role === "Inventory Manager"
         ) {
-          const auditResponse = await apiFetch("/api/v1/audit-logs", {
+          const auditResponse = await apiFetch("/api/v1/audit-logs?page=1&pageSize=100", {
             headers,
           });
           if (auditResponse.ok) {
@@ -618,7 +619,7 @@ function App() {
       return;
     }
 
-    const response = await apiFetch("/api/v1/audit-logs", {
+    const response = await apiFetch("/api/v1/audit-logs?page=1&pageSize=100", {
       headers: { Authorization: `Bearer ${session.token}` },
     });
     if (response.ok) {
@@ -1311,12 +1312,18 @@ function App() {
         error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success) {
-        throw new Error(extractErrorMessage(result, "Unable to change password."));
+        throw new Error(
+          extractErrorMessage(result, "Unable to change password."),
+        );
       }
 
       sessionStorage.removeItem("pharmasense-session");
       setPasswordChangeOpen(false);
-      setPasswordChangeForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setPasswordChangeForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
       setSession(null);
       setLoginError("Password changed. Sign in again with your new password.");
     } catch (requestError) {
@@ -2215,7 +2222,10 @@ function App() {
             className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
           >
             <div className="mb-6 flex items-center justify-between">
-              <h2 id="password-change-title" className="text-xl font-bold text-slate-900">
+              <h2
+                id="password-change-title"
+                className="text-xl font-bold text-slate-900"
+              >
                 Change password
               </h2>
               <button
@@ -2227,7 +2237,10 @@ function App() {
               </button>
             </div>
             {formError && (
-              <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+              <p
+                role="alert"
+                className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700"
+              >
                 {formError}
               </p>
             )}

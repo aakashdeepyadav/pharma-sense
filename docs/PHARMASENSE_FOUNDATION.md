@@ -15,7 +15,7 @@ The repository began as an early prototype. The current implementation has moved
 - PostgreSQL is available through `docker-compose.yml`.
 - Prisma already models users, roles, categories, medicines, suppliers, batches, and stock transactions.
 - The backend now uses protected, validated routes for inventory, purchases, alerts, reports, and audit logs.
-- Admin-only user listing, account creation, role updates, and account activation controls are available; protected requests resolve the user's current role and session version so role changes and deactivation affect existing tokens.
+- Admin-only user listing, account creation, role updates, account activation controls, and searchable audit history are available; protected requests resolve the user's current role and session version so role changes and deactivation affect existing tokens.
 - The frontend dashboard reads live API data and supports medicine, category, supplier, batch, purchase, and stock workflows.
 - Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, baseline tests, a read-only replenishment recommendation, and paginated list API hardening are implemented; production deployment and advanced AI features remain open.
 
