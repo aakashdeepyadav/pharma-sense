@@ -3,7 +3,7 @@ import prisma from '../lib/prisma';
 import { AuthenticatedRequest } from '../auth';
 import { demandHistoryQuerySchema } from '../validation/schemas';
 import { forecastQuerySchema } from '../validation/schemas';
-import { movingAverageForecast, movingAverageMae } from '../domain/forecasting';
+import { assessForecastReadiness, movingAverageForecast, movingAverageMae } from '../domain/forecasting';
 
 const router = Router();
 
@@ -142,6 +142,7 @@ router.get('/forecast-baseline', async (req: AuthenticatedRequest, res: Response
       currentDate.setUTCDate(currentDate.getUTCDate() + 1);
     }
     const forecastValues = movingAverageForecast(dailyValues, result.data.window, result.data.horizon);
+    const readiness = assessForecastReadiness(dailyValues, result.data.window);
     const forecast = forecastValues.map((quantity, index) => {
       const forecastDate = new Date(endDate);
       forecastDate.setUTCDate(forecastDate.getUTCDate() + index + 1);
@@ -157,7 +158,11 @@ router.get('/forecast-baseline', async (req: AuthenticatedRequest, res: Response
         window: result.data.window,
         horizon: result.data.horizon,
         forecast,
-        evaluation: { mae: movingAverageMae(dailyValues, result.data.window), observations: dailyValues.length },
+        evaluation: {
+          mae: movingAverageMae(dailyValues, result.data.window),
+          observations: dailyValues.length,
+          readiness,
+        },
       },
     });
   } catch {

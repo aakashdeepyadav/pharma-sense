@@ -19,3 +19,15 @@ export function movingAverageMae(values: number[], window: number) {
   }
   return absoluteError / evaluatedPoints;
 }
+
+export function assessForecastReadiness(values: number[], window: number) {
+  const daysWithDemand = values.filter((value) => value > 0).length;
+  const minimumDays = Math.max(window + 1, 14);
+  return {
+    totalDays: values.length,
+    daysWithDemand,
+    zeroDemandDays: values.length - daysWithDemand,
+    observationRate: values.length === 0 ? 0 : daysWithDemand / values.length,
+    status: values.length >= minimumDays && daysWithDemand > 0 ? 'READY_FOR_BASELINE' : 'INSUFFICIENT_HISTORY',
+  } as const;
+}
