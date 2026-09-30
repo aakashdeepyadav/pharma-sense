@@ -22,17 +22,17 @@ Agent-Based Medicine Stock Management System.
 - Read-only replenishment recommendations based on recent OUT demand and reorder levels; recommendations never place purchases automatically.
 - Pagination metadata and a structured validation error envelope on list endpoints for safer production API contracts.
 - Dashboard error handling aligned with the structured API envelope so login, submit, and inventory actions show actionable server messages.
-- CI checks for migrations, backend tests, research validation, frontend lint, and frontend builds.
+- CI checks for migrations, backend tests, research validation, frontend lint/build, mocked browser smoke tests, and a live inventory workflow against an isolated PostgreSQL database.
 
 ## Completion Status
 
-The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase receiving, stock movement, alerts, reporting, and role-checked API workflows are implemented. Current local validation passes: backend build, 19 backend tests, research dataset validation, frontend lint/build, and three Playwright browser smoke tests. The browser suite covers rejected login and Admin/Staff action visibility with mocked API responses; it does not yet cover the complete stock workflow against a live API and database.
+The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase receiving, stock movement, alerts, reporting, and role-checked API workflows are implemented. Browser coverage now includes three mocked smoke tests plus a live PostgreSQL workflow for login, medicine/supplier creation, batch receiving, stock issue, quantity verification, and audit logging. Local validation passes; dataset validation reports documented synthetic-data warnings.
 
 ## Next Work
 
 The current development line adds read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, and basic request throttling. Production readiness is still in progress; the current controls are local single-process implementations, not shared controls for horizontally scaled deployments.
 
-- Expand browser-level tests to cover the complete stock workflow against a live API and database and the full role matrix; finish responsive and accessibility review.
+- Expand browser tests to cover all four roles and negative stock/expiry paths; finish responsive and accessibility review.
 - Add controlled user and role administration; today, the seeded account is the only documented account-management path.
 - Replace file-backed token revocation and process-local rate limiting with shared production storage, and configure trusted proxy handling before deployment.
 - Obtain approved real or de-identified demand data before making model-performance claims; synthetic data remains research/test-only.
@@ -95,6 +95,8 @@ npm run lint
 npm run build
 npm run test:e2e
 ```
+
+The live browser workflow uses a disposable PostgreSQL database and writes test records. For a local run, create a separate database such as `pharmasense_e2e`, apply migrations and seed it with `DATABASE_URL` pointing to that database, then set `E2E_DATABASE_URL` to the same connection string before running `npm run test:e2e:live` from `frontend/`. CI provisions an isolated database automatically.
 
 ## Security Notes
 

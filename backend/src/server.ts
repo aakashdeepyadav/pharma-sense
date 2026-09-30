@@ -29,6 +29,7 @@ app.use((_req, res, next) => {
   res.setHeader('Referrer-Policy', 'no-referrer');
   next();
 });
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
 app.use((req, res, next) => {
   const forwarded = req.headers['x-forwarded-for'];
   const clientKey = Array.isArray(forwarded)
@@ -36,18 +37,19 @@ app.use((req, res, next) => {
     : typeof forwarded === 'string'
       ? forwarded.split(',')[0].trim()
       : req.socket.remoteAddress ?? 'unknown';
+  const rateLimitKey = `${clientKey}:${req.path}`;
 
   const now = Date.now();
-  const currentWindow = requestCounts.get(clientKey) ?? { count: 0, windowStart: now };
+  const currentWindow = requestCounts.get(rateLimitKey) ?? { count: 0, windowStart: now };
 
   if (now - currentWindow.windowStart > RATE_LIMIT_WINDOW_MS) {
-    requestCounts.set(clientKey, { count: 1, windowStart: now });
+    requestCounts.set(rateLimitKey, { count: 1, windowStart: now });
     next();
     return;
   }
 
   currentWindow.count += 1;
-  requestCounts.set(clientKey, currentWindow);
+  requestCounts.set(rateLimitKey, currentWindow);
 
   if (currentWindow.count > RATE_LIMIT_MAX_REQUESTS) {
     res.status(429).json({
@@ -62,7 +64,6 @@ app.use((req, res, next) => {
 
   next();
 });
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
 app.use(express.json({ limit: '100kb' }));
 
 app.use('/api/v1/auth', authRoutes);

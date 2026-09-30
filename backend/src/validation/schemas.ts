@@ -20,7 +20,13 @@ export const medicineSchema = z.object({
   categoryId: z.coerce.number().int().positive(),
   manufacturer: z.string().trim().max(150).optional(),
   dosageForm: z.string().trim().max(100).optional(),
-  barcode: z.string().trim().max(100).optional(),
+  barcode: z.preprocess(
+    (value) =>
+      typeof value === 'string' && value.trim().length === 0
+        ? undefined
+        : value,
+    z.string().trim().max(100).optional(),
+  ),
   active: z.coerce.boolean().default(true),
   reorderLevel: z.coerce.number().int().nonnegative(),
   unit: z.string().trim().min(1).max(50),

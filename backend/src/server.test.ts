@@ -5,6 +5,7 @@ import { after, before, describe, it } from 'node:test';
 import type { AddressInfo } from 'node:net';
 import { app } from './server';
 import { configureRevokedTokensStorage, createAccessToken, revokeAccessToken } from './auth';
+import prisma from './lib/prisma';
 
 let server: ReturnType<typeof app.listen>;
 let baseUrl = '';
@@ -45,16 +46,18 @@ describe('PharmaSense API', () => {
     assert.equal(response.status, 400);
   });
 
-  it('rate limits repeated requests from the same client', async () => {
+  it('rate limits repeated requests per client and route with CORS headers', async () => {
     const clientIp = '203.0.113.250';
+    const origin = 'http://localhost:5173';
     let rateLimited = false;
 
     for (let index = 0; index < 45; index += 1) {
       const response = await fetch(`${baseUrl}/health`, {
-        headers: { 'X-Forwarded-For': clientIp },
+        headers: { 'X-Forwarded-For': clientIp, Origin: origin },
       });
       if (response.status === 429) {
         rateLimited = true;
+        assert.equal(response.headers.get('access-control-allow-origin'), origin);
         const body = (await response.json()) as { error?: { code?: string; message?: string } };
         assert.equal(body.error?.code, 'RATE_LIMIT_EXCEEDED');
         break;
@@ -62,6 +65,10 @@ describe('PharmaSense API', () => {
     }
 
     assert.equal(rateLimited, true);
+    const otherRouteResponse = await fetch(`${baseUrl}/`, {
+      headers: { 'X-Forwarded-For': clientIp, Origin: origin },
+    });
+    assert.equal(otherRouteResponse.status, 200);
   });
 
   it('revokes a token on logout', async () => {
@@ -149,6 +156,49 @@ describe('PharmaSense API', () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(searchResponse.status, 200);
+  });
+
+  it('allows multiple medicines without a barcode', async () => {
+    const category = await prisma.category.findFirst();
+    assert.ok(category);
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const createdMedicineIds: number[] = [];
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+
+    try {
+      for (const index of [1, 2]) {
+        const medicineResponse: Awaited<ReturnType<typeof fetch>> = await fetch(
+          `${baseUrl}/api/v1/medicines`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              genericName: `Barcode optional ${suffix} ${index}`,
+              brandName: `Barcode optional brand ${suffix} ${index}`,
+              categoryId: category.id,
+              unit: 'Tablet',
+              reorderLevel: 0,
+              barcode: '',
+            }),
+          },
+        );
+        assert.equal(medicineResponse.status, 201);
+        const result = (await medicineResponse.json()) as { data: { id: number } };
+        createdMedicineIds.push(result.data.id);
+      }
+    } finally {
+      if (createdMedicineIds.length > 0) {
+        await prisma.auditLog.deleteMany({
+          where: { entity: 'Medicine', entityId: { in: createdMedicineIds } },
+        });
+        await prisma.medicine.deleteMany({
+          where: { id: { in: createdMedicineIds } },
+        });
+      }
+    }
   });
 
   it('validates supplier search filters', async () => {
