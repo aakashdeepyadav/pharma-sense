@@ -613,7 +613,11 @@ function App() {
         data?: { id: number };
         error?: string;
       };
-      if (!purchaseResponse.ok || !purchaseResult.success || !purchaseResult.data) {
+      if (
+        !purchaseResponse.ok ||
+        !purchaseResult.success ||
+        !purchaseResult.data
+      ) {
         throw new Error(purchaseResult.error ?? "Unable to create purchase.");
       }
 
@@ -630,21 +634,30 @@ function App() {
       }
 
       const authHeaders = { Authorization: `Bearer ${session.token}` };
-      const [batchResponse, medicineResponse, transactionResponse, alertResponse] =
-        await Promise.all([
-          fetch("http://localhost:5000/api/v1/batches", { headers: authHeaders }),
-          fetch("http://localhost:5000/api/v1/medicines", { headers: authHeaders }),
-          fetch("http://localhost:5000/api/v1/inventory/transactions", {
-            headers: authHeaders,
-          }),
-          fetch("http://localhost:5000/api/v1/alerts", { headers: authHeaders }),
-        ]);
+      const [
+        batchResponse,
+        medicineResponse,
+        transactionResponse,
+        alertResponse,
+      ] = await Promise.all([
+        fetch("http://localhost:5000/api/v1/batches", { headers: authHeaders }),
+        fetch("http://localhost:5000/api/v1/medicines", {
+          headers: authHeaders,
+        }),
+        fetch("http://localhost:5000/api/v1/inventory/transactions", {
+          headers: authHeaders,
+        }),
+        fetch("http://localhost:5000/api/v1/alerts", { headers: authHeaders }),
+      ]);
       setBatches(((await batchResponse.json()) as { data: Batch[] }).data);
       setMedicines(((await medicineResponse.json()) as ApiResponse).data);
       setTransactions(
-        ((await transactionResponse.json()) as { data: StockTransaction[] }).data,
+        ((await transactionResponse.json()) as { data: StockTransaction[] })
+          .data,
       );
-      setAlerts(((await alertResponse.json()) as { data: InventoryAlert[] }).data);
+      setAlerts(
+        ((await alertResponse.json()) as { data: InventoryAlert[] }).data,
+      );
       setPurchaseFormOpen(false);
       await refreshAuditLogs();
     } catch (requestError) {
@@ -1213,7 +1226,10 @@ function App() {
               <textarea
                 value={purchaseForm.notes}
                 onChange={(event) =>
-                  setPurchaseForm({ ...purchaseForm, notes: event.target.value })
+                  setPurchaseForm({
+                    ...purchaseForm,
+                    notes: event.target.value,
+                  })
                 }
                 className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
                 rows={2}
