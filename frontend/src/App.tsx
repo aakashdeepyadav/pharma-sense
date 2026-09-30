@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { apiFetch } from "./api";
 
 type Medicine = {
   id: number;
@@ -245,16 +246,16 @@ function App() {
           alertResponse,
           reportResponse,
         ] = await Promise.all([
-          fetch("http://localhost:5000/api/v1/medicines", { headers }),
-          fetch("http://localhost:5000/api/v1/categories", { headers }),
-          fetch("http://localhost:5000/api/v1/suppliers", { headers }),
-          fetch("http://localhost:5000/api/v1/batches", { headers }),
-          fetch("http://localhost:5000/api/v1/purchases", { headers }),
-          fetch("http://localhost:5000/api/v1/inventory/transactions", {
+          apiFetch("/api/v1/medicines", { headers }),
+          apiFetch("/api/v1/categories", { headers }),
+          apiFetch("/api/v1/suppliers", { headers }),
+          apiFetch("/api/v1/batches", { headers }),
+          apiFetch("/api/v1/purchases", { headers }),
+          apiFetch("/api/v1/inventory/transactions", {
             headers,
           }),
-          fetch("http://localhost:5000/api/v1/alerts", { headers }),
-          fetch("http://localhost:5000/api/v1/reports/summary", { headers }),
+          apiFetch("/api/v1/alerts", { headers }),
+          apiFetch("/api/v1/reports/summary", { headers }),
         ]);
         if (
           !medicineResponse.ok ||
@@ -310,8 +311,8 @@ function App() {
           session.user.role === "Admin" ||
           session.user.role === "Inventory Manager"
         ) {
-          const auditResponse = await fetch(
-            "http://localhost:5000/api/v1/audit-logs",
+          const auditResponse = await apiFetch(
+            "/api/v1/audit-logs",
             { headers },
           );
           if (auditResponse.ok) {
@@ -344,7 +345,7 @@ function App() {
     setLoginError("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/v1/auth/login", {
+      const response = await apiFetch("/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -383,7 +384,7 @@ function App() {
       return;
     }
 
-    const response = await fetch("http://localhost:5000/api/v1/audit-logs", {
+    const response = await apiFetch("/api/v1/audit-logs", {
       headers: { Authorization: `Bearer ${session.token}` },
     });
     if (response.ok) {
@@ -394,7 +395,7 @@ function App() {
 
   const refreshPurchases = async () => {
     if (!session) return;
-    const response = await fetch("http://localhost:5000/api/v1/purchases", {
+    const response = await apiFetch("/api/v1/purchases", {
       headers: { Authorization: `Bearer ${session.token}` },
     });
     if (response.ok) {
@@ -445,9 +446,9 @@ function App() {
     setFormError("");
     try {
       const endpoint = editingMedicine
-        ? `http://localhost:5000/api/v1/medicines/${editingMedicine.id}`
-        : "http://localhost:5000/api/v1/medicines";
-      const response = await fetch(endpoint, {
+        ? `/api/v1/medicines/${editingMedicine.id}`
+        : "/api/v1/medicines";
+      const response = await apiFetch(endpoint, {
         method: editingMedicine ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
@@ -473,7 +474,7 @@ function App() {
 
       setFormOpen(false);
       setEditingMedicine(null);
-      const refreshed = await fetch("http://localhost:5000/api/v1/medicines", {
+      const refreshed = await apiFetch("/api/v1/medicines", {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       const refreshedResult = (await refreshed.json()) as ApiResponse;
@@ -515,9 +516,9 @@ function App() {
     setFormError("");
     try {
       const endpoint = editingSupplier
-        ? `http://localhost:5000/api/v1/suppliers/${editingSupplier.id}`
-        : "http://localhost:5000/api/v1/suppliers";
-      const response = await fetch(endpoint, {
+        ? `/api/v1/suppliers/${editingSupplier.id}`
+        : "/api/v1/suppliers";
+      const response = await apiFetch(endpoint, {
         method: editingSupplier ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
@@ -537,7 +538,7 @@ function App() {
         );
       }
 
-      const refreshed = await fetch("http://localhost:5000/api/v1/suppliers", {
+      const refreshed = await apiFetch("/api/v1/suppliers", {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       const refreshedResult = (await refreshed.json()) as { data: Supplier[] };
@@ -574,9 +575,9 @@ function App() {
     setFormError("");
     try {
       const endpoint = editingCategory
-        ? `http://localhost:5000/api/v1/categories/${editingCategory.id}`
-        : "http://localhost:5000/api/v1/categories";
-      const response = await fetch(endpoint, {
+        ? `/api/v1/categories/${editingCategory.id}`
+        : "/api/v1/categories";
+      const response = await apiFetch(endpoint, {
         method: editingCategory ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
@@ -597,7 +598,7 @@ function App() {
         );
       }
 
-      const refreshed = await fetch("http://localhost:5000/api/v1/categories", {
+      const refreshed = await apiFetch("/api/v1/categories", {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       const refreshedResult = (await refreshed.json()) as {
@@ -659,8 +660,8 @@ function App() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.token}`,
       };
-      const purchaseResponse = await fetch(
-        "http://localhost:5000/api/v1/purchases",
+      const purchaseResponse = await apiFetch(
+        "/api/v1/purchases",
         {
           method: "POST",
           headers,
@@ -693,8 +694,8 @@ function App() {
         throw new Error(purchaseResult.error ?? "Unable to create purchase.");
       }
 
-      const receiveResponse = await fetch(
-        `http://localhost:5000/api/v1/purchases/${purchaseResult.data.id}/receive`,
+      const receiveResponse = await apiFetch(
+        `/api/v1/purchases/${purchaseResult.data.id}/receive`,
         { method: "POST", headers },
       );
       const receiveResult = (await receiveResponse.json()) as {
@@ -712,14 +713,14 @@ function App() {
         transactionResponse,
         alertResponse,
       ] = await Promise.all([
-        fetch("http://localhost:5000/api/v1/batches", { headers: authHeaders }),
-        fetch("http://localhost:5000/api/v1/medicines", {
+        apiFetch("/api/v1/batches", { headers: authHeaders }),
+        apiFetch("/api/v1/medicines", {
           headers: authHeaders,
         }),
-        fetch("http://localhost:5000/api/v1/inventory/transactions", {
+        apiFetch("/api/v1/inventory/transactions", {
           headers: authHeaders,
         }),
-        fetch("http://localhost:5000/api/v1/alerts", { headers: authHeaders }),
+        apiFetch("/api/v1/alerts", { headers: authHeaders }),
       ]);
       setBatches(((await batchResponse.json()) as { data: Batch[] }).data);
       setMedicines(((await medicineResponse.json()) as ApiResponse).data);
@@ -751,7 +752,7 @@ function App() {
     setSaving(true);
     setFormError("");
     try {
-      const response = await fetch("http://localhost:5000/api/v1/batches", {
+      const response = await apiFetch("/api/v1/batches", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -779,8 +780,8 @@ function App() {
 
       const headers = { Authorization: `Bearer ${session.token}` };
       const [batchResponse, medicineResponse] = await Promise.all([
-        fetch("http://localhost:5000/api/v1/batches", { headers }),
-        fetch("http://localhost:5000/api/v1/medicines", { headers }),
+        apiFetch("/api/v1/batches", { headers }),
+        apiFetch("/api/v1/medicines", { headers }),
       ]);
       const batchResult = (await batchResponse.json()) as { data: Batch[] };
       const medicineResult = (await medicineResponse.json()) as ApiResponse;
@@ -817,8 +818,8 @@ function App() {
     setSaving(true);
     setFormError("");
     try {
-      const response = await fetch(
-        "http://localhost:5000/api/v1/inventory/transactions",
+      const response = await apiFetch(
+        "/api/v1/inventory/transactions",
         {
           method: "POST",
           headers: {
@@ -847,9 +848,9 @@ function App() {
       const headers = { Authorization: `Bearer ${session.token}` };
       const [batchResponse, medicineResponse, transactionResponse] =
         await Promise.all([
-          fetch("http://localhost:5000/api/v1/batches", { headers }),
-          fetch("http://localhost:5000/api/v1/medicines", { headers }),
-          fetch("http://localhost:5000/api/v1/inventory/transactions", {
+          apiFetch("/api/v1/batches", { headers }),
+          apiFetch("/api/v1/medicines", { headers }),
+          apiFetch("/api/v1/inventory/transactions", {
             headers,
           }),
         ]);
@@ -877,8 +878,8 @@ function App() {
   const receivePurchase = async (purchaseId: number) => {
     if (!session) return;
     const headers = { Authorization: `Bearer ${session.token}` };
-    const response = await fetch(
-      `http://localhost:5000/api/v1/purchases/${purchaseId}/receive`,
+    const response = await apiFetch(
+      `/api/v1/purchases/${purchaseId}/receive`,
       { method: "POST", headers },
     );
     const result = (await response.json()) as {
@@ -896,10 +897,10 @@ function App() {
       transactionResponse,
       alertResponse,
     ] = await Promise.all([
-      fetch("http://localhost:5000/api/v1/batches", { headers }),
-      fetch("http://localhost:5000/api/v1/medicines", { headers }),
-      fetch("http://localhost:5000/api/v1/inventory/transactions", { headers }),
-      fetch("http://localhost:5000/api/v1/alerts", { headers }),
+      apiFetch("/api/v1/batches", { headers }),
+      apiFetch("/api/v1/medicines", { headers }),
+      apiFetch("/api/v1/inventory/transactions", { headers }),
+      apiFetch("/api/v1/alerts", { headers }),
     ]);
     setBatches(((await batchResponse.json()) as { data: Batch[] }).data);
     setMedicines(((await medicineResponse.json()) as ApiResponse).data);
@@ -915,8 +916,8 @@ function App() {
 
   const acknowledgeAlert = async (alertId: number) => {
     if (!session) return;
-    const response = await fetch(
-      `http://localhost:5000/api/v1/alerts/${alertId}/acknowledge`,
+    const response = await apiFetch(
+      `/api/v1/alerts/${alertId}/acknowledge`,
       {
         method: "PATCH",
         headers: { Authorization: `Bearer ${session.token}` },
@@ -926,7 +927,7 @@ function App() {
       setError("Unable to acknowledge alert.");
       return;
     }
-    const refreshed = await fetch("http://localhost:5000/api/v1/alerts", {
+    const refreshed = await apiFetch("/api/v1/alerts", {
       headers: { Authorization: `Bearer ${session.token}` },
     });
     const result = (await refreshed.json()) as { data: InventoryAlert[] };
