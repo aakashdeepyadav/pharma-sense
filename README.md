@@ -7,6 +7,17 @@ Agent-Based Medicine Stock Management System.
 - Node.js (v18+)
 - Docker (for database)
 
+## Current MVP
+
+- JWT login with server-side role checks for Admin, Pharmacist, Inventory Manager, and Staff.
+- Medicine, category, supplier, and batch management through the live API and dashboard.
+- Atomic stock receiving, issuing, and adjustments with transaction history.
+- Expiry-aware batch ordering and protection against issuing expired stock.
+- Low-stock, out-of-stock, expired, and expiring-soon alerts with acknowledgement.
+- Operational reports, management-only audit logs, and transactional audit events for writes.
+
+The forecasting pipeline currently uses synthetic research data only. It must not be mixed with operational inventory or treated as evidence of production model performance. See [research/data/DATA_CONTRACT.md](research/data/DATA_CONTRACT.md) before using any real or de-identified data.
+
 ## Quick Start
 
 ### 1. Database
@@ -20,7 +31,7 @@ docker-compose up -d
 ```bash
 cd backend
 npm install
-npx prisma db push
+npx prisma migrate deploy
 npm run seed
 npm run dev
 ```
@@ -43,3 +54,26 @@ npm run dev
 ```
 
 Open the frontend at the Vite URL and sign in with the seeded administrator account. Inventory routes require a valid JWT issued by the backend.
+
+## Validation
+
+Run these checks from the repository root:
+
+```bash
+cd backend
+npm run build
+npm test
+npm run research:validate
+
+cd ../frontend
+npm run lint
+npm run build
+```
+
+## Security Notes
+
+- Passwords are stored as bcrypt hashes and login failures use a generic response.
+- Protected API routes enforce JWT authentication and role authorization on the server; frontend controls are presentation only.
+- Stock changes and inventory master-data writes create audit records tied to the authenticated user.
+- Keep `JWT_SECRET`, database credentials, and shared-environment credentials outside source control.
+- The seeded account and Docker database password are for local development only.
