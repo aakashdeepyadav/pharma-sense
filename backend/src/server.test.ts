@@ -91,6 +91,19 @@ describe('PharmaSense API', () => {
     assert.equal(detailResponse.status, 400);
   });
 
+  it('validates medicine search filters', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const invalidResponse = await fetch(`${baseUrl}/api/v1/medicines?active=maybe`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(invalidResponse.status, 400);
+
+    const searchResponse = await fetch(`${baseUrl}/api/v1/medicines?search=tablet`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(searchResponse.status, 200);
+  });
+
   it('denies Staff medicine writes', async () => {
     const response = await fetch(`${baseUrl}/api/v1/medicines`, {
       method: 'POST',
