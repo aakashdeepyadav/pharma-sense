@@ -10,6 +10,7 @@ import inventoryRoutes from './routes/inventory';
 import alertRoutes from './routes/alerts';
 import reportRoutes from './routes/reports';
 import auditRoutes from './routes/audit';
+import purchaseRoutes from './routes/purchases';
 import prisma from './lib/prisma';
 import { requireAuth } from './auth';
 
@@ -25,6 +26,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/medicines', requireAuth, medicineRoutes);
 app.use('/api/v1/categories', requireAuth, categoryRoutes);
 app.use('/api/v1/batches', requireAuth, batchRoutes);
+app.use('/api/v1/purchases', requireAuth, purchaseRoutes);
 app.use('/api/v1/suppliers', requireAuth, supplierRoutes);
 app.use('/api/v1/inventory', requireAuth, inventoryRoutes);
 app.use('/api/v1/alerts', requireAuth, alertRoutes);

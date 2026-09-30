@@ -67,3 +67,21 @@ export const forecastQuerySchema = z.object({
   message: 'from must be before or equal to to',
   path: ['from'],
 });
+
+const purchaseItemSchema = z.object({
+  medicineId: z.coerce.number().int().positive(),
+  batchNumber: z.string().trim().min(1).max(100),
+  mfgDate: z.coerce.date(),
+  expiryDate: z.coerce.date(),
+  quantity: z.coerce.number().int().positive(),
+  purchasePrice: z.coerce.number().nonnegative(),
+}).refine((value) => value.expiryDate > value.mfgDate, {
+  message: 'Expiry date must be after manufacturing date',
+  path: ['expiryDate'],
+});
+
+export const purchaseSchema = z.object({
+  supplierId: z.coerce.number().int().positive(),
+  notes: z.string().trim().max(500).optional(),
+  items: z.array(purchaseItemSchema).min(1).max(100),
+});
