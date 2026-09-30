@@ -1,0 +1,13 @@
+-- AlterTable
+ALTER TABLE "Batch"
+ADD COLUMN "sellingPrice" DECIMAL(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE "Batch"
+ALTER COLUMN "sellingPrice" DROP DEFAULT;
+
+-- AlterTable
+ALTER TABLE "PurchaseItem"
+ADD COLUMN "sellingPrice" DECIMAL(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE "PurchaseItem"
+ALTER COLUMN "sellingPrice" DROP DEFAULT;

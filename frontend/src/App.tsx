@@ -1,16 +1,21 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { apiFetch } from "./api";
 
 type Medicine = {
   id: number;
   genericName: string;
   brandName: string;
   categoryId: number;
+  manufacturer: string | null;
+  dosageForm: string | null;
+  barcode: string | null;
+  active: boolean;
   unit: string;
   reorderLevel: number;
   batches: { quantity: number }[];
 };
 
-type Category = { id: number; name: string };
+type Category = { id: number; name: string; description: string | null };
 
 type Supplier = {
   id: number;
@@ -28,6 +33,7 @@ type Batch = {
   expiryDate: string;
   quantity: number;
   purchasePrice: number;
+  sellingPrice: number;
   medicine: { genericName: string; brandName: string };
   supplier: { name: string };
 };
@@ -97,6 +103,10 @@ type MedicineForm = {
   genericName: string;
   brandName: string;
   categoryId: string;
+  manufacturer: string;
+  dosageForm: string;
+  barcode: string;
+  active: boolean;
   unit: string;
   reorderLevel: string;
 };
@@ -119,6 +129,7 @@ type BatchForm = {
   expiryDate: string;
   quantity: string;
   purchasePrice: string;
+  sellingPrice: string;
 };
 
 type PurchaseForm = BatchForm & {
@@ -163,6 +174,7 @@ function App() {
   const [loading, setLoading] = useState(() => session !== null);
   const [error, setError] = useState("");
   const [medicineSearch, setMedicineSearch] = useState("");
+  const [supplierSearch, setSupplierSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
   const [saving, setSaving] = useState(false);
@@ -174,6 +186,7 @@ function App() {
     contactInfo: "",
   });
   const [categoryFormOpen, setCategoryFormOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryForm, setCategoryForm] = useState<CategoryForm>({
     name: "",
     description: "",
@@ -187,6 +200,7 @@ function App() {
     expiryDate: "",
     quantity: "0",
     purchasePrice: "0",
+    sellingPrice: "0",
   });
   const [purchaseFormOpen, setPurchaseFormOpen] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState<PurchaseForm>({
@@ -197,6 +211,7 @@ function App() {
     expiryDate: "",
     quantity: "0",
     purchasePrice: "0",
+    sellingPrice: "0",
     notes: "",
   });
   const [stockFormOpen, setStockFormOpen] = useState(false);
@@ -210,6 +225,10 @@ function App() {
     genericName: "",
     brandName: "",
     categoryId: "",
+    manufacturer: "",
+    dosageForm: "",
+    barcode: "",
+    active: true,
     unit: "Tablet",
     reorderLevel: "0",
   });
@@ -232,16 +251,16 @@ function App() {
           alertResponse,
           reportResponse,
         ] = await Promise.all([
-          fetch("http://localhost:5000/api/v1/medicines", { headers }),
-          fetch("http://localhost:5000/api/v1/categories", { headers }),
-          fetch("http://localhost:5000/api/v1/suppliers", { headers }),
-          fetch("http://localhost:5000/api/v1/batches", { headers }),
-          fetch("http://localhost:5000/api/v1/purchases", { headers }),
-          fetch("http://localhost:5000/api/v1/inventory/transactions", {
+          apiFetch("/api/v1/medicines", { headers }),
+          apiFetch("/api/v1/categories", { headers }),
+          apiFetch("/api/v1/suppliers", { headers }),
+          apiFetch("/api/v1/batches", { headers }),
+          apiFetch("/api/v1/purchases", { headers }),
+          apiFetch("/api/v1/inventory/transactions", {
             headers,
           }),
-          fetch("http://localhost:5000/api/v1/alerts", { headers }),
-          fetch("http://localhost:5000/api/v1/reports/summary", { headers }),
+          apiFetch("/api/v1/alerts", { headers }),
+          apiFetch("/api/v1/reports/summary", { headers }),
         ]);
         if (
           !medicineResponse.ok ||
@@ -297,10 +316,9 @@ function App() {
           session.user.role === "Admin" ||
           session.user.role === "Inventory Manager"
         ) {
-          const auditResponse = await fetch(
-            "http://localhost:5000/api/v1/audit-logs",
-            { headers },
-          );
+          const auditResponse = await apiFetch("/api/v1/audit-logs", {
+            headers,
+          });
           if (auditResponse.ok) {
             const auditResult = (await auditResponse.json()) as {
               data: AuditLog[];
@@ -331,7 +349,7 @@ function App() {
     setLoginError("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/v1/auth/login", {
+      const response = await apiFetch("/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -370,7 +388,7 @@ function App() {
       return;
     }
 
-    const response = await fetch("http://localhost:5000/api/v1/audit-logs", {
+    const response = await apiFetch("/api/v1/audit-logs", {
       headers: { Authorization: `Bearer ${session.token}` },
     });
     if (response.ok) {
@@ -381,7 +399,7 @@ function App() {
 
   const refreshPurchases = async () => {
     if (!session) return;
-    const response = await fetch("http://localhost:5000/api/v1/purchases", {
+    const response = await apiFetch("/api/v1/purchases", {
       headers: { Authorization: `Bearer ${session.token}` },
     });
     if (response.ok) {
@@ -396,6 +414,10 @@ function App() {
       genericName: "",
       brandName: "",
       categoryId: categories[0] ? String(categories[0].id) : "",
+      manufacturer: "",
+      dosageForm: "",
+      barcode: "",
+      active: true,
       unit: "Tablet",
       reorderLevel: "0",
     });
@@ -409,6 +431,10 @@ function App() {
       genericName: medicine.genericName,
       brandName: medicine.brandName,
       categoryId: String(medicine.categoryId),
+      manufacturer: medicine.manufacturer ?? "",
+      dosageForm: medicine.dosageForm ?? "",
+      barcode: medicine.barcode ?? "",
+      active: medicine.active,
       unit: medicine.unit,
       reorderLevel: String(medicine.reorderLevel),
     });
@@ -424,9 +450,9 @@ function App() {
     setFormError("");
     try {
       const endpoint = editingMedicine
-        ? `http://localhost:5000/api/v1/medicines/${editingMedicine.id}`
-        : "http://localhost:5000/api/v1/medicines";
-      const response = await fetch(endpoint, {
+        ? `/api/v1/medicines/${editingMedicine.id}`
+        : "/api/v1/medicines";
+      const response = await apiFetch(endpoint, {
         method: editingMedicine ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
@@ -452,7 +478,7 @@ function App() {
 
       setFormOpen(false);
       setEditingMedicine(null);
-      const refreshed = await fetch("http://localhost:5000/api/v1/medicines", {
+      const refreshed = await apiFetch("/api/v1/medicines", {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       const refreshedResult = (await refreshed.json()) as ApiResponse;
@@ -494,9 +520,9 @@ function App() {
     setFormError("");
     try {
       const endpoint = editingSupplier
-        ? `http://localhost:5000/api/v1/suppliers/${editingSupplier.id}`
-        : "http://localhost:5000/api/v1/suppliers";
-      const response = await fetch(endpoint, {
+        ? `/api/v1/suppliers/${editingSupplier.id}`
+        : "/api/v1/suppliers";
+      const response = await apiFetch(endpoint, {
         method: editingSupplier ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
@@ -516,7 +542,7 @@ function App() {
         );
       }
 
-      const refreshed = await fetch("http://localhost:5000/api/v1/suppliers", {
+      const refreshed = await apiFetch("/api/v1/suppliers", {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       const refreshedResult = (await refreshed.json()) as { data: Supplier[] };
@@ -535,6 +561,16 @@ function App() {
     }
   };
 
+  const openEditCategoryForm = (category: Category) => {
+    setEditingCategory(category);
+    setCategoryForm({
+      name: category.name,
+      description: category.description ?? "",
+    });
+    setFormError("");
+    setCategoryFormOpen(true);
+  };
+
   const handleCategorySave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!session) return;
@@ -542,8 +578,11 @@ function App() {
     setSaving(true);
     setFormError("");
     try {
-      const response = await fetch("http://localhost:5000/api/v1/categories", {
-        method: "POST",
+      const endpoint = editingCategory
+        ? `/api/v1/categories/${editingCategory.id}`
+        : "/api/v1/categories";
+      const response = await apiFetch(endpoint, {
+        method: editingCategory ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.token}`,
@@ -563,12 +602,15 @@ function App() {
         );
       }
 
-      setCategories((current) =>
-        [...current, result.data!].sort((left, right) =>
-          left.name.localeCompare(right.name),
-        ),
-      );
+      const refreshed = await apiFetch("/api/v1/categories", {
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
+      const refreshedResult = (await refreshed.json()) as {
+        data: Category[];
+      };
+      setCategories(refreshedResult.data);
       setCategoryFormOpen(false);
+      setEditingCategory(null);
       setCategoryForm({ name: "", description: "" });
       await refreshAuditLogs();
     } catch (requestError) {
@@ -591,6 +633,7 @@ function App() {
       expiryDate: "",
       quantity: "0",
       purchasePrice: "0",
+      sellingPrice: "0",
     });
     setFormError("");
     setBatchFormOpen(true);
@@ -605,6 +648,7 @@ function App() {
       expiryDate: "",
       quantity: "1",
       purchasePrice: "0",
+      sellingPrice: "0",
       notes: "",
     });
     setFormError("");
@@ -622,27 +666,25 @@ function App() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.token}`,
       };
-      const purchaseResponse = await fetch(
-        "http://localhost:5000/api/v1/purchases",
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            supplierId: Number(purchaseForm.supplierId),
-            notes: purchaseForm.notes,
-            items: [
-              {
-                medicineId: Number(purchaseForm.medicineId),
-                batchNumber: purchaseForm.batchNumber,
-                mfgDate: purchaseForm.mfgDate,
-                expiryDate: purchaseForm.expiryDate,
-                quantity: Number(purchaseForm.quantity),
-                purchasePrice: Number(purchaseForm.purchasePrice),
-              },
-            ],
-          }),
-        },
-      );
+      const purchaseResponse = await apiFetch("/api/v1/purchases", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          supplierId: Number(purchaseForm.supplierId),
+          notes: purchaseForm.notes,
+          items: [
+            {
+              medicineId: Number(purchaseForm.medicineId),
+              batchNumber: purchaseForm.batchNumber,
+              mfgDate: purchaseForm.mfgDate,
+              expiryDate: purchaseForm.expiryDate,
+              quantity: Number(purchaseForm.quantity),
+              purchasePrice: Number(purchaseForm.purchasePrice),
+              sellingPrice: Number(purchaseForm.sellingPrice),
+            },
+          ],
+        }),
+      });
       const purchaseResult = (await purchaseResponse.json()) as {
         success: boolean;
         data?: { id: number };
@@ -656,8 +698,8 @@ function App() {
         throw new Error(purchaseResult.error ?? "Unable to create purchase.");
       }
 
-      const receiveResponse = await fetch(
-        `http://localhost:5000/api/v1/purchases/${purchaseResult.data.id}/receive`,
+      const receiveResponse = await apiFetch(
+        `/api/v1/purchases/${purchaseResult.data.id}/receive`,
         { method: "POST", headers },
       );
       const receiveResult = (await receiveResponse.json()) as {
@@ -675,14 +717,14 @@ function App() {
         transactionResponse,
         alertResponse,
       ] = await Promise.all([
-        fetch("http://localhost:5000/api/v1/batches", { headers: authHeaders }),
-        fetch("http://localhost:5000/api/v1/medicines", {
+        apiFetch("/api/v1/batches", { headers: authHeaders }),
+        apiFetch("/api/v1/medicines", {
           headers: authHeaders,
         }),
-        fetch("http://localhost:5000/api/v1/inventory/transactions", {
+        apiFetch("/api/v1/inventory/transactions", {
           headers: authHeaders,
         }),
-        fetch("http://localhost:5000/api/v1/alerts", { headers: authHeaders }),
+        apiFetch("/api/v1/alerts", { headers: authHeaders }),
       ]);
       setBatches(((await batchResponse.json()) as { data: Batch[] }).data);
       setMedicines(((await medicineResponse.json()) as ApiResponse).data);
@@ -714,7 +756,7 @@ function App() {
     setSaving(true);
     setFormError("");
     try {
-      const response = await fetch("http://localhost:5000/api/v1/batches", {
+      const response = await apiFetch("/api/v1/batches", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -726,6 +768,7 @@ function App() {
           supplierId: Number(batchForm.supplierId),
           quantity: Number(batchForm.quantity),
           purchasePrice: Number(batchForm.purchasePrice),
+          sellingPrice: Number(batchForm.sellingPrice),
         }),
       });
       const result = (await response.json()) as {
@@ -742,8 +785,8 @@ function App() {
 
       const headers = { Authorization: `Bearer ${session.token}` };
       const [batchResponse, medicineResponse] = await Promise.all([
-        fetch("http://localhost:5000/api/v1/batches", { headers }),
-        fetch("http://localhost:5000/api/v1/medicines", { headers }),
+        apiFetch("/api/v1/batches", { headers }),
+        apiFetch("/api/v1/medicines", { headers }),
       ]);
       const batchResult = (await batchResponse.json()) as { data: Batch[] };
       const medicineResult = (await medicineResponse.json()) as ApiResponse;
@@ -780,21 +823,18 @@ function App() {
     setSaving(true);
     setFormError("");
     try {
-      const response = await fetch(
-        "http://localhost:5000/api/v1/inventory/transactions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.token}`,
-          },
-          body: JSON.stringify({
-            ...stockForm,
-            batchId: Number(stockForm.batchId),
-            quantity: Number(stockForm.quantity),
-          }),
+      const response = await apiFetch("/api/v1/inventory/transactions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
         },
-      );
+        body: JSON.stringify({
+          ...stockForm,
+          batchId: Number(stockForm.batchId),
+          quantity: Number(stockForm.quantity),
+        }),
+      });
       const result = (await response.json()) as {
         success: boolean;
         error?: string;
@@ -810,9 +850,9 @@ function App() {
       const headers = { Authorization: `Bearer ${session.token}` };
       const [batchResponse, medicineResponse, transactionResponse] =
         await Promise.all([
-          fetch("http://localhost:5000/api/v1/batches", { headers }),
-          fetch("http://localhost:5000/api/v1/medicines", { headers }),
-          fetch("http://localhost:5000/api/v1/inventory/transactions", {
+          apiFetch("/api/v1/batches", { headers }),
+          apiFetch("/api/v1/medicines", { headers }),
+          apiFetch("/api/v1/inventory/transactions", {
             headers,
           }),
         ]);
@@ -840,10 +880,10 @@ function App() {
   const receivePurchase = async (purchaseId: number) => {
     if (!session) return;
     const headers = { Authorization: `Bearer ${session.token}` };
-    const response = await fetch(
-      `http://localhost:5000/api/v1/purchases/${purchaseId}/receive`,
-      { method: "POST", headers },
-    );
+    const response = await apiFetch(`/api/v1/purchases/${purchaseId}/receive`, {
+      method: "POST",
+      headers,
+    });
     const result = (await response.json()) as {
       success: boolean;
       error?: string;
@@ -859,10 +899,10 @@ function App() {
       transactionResponse,
       alertResponse,
     ] = await Promise.all([
-      fetch("http://localhost:5000/api/v1/batches", { headers }),
-      fetch("http://localhost:5000/api/v1/medicines", { headers }),
-      fetch("http://localhost:5000/api/v1/inventory/transactions", { headers }),
-      fetch("http://localhost:5000/api/v1/alerts", { headers }),
+      apiFetch("/api/v1/batches", { headers }),
+      apiFetch("/api/v1/medicines", { headers }),
+      apiFetch("/api/v1/inventory/transactions", { headers }),
+      apiFetch("/api/v1/alerts", { headers }),
     ]);
     setBatches(((await batchResponse.json()) as { data: Batch[] }).data);
     setMedicines(((await medicineResponse.json()) as ApiResponse).data);
@@ -878,23 +918,31 @@ function App() {
 
   const acknowledgeAlert = async (alertId: number) => {
     if (!session) return;
-    const response = await fetch(
-      `http://localhost:5000/api/v1/alerts/${alertId}/acknowledge`,
-      {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${session.token}` },
-      },
-    );
+    const response = await apiFetch(`/api/v1/alerts/${alertId}/acknowledge`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${session.token}` },
+    });
     if (!response.ok) {
       setError("Unable to acknowledge alert.");
       return;
     }
-    const refreshed = await fetch("http://localhost:5000/api/v1/alerts", {
+    const refreshed = await apiFetch("/api/v1/alerts", {
       headers: { Authorization: `Bearer ${session.token}` },
     });
     const result = (await refreshed.json()) as { data: InventoryAlert[] };
     setAlerts(result.data);
     await refreshAuditLogs();
+  };
+
+  const handleLogout = async () => {
+    if (session) {
+      await apiFetch("/api/v1/auth/logout", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
+    }
+    sessionStorage.removeItem("pharmasense-session");
+    setSession(null);
   };
 
   if (!session) {
@@ -991,9 +1039,13 @@ function App() {
     return (
       search.length === 0 ||
       medicine.genericName.toLowerCase().includes(search) ||
-      medicine.brandName.toLowerCase().includes(search)
+      medicine.brandName.toLowerCase().includes(search) ||
+      medicine.barcode?.toLowerCase().includes(search)
     );
   });
+  const filteredSuppliers = suppliers.filter((supplier) =>
+    supplier.name.toLowerCase().includes(supplierSearch.trim().toLowerCase()),
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -1014,10 +1066,7 @@ function App() {
             <p className="text-xs text-gray-500">{session.user.role}</p>
           </div>
           <button
-            onClick={() => {
-              sessionStorage.removeItem("pharmasense-session");
-              setSession(null);
-            }}
+            onClick={() => void handleLogout()}
             className="text-gray-600 hover:text-gray-900 font-medium"
           >
             Sign out
@@ -1053,6 +1102,7 @@ function App() {
           {canWriteMedicines && (
             <button
               onClick={() => {
+                setEditingCategory(null);
                 setCategoryForm({ name: "", description: "" });
                 setFormError("");
                 setCategoryFormOpen(true);
@@ -1295,6 +1345,23 @@ function App() {
                   required
                 />
               </label>
+              <label className="text-sm font-medium text-gray-700">
+                Selling price per unit
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={purchaseForm.sellingPrice}
+                  onChange={(event) =>
+                    setPurchaseForm({
+                      ...purchaseForm,
+                      sellingPrice: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
             </div>
             <label className="block text-sm font-medium text-gray-700 mt-4">
               Purchase notes
@@ -1471,6 +1538,23 @@ function App() {
                   required
                 />
               </label>
+              <label className="text-sm font-medium text-gray-700">
+                Selling price per unit
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={batchForm.sellingPrice}
+                  onChange={(event) =>
+                    setBatchForm({
+                      ...batchForm,
+                      sellingPrice: event.target.value,
+                    })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </label>
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button
@@ -1567,7 +1651,9 @@ function App() {
             className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Add category</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingCategory ? "Edit category" : "Add category"}
+              </h2>
               <button
                 type="button"
                 onClick={() => setCategoryFormOpen(false)}
@@ -1673,6 +1759,37 @@ function App() {
                 />
               </label>
               <label className="text-sm font-medium text-gray-700">
+                Manufacturer
+                <input
+                  value={form.manufacturer}
+                  onChange={(event) =>
+                    setForm({ ...form, manufacturer: event.target.value })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Dosage / form
+                <input
+                  value={form.dosageForm}
+                  onChange={(event) =>
+                    setForm({ ...form, dosageForm: event.target.value })
+                  }
+                  placeholder="e.g. 500 mg tablet"
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Barcode
+                <input
+                  value={form.barcode}
+                  onChange={(event) =>
+                    setForm({ ...form, barcode: event.target.value })
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
                 Category
                 <select
                   value={form.categoryId}
@@ -1715,6 +1832,17 @@ function App() {
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
                   required
                 />
+              </label>
+              <label className="flex items-center gap-3 text-sm font-medium text-gray-700 md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={form.active}
+                  onChange={(event) =>
+                    setForm({ ...form, active: event.target.checked })
+                  }
+                  className="h-4 w-4"
+                />
+                Active medicine
               </label>
             </div>
             <div className="flex justify-end gap-3 mt-6">
@@ -1895,7 +2023,7 @@ function App() {
               type="search"
               value={medicineSearch}
               onChange={(event) => setMedicineSearch(event.target.value)}
-              placeholder="Search by generic or brand name"
+              placeholder="Search by name or barcode"
               className="w-full md:w-80 border border-gray-300 rounded-lg px-3 py-2"
             />
           </label>
@@ -1907,7 +2035,9 @@ function App() {
               <tr>
                 <th className="px-6 py-4">Generic Name</th>
                 <th className="px-6 py-4">Brand Name</th>
+                <th className="px-6 py-4">Manufacturer</th>
                 <th className="px-6 py-4">Unit</th>
+                <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Reorder Level</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -1916,7 +2046,7 @@ function App() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={7}
                     className="px-6 py-8 text-center text-gray-500"
                   >
                     Loading inventory data...
@@ -1940,7 +2070,13 @@ function App() {
                       {med.genericName}
                     </td>
                     <td className="px-6 py-4 text-gray-600">{med.brandName}</td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {med.manufacturer || "-"}
+                    </td>
                     <td className="px-6 py-4 text-gray-600">{med.unit}</td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {med.active ? "Active" : "Inactive"}
+                    </td>
                     <td className="px-6 py-4 text-gray-600">
                       {med.batches.reduce(
                         (total, batch) => total + batch.quantity,
@@ -1968,7 +2104,67 @@ function App() {
 
       <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900">Categories</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4">Category</th>
+                <th className="px-6 py-4">Description</th>
+                <th className="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {categories.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={3}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    No categories have been added yet.
+                  </td>
+                </tr>
+              ) : (
+                categories.map((category) => (
+                  <tr key={category.id}>
+                    <td className="px-6 py-4 font-medium text-gray-900">
+                      {category.name}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {category.description || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {canWriteMedicines && (
+                        <button
+                          onClick={() => openEditCategoryForm(category)}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <h2 className="text-xl font-bold text-gray-900">Suppliers</h2>
+          <label>
+            <span className="sr-only">Search suppliers</span>
+            <input
+              type="search"
+              value={supplierSearch}
+              onChange={(event) => setSupplierSearch(event.target.value)}
+              placeholder="Search suppliers"
+              className="w-full md:w-72 border border-gray-300 rounded-lg px-3 py-2"
+            />
+          </label>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -1981,17 +2177,19 @@ function App() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {suppliers.length === 0 ? (
+              {filteredSuppliers.length === 0 ? (
                 <tr>
                   <td
                     colSpan={4}
                     className="px-6 py-8 text-center text-gray-500"
                   >
-                    No suppliers have been added yet.
+                    {suppliers.length === 0
+                      ? "No suppliers have been added yet."
+                      : "No suppliers match this search."}
                   </td>
                 </tr>
               ) : (
-                suppliers.map((supplier) => (
+                filteredSuppliers.map((supplier) => (
                   <tr key={supplier.id}>
                     <td className="px-6 py-4 font-medium text-gray-900">
                       {supplier.name}

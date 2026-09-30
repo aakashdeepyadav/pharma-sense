@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { batchSchema } from '../validation/schemas';
 import { AuthenticatedRequest, requireRoles } from '../auth';
@@ -58,6 +59,10 @@ router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async
     });
     res.status(201).json({ success: true, data: batch });
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      res.status(409).json({ success: false, error: 'A batch with this medicine and batch number already exists' });
+      return;
+    }
     res.status(500).json({ success: false, error: 'Failed to add batch' });
   }
 });

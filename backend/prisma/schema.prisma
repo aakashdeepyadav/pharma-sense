@@ -39,6 +39,10 @@ model Medicine {
   brandName     String
   categoryId    Int
   category      Category       @relation(fields: [categoryId], references: [id])
+  manufacturer  String?
+  dosageForm    String?
+  barcode       String?        @unique
+  active        Boolean        @default(true)
   reorderLevel  Int            @default(0)
   unit          String
   batches       Batch[]
@@ -64,9 +68,12 @@ model Batch {
   mfgDate       DateTime
   expiryDate    DateTime
   quantity      Int                @default(0)
-  purchasePrice Float
+  purchasePrice Decimal            @db.Decimal(12, 2)
+  sellingPrice  Decimal            @db.Decimal(12, 2)
   transactions  StockTransaction[]
   alerts        Alert[]
+
+  @@unique([medicineId, batchNumber])
 }
 
 model Purchase {
@@ -92,7 +99,8 @@ model PurchaseItem {
   mfgDate       DateTime
   expiryDate    DateTime
   quantity      Int
-  purchasePrice Float
+  purchasePrice Decimal  @db.Decimal(12, 2)
+  sellingPrice  Decimal  @db.Decimal(12, 2)
 }
 
 model StockTransaction {

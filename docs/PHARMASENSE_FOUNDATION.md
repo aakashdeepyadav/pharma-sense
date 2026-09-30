@@ -2,23 +2,23 @@
 
 **Formal title:** Agent-Based Medicine Stock Management System
 **Project type:** AI-powered pharmaceutical inventory management and decision-support system
-**Document status:** Baseline architecture and delivery plan
-**Version:** 0.1
+**Document status:** Baseline architecture and implementation status
+**Version:** 0.2
 **Date:** 2026-09-30
 
 ## How to use this document
 
 This document is the working contract for the six-member team. It defines what the first release is, what is deliberately postponed, who owns each workstream, and how the current repository will be advanced.
 
-The repository is currently an early prototype:
+The repository began as an early prototype. The current implementation has moved beyond that baseline:
 
 - PostgreSQL is available through `docker-compose.yml`.
 - Prisma already models users, roles, categories, medicines, suppliers, batches, and stock transactions.
-- The backend currently exposes basic unauthenticated list/create routes for medicines, categories, and batches.
-- The frontend dashboard still renders mock medicine data.
-- Authentication, validation, authorization, purchases, alerts, audit logging, tests, and production deployment are not complete.
+- The backend now uses protected, validated routes for inventory, purchases, alerts, reports, and audit logs.
+- The frontend dashboard reads live API data and supports medicine, category, supplier, batch, purchase, and stock workflows.
+- Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, and baseline tests are implemented; production deployment and advanced AI features remain open.
 
-The next work therefore starts with core correctness and security. AI agents, forecasting, mobile, and barcode features remain later phases.
+The next work focuses on final release hardening. Camera/mobile scanning, advanced forecasting, AI agents, and replenishment recommendations remain later phases.
 
 ## A. Executive Summary
 
@@ -178,12 +178,12 @@ No recommendation changes inventory or creates a purchase without explicit autho
 
 ### Required schema corrections before MVP
 
-- Add `sellingPrice` to `Batch`.
-- Add manufacturer, dosage/form, barcode, and active status to `Medicine`.
-- Add `Purchase`, `PurchaseItem`, `Alert`, and `AuditLog` models.
+- `sellingPrice` is implemented on `Batch` and purchase receiving items.
+- Manufacturer, dosage/form, barcode, and active status are implemented for `Medicine`.
+- `Purchase`, `PurchaseItem`, `Alert`, and `AuditLog` models are implemented.
 - Prefer enums for role, transaction type, purchase status, alert type, and alert status.
-- Use `Decimal` for money instead of floating point.
-- Add unique constraints such as `(medicineId, batchNumber)` and supplier contact identifiers where appropriate.
+- Use `Decimal` for money instead of floating point. Purchase and selling prices now use `Decimal(12,2)`.
+- The `(medicineId, batchNumber)` batch uniqueness constraint is implemented; supplier contact uniqueness remains a future data-policy decision.
 - Add checks for positive quantities, non-negative prices, expiry after manufacturing date, and valid dates.
 - Add indexes for medicine search fields, batch expiry, batch medicine, transaction timestamp, and alert status/type.
 - Decide whether quantity is a maintained projection or calculated from transactions. For the MVP, maintain `Batch.quantity` inside the same transaction as every stock transaction and periodically reconcile it from the ledger.
@@ -202,7 +202,7 @@ Base path: `/api/v1`.
 | Area       | Endpoints                                                                       |
 | ---------- | ------------------------------------------------------------------------------- |
 | Auth       | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`                         |
-| Medicines  | `GET/POST /medicines`, `GET/PATCH /medicines/:id`                               |
+| Medicines  | `GET/POST /medicines`, `GET/PATCH /medicines/:id`, search/barcode filters       |
 | Categories | `GET/POST /categories`, `PATCH /categories/:id`                                 |
 | Suppliers  | `GET/POST /suppliers`, `GET/PATCH /suppliers/:id`                               |
 | Batches    | `GET/POST /batches`, `GET/PATCH /batches/:id`                                   |

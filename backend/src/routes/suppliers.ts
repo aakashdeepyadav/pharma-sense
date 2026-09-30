@@ -1,13 +1,22 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
-import { supplierSchema, supplierUpdateSchema } from '../validation/schemas';
+import { supplierQuerySchema, supplierSchema, supplierUpdateSchema } from '../validation/schemas';
 import { AuthenticatedRequest, requireRoles } from '../auth';
 
 const router = Router();
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
+  const query = supplierQuerySchema.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ success: false, error: query.error.issues });
+    return;
+  }
+
   try {
     const suppliers = await prisma.supplier.findMany({
+      where: query.data.search
+        ? { name: { contains: query.data.search, mode: 'insensitive' } }
+        : undefined,
       include: { _count: { select: { batches: true } } },
       orderBy: { name: 'asc' },
     });

@@ -5,15 +5,27 @@ export const categorySchema = z.object({
   description: z.string().trim().max(500).optional(),
 });
 
+export const categoryUpdateSchema = categorySchema.partial();
+
 export const medicineSchema = z.object({
   genericName: z.string().trim().min(1).max(150),
   brandName: z.string().trim().min(1).max(150),
   categoryId: z.coerce.number().int().positive(),
+  manufacturer: z.string().trim().max(150).optional(),
+  dosageForm: z.string().trim().max(100).optional(),
+  barcode: z.string().trim().max(100).optional(),
+  active: z.coerce.boolean().default(true),
   reorderLevel: z.coerce.number().int().nonnegative(),
   unit: z.string().trim().min(1).max(50),
 });
 
 export const medicineUpdateSchema = medicineSchema.partial();
+
+export const medicineQuerySchema = z.object({
+  search: z.string().trim().max(150).optional(),
+  barcode: z.string().trim().max(100).optional(),
+  active: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
+});
 
 export const supplierSchema = z.object({
   name: z.string().trim().min(1).max(150),
@@ -21,6 +33,10 @@ export const supplierSchema = z.object({
 });
 
 export const supplierUpdateSchema = supplierSchema.partial();
+
+export const supplierQuerySchema = z.object({
+  search: z.string().trim().max(150).optional(),
+});
 
 export const batchSchema = z.object({
   medicineId: z.coerce.number().int().positive(),
@@ -30,6 +46,7 @@ export const batchSchema = z.object({
   expiryDate: z.coerce.date(),
   quantity: z.coerce.number().int().nonnegative(),
   purchasePrice: z.coerce.number().nonnegative(),
+  sellingPrice: z.coerce.number().nonnegative(),
 }).refine((value) => value.expiryDate > value.mfgDate, {
   message: 'Expiry date must be after manufacturing date',
   path: ['expiryDate'],
@@ -75,6 +92,7 @@ const purchaseItemSchema = z.object({
   expiryDate: z.coerce.date(),
   quantity: z.coerce.number().int().positive(),
   purchasePrice: z.coerce.number().nonnegative(),
+  sellingPrice: z.coerce.number().nonnegative(),
 }).refine((value) => value.expiryDate > value.mfgDate, {
   message: 'Expiry date must be after manufacturing date',
   path: ['expiryDate'],

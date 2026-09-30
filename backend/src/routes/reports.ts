@@ -44,7 +44,7 @@ router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
         supplierCount: suppliers,
         batchCount: batches.length,
         totalUnits: batches.reduce((total, batch) => total + batch.quantity, 0),
-        inventoryCost: batches.reduce((total, batch) => total + batch.quantity * batch.purchasePrice, 0),
+        inventoryCost: batches.reduce((total, batch) => total + batch.quantity * Number(batch.purchasePrice), 0),
         issuedUnits: transactions.reduce((total, transaction) => total + transaction.quantity, 0),
         topIssuedMedicines,
       },

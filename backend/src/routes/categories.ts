@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
-import { categorySchema } from '../validation/schemas';
+import { categorySchema, categoryUpdateSchema } from '../validation/schemas';
 import { AuthenticatedRequest, requireRoles } from '../auth';
 
 const router = Router();
@@ -45,6 +45,42 @@ router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async
     res.status(201).json({ success: true, data: category });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to add category' });
+  }
+});
+
+router.patch('/:id', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async (req: AuthenticatedRequest, res: Response) => {
+  const id = Number(req.params.id);
+  const result = categoryUpdateSchema.safeParse(req.body);
+  if (!Number.isInteger(id) || id < 1) {
+    res.status(400).json({ success: false, error: 'Category id must be a positive integer' });
+    return;
+  }
+  if (!result.success || Object.keys(result.data).length === 0) {
+    res.status(400).json({ success: false, error: 'Provide at least one valid category field' });
+    return;
+  }
+  if (!req.user) {
+    res.status(401).json({ success: false, error: 'Authentication required' });
+    return;
+  }
+
+  try {
+    const category = await prisma.$transaction(async (database) => {
+      const updatedCategory = await database.category.update({ where: { id }, data: result.data });
+      await database.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: 'CATEGORY_UPDATED',
+          entity: 'Category',
+          entityId: id,
+          details: JSON.stringify(result.data),
+        },
+      });
+      return updatedCategory;
+    });
+    res.json({ success: true, data: category });
+  } catch {
+    res.status(404).json({ success: false, error: 'Category not found' });
   }
 });
 

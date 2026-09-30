@@ -23,6 +23,10 @@ describe('PharmaSense API', () => {
     const response = await fetch(`${baseUrl}/health`);
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { status: 'ok', database: 'ok' });
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(response.headers.get('x-frame-options'), 'DENY');
+    assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(response.headers.get('x-powered-by'), null);
   });
 
   it('protects inventory routes from anonymous access', async () => {
@@ -37,6 +41,20 @@ describe('PharmaSense API', () => {
       body: JSON.stringify({ email: 'not-an-email', password: 'short' }),
     });
     assert.equal(response.status, 400);
+  });
+
+  it('revokes a token on logout', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const logoutResponse = await fetch(`${baseUrl}/api/v1/auth/logout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(logoutResponse.status, 200);
+
+    const protectedResponse = await fetch(`${baseUrl}/api/v1/reports/summary`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(protectedResponse.status, 401);
   });
 
   it('allows the seeded admin to read reports', async () => {
@@ -85,6 +103,27 @@ describe('PharmaSense API', () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(detailResponse.status, 400);
+  });
+
+  it('validates medicine search filters', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const invalidResponse = await fetch(`${baseUrl}/api/v1/medicines?active=maybe`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(invalidResponse.status, 400);
+
+    const searchResponse = await fetch(`${baseUrl}/api/v1/medicines?search=tablet`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(searchResponse.status, 200);
+  });
+
+  it('validates supplier search filters', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const response = await fetch(`${baseUrl}/api/v1/suppliers?search=${'x'.repeat(151)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.status, 400);
   });
 
   it('denies Staff medicine writes', async () => {
