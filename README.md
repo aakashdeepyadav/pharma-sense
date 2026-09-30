@@ -37,6 +37,8 @@ npm run seed
 npm run dev
 ```
 
+Before starting the backend, copy `backend/.env.example` to `backend/.env` and replace `JWT_SECRET` with a long random value. Copy `frontend/.env.example` to `frontend/.env` if the API is not running at the local default URL.
+
 The development seed creates this local administrator account:
 
 ```text
