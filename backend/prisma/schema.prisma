@@ -8,19 +8,20 @@ datasource db {
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
-  name          String
-  email         String   @unique
-  passwordHash  String
-  roleId        Int
-  role          Role     @relation(fields: [roleId], references: [id])
-  transactions  StockTransaction[]
-  auditLogs     AuditLog[]
+  id           Int                @id @default(autoincrement())
+  name         String
+  email        String             @unique
+  passwordHash String
+  roleId       Int
+  role         Role               @relation(fields: [roleId], references: [id])
+  transactions StockTransaction[]
+  auditLogs    AuditLog[]
+  purchases    Purchase[]         @relation("PurchasesCreated")
 }
 
 model Role {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
+  id          Int    @id @default(autoincrement())
+  name        String @unique
   permissions String
   users       User[]
 }
@@ -33,37 +34,65 @@ model Category {
 }
 
 model Medicine {
-  id           Int        @id @default(autoincrement())
-  genericName  String
-  brandName    String
-  categoryId   Int
-  category     Category   @relation(fields: [categoryId], references: [id])
-  reorderLevel Int        @default(0)
-  unit         String
-  batches      Batch[]
-  alerts       Alert[]
+  id            Int            @id @default(autoincrement())
+  genericName   String
+  brandName     String
+  categoryId    Int
+  category      Category       @relation(fields: [categoryId], references: [id])
+  reorderLevel  Int            @default(0)
+  unit          String
+  batches       Batch[]
+  alerts        Alert[]
+  purchaseItems PurchaseItem[]
 }
 
 model Supplier {
-  id          Int       @id @default(autoincrement())
+  id          Int        @id @default(autoincrement())
   name        String
   contactInfo String?
   batches     Batch[]
+  purchases   Purchase[]
 }
 
 model Batch {
-  id            Int      @id @default(autoincrement())
+  id            Int                @id @default(autoincrement())
   medicineId    Int
-  medicine      Medicine @relation(fields: [medicineId], references: [id])
+  medicine      Medicine           @relation(fields: [medicineId], references: [id])
   supplierId    Int
-  supplier      Supplier @relation(fields: [supplierId], references: [id])
+  supplier      Supplier           @relation(fields: [supplierId], references: [id])
   batchNumber   String
   mfgDate       DateTime
   expiryDate    DateTime
-  quantity      Int      @default(0)
+  quantity      Int                @default(0)
   purchasePrice Float
   transactions  StockTransaction[]
   alerts        Alert[]
+}
+
+model Purchase {
+  id          Int            @id @default(autoincrement())
+  supplierId  Int
+  supplier    Supplier       @relation(fields: [supplierId], references: [id])
+  createdById Int
+  createdBy   User           @relation("PurchasesCreated", fields: [createdById], references: [id])
+  status      String         @default("DRAFT")
+  notes       String?
+  createdAt   DateTime       @default(now())
+  receivedAt  DateTime?
+  items       PurchaseItem[]
+}
+
+model PurchaseItem {
+  id            Int      @id @default(autoincrement())
+  purchaseId    Int
+  purchase      Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  medicineId    Int
+  medicine      Medicine @relation(fields: [medicineId], references: [id])
+  batchNumber   String
+  mfgDate       DateTime
+  expiryDate    DateTime
+  quantity      Int
+  purchasePrice Float
 }
 
 model StockTransaction {
@@ -72,27 +101,27 @@ model StockTransaction {
   batch     Batch    @relation(fields: [batchId], references: [id])
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
-  type      String   // IN, OUT, ADJ
+  type      String // IN, OUT, ADJ
   quantity  Int
   timestamp DateTime @default(now())
   notes     String?
 }
 
 model Alert {
-  id             Int      @id @default(autoincrement())
-  fingerprint    String   @unique
+  id             Int       @id @default(autoincrement())
+  fingerprint    String    @unique
   type           String
   severity       String
-  status         String   @default("OPEN")
+  status         String    @default("OPEN")
   message        String
   quantity       Int
   medicineId     Int
-  medicine       Medicine @relation(fields: [medicineId], references: [id])
+  medicine       Medicine  @relation(fields: [medicineId], references: [id])
   batchId        Int?
-  batch          Batch?   @relation(fields: [batchId], references: [id])
+  batch          Batch?    @relation(fields: [batchId], references: [id])
   expiryDate     DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   acknowledgedAt DateTime?
 }
 
