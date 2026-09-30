@@ -634,6 +634,29 @@ function App() {
     }
   };
 
+  const exportAuditLogs = () => {
+    const escapeCsv = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    const rows = [
+      ["Time", "Action", "Entity", "User", "Details"],
+      ...auditLogs.map((log) => [
+        new Date(log.createdAt).toISOString(),
+        log.action.replaceAll("_", " "),
+        `${log.entity}${log.entityId === null ? "" : ` #${log.entityId}`}`,
+        `${log.user.name} (${log.user.role.name})`,
+        log.details ?? "",
+      ]),
+    ];
+    const csv = rows.map((row) => row.map(escapeCsv).join(",")).join("\r\n");
+    const downloadUrl = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8" }),
+    );
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = `pharmasense-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(downloadUrl);
+  };
+
   const refreshUserAdministration = async () => {
     if (!session || session.user.role !== "Admin") return;
     const administration = await fetchUserAdministration(session.token);
@@ -3293,7 +3316,9 @@ function App() {
               <div className="p-6 border-b border-gray-100">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Audit log</h2>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      Audit log
+                    </h2>
                     <p className="text-sm text-gray-500 mt-1">
                       Recent operational changes recorded by the system.
                     </p>
@@ -3318,6 +3343,14 @@ function App() {
                       className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                     >
                       Search
+                    </button>
+                    <button
+                      type="button"
+                      onClick={exportAuditLogs}
+                      disabled={auditLogs.length === 0}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Export CSV
                     </button>
                     {auditSearch && (
                       <button

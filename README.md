@@ -21,6 +21,7 @@ Agent-Based Medicine Stock Management System.
 - Low-stock, out-of-stock, expired, and expiring-soon alerts with acknowledgement.
 - Operational reports, management-only audit logs, and transactional audit events for writes.
 - Management audit history supports paginated, text-filtered retrieval for larger operational datasets.
+- Management users can export the currently loaded audit results as CSV for review.
 - Read-only replenishment recommendations based on recent OUT demand and reorder levels; recommendations never place purchases automatically.
 - Pagination metadata and a structured validation error envelope on list endpoints for safer production API contracts.
 - Dashboard error handling aligned with the structured API envelope so login, submit, and inventory actions show actionable server messages.
