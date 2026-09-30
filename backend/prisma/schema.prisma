@@ -72,6 +72,8 @@ model Batch {
   sellingPrice  Decimal            @db.Decimal(12, 2)
   transactions  StockTransaction[]
   alerts        Alert[]
+
+  @@unique([medicineId, batchNumber])
 }
 
 model Purchase {

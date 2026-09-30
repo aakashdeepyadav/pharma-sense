@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthenticatedRequest, requireRoles } from '../auth';
 import { purchaseSchema } from '../validation/schemas';
@@ -155,6 +156,10 @@ router.post('/:id/receive', requireRoles(...receivingRoles), async (req: Authent
     }
     if (error instanceof Error && error.message === 'PURCHASE_ALREADY_RECEIVED') {
       res.status(409).json({ success: false, error: 'Purchase has already been received' });
+      return;
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      res.status(409).json({ success: false, error: 'A batch with this medicine and batch number already exists' });
       return;
     }
     res.status(500).json({ success: false, error: 'Failed to receive purchase' });
