@@ -4,10 +4,7 @@
   justify-content: center;
   min-height: 100vh;
   padding: 32px;
-  background:
-    radial-gradient(circle at top left, rgba(34, 211, 238, 0.22), transparent 26%),
-    radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.18), transparent 30%),
-    linear-gradient(135deg, #f8fbff 0%, #edf3ff 40%, #f8fafc 100%);
+  background: #eef3f6;
 }
 
 .auth-card {
@@ -24,13 +21,50 @@
 
 .auth-hero {
   padding: 48px 40px;
-  background:
-    linear-gradient(135deg, rgba(12, 74, 110, 0.94), rgba(14, 116, 144, 0.9) 35%, rgba(30, 64, 175, 0.92));
+  background: #155e63;
 }
 
 .auth-form-shell {
   padding: 48px 40px;
   background: rgba(255, 255, 255, 0.88);
+}
+
+.workspace-disclosure {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.workspace-disclosure > summary {
+  cursor: pointer;
+  padding: 16px 20px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.workspace-disclosure > summary::marker {
+  color: #0e7490;
+}
+
+.workspace-disclosure > summary:focus-visible {
+  outline: 2px solid #0e7490;
+  outline-offset: -3px;
+}
+
+.workspace-disclosure[open] > summary {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.workspace-disclosure-content {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.workspace-disclosure-content > section {
+  margin-top: 0;
 }
 
 @media (max-width: 840px) {

@@ -196,6 +196,28 @@ function extractErrorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+function readStoredSession(): Session | null {
+  try {
+    const storedSession = sessionStorage.getItem("pharmasense-session");
+    if (!storedSession) return null;
+
+    const parsed = JSON.parse(storedSession) as Partial<Session>;
+    if (
+      typeof parsed.token !== "string" ||
+      typeof parsed.user?.name !== "string" ||
+      typeof parsed.user?.role !== "string"
+    ) {
+      sessionStorage.removeItem("pharmasense-session");
+      return null;
+    }
+
+    return parsed as Session;
+  } catch {
+    sessionStorage.removeItem("pharmasense-session");
+    return null;
+  }
+}
+
 const roleThemeMap: Record<
   string,
   { tone: string; accent: string; description: string }
@@ -203,32 +225,33 @@ const roleThemeMap: Record<
   Admin: {
     tone: "bg-emerald-100 text-emerald-800 border-emerald-200",
     accent: "text-emerald-700",
-    description: "Full operational control across inventory, purchasing, and reporting.",
+    description:
+      "Full operational control across inventory, purchasing, and reporting.",
   },
   Pharmacist: {
     tone: "bg-cyan-100 text-cyan-800 border-cyan-200",
     accent: "text-cyan-700",
-    description: "Medication and stock management with read-write dispensing controls.",
+    description:
+      "Medication and stock management with read-write dispensing controls.",
   },
   "Inventory Manager": {
     tone: "bg-violet-100 text-violet-800 border-violet-200",
     accent: "text-violet-700",
-    description: "Vendor, batch, and stock integrity oversight for the supply chain.",
+    description:
+      "Vendor, batch, and stock integrity oversight for the supply chain.",
   },
   Staff: {
     tone: "bg-amber-100 text-amber-800 border-amber-200",
     accent: "text-amber-700",
-    description: "Operational access for daily stock movement and issue monitoring.",
+    description:
+      "Operational access for daily stock movement and issue monitoring.",
   },
 };
 
 function App() {
-  const [session, setSession] = useState<Session | null>(() => {
-    const storedSession = sessionStorage.getItem("pharmasense-session");
-    return storedSession ? (JSON.parse(storedSession) as Session) : null;
-  });
-  const [email, setEmail] = useState("admin@pharmasense.local");
-  const [password, setPassword] = useState("admin12345");
+  const [session, setSession] = useState<Session | null>(readStoredSession);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
@@ -1055,14 +1078,26 @@ function App() {
   };
 
   const handleLogout = async () => {
-    if (session) {
-      await apiFetch("/api/v1/auth/logout", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${session.token}` },
-      });
+    try {
+      if (session) {
+        const response = await apiFetch("/api/v1/auth/logout", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session.token}` },
+        });
+        if (!response.ok) {
+          setLoginError(
+            "Signed out on this device, but server revocation could not be confirmed.",
+          );
+        }
+      }
+    } catch {
+      setLoginError(
+        "Signed out on this device, but server revocation could not be confirmed.",
+      );
+    } finally {
+      sessionStorage.removeItem("pharmasense-session");
+      setSession(null);
     }
-    sessionStorage.removeItem("pharmasense-session");
-    setSession(null);
   };
 
   if (!session) {
@@ -1075,10 +1110,13 @@ function App() {
             </div>
             <h1 className="mt-6 text-4xl font-black leading-tight text-white">
               Better pharmacy operations,
-              <span className="block text-cyan-200">in one secure workspace.</span>
+              <span className="block text-cyan-200">
+                in one secure workspace.
+              </span>
             </h1>
             <p className="mt-4 max-w-md text-sm leading-6 text-slate-200">
-              Monitor stock, receive purchase orders, manage suppliers, and keep your medicine flow compliant across every role.
+              Monitor stock, receive purchase orders, manage suppliers, and keep
+              your medicine flow compliant across every role.
             </p>
 
             <div className="mt-8 grid gap-3 text-sm text-slate-100 sm:grid-cols-2">
@@ -1095,16 +1133,6 @@ function App() {
                   {feature}
                 </div>
               ))}
-            </div>
-
-            <div className="mt-8 rounded-2xl border border-cyan-400/30 bg-slate-950/20 p-4 backdrop-blur-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">
-                Demo access
-              </p>
-              <div className="mt-3 space-y-2 text-sm text-slate-100">
-                <p>Email: admin@pharmasense.local</p>
-                <p>Password: admin12345</p>
-              </div>
             </div>
           </section>
 
@@ -1125,11 +1153,15 @@ function App() {
                 </p>
               )}
 
-              <label className="block text-sm font-medium text-slate-700" htmlFor="email">
+              <label
+                className="block text-sm font-medium text-slate-700"
+                htmlFor="email"
+              >
                 Email address
                 <input
                   id="email"
                   type="email"
+                  autoComplete="username"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100"
@@ -1137,11 +1169,15 @@ function App() {
                 />
               </label>
 
-              <label className="block text-sm font-medium text-slate-700" htmlFor="password">
+              <label
+                className="block text-sm font-medium text-slate-700"
+                htmlFor="password"
+              >
                 Password
                 <input
                   id="password"
                   type="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100"
@@ -1152,7 +1188,7 @@ function App() {
               <button
                 type="submit"
                 disabled={loggingIn}
-                className="w-full rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-3 text-base font-semibold text-white shadow-lg shadow-cyan-600/20 transition hover:scale-[1.01] hover:from-cyan-500 hover:to-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                className="w-full rounded-xl bg-cyan-700 px-4 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {loggingIn ? "Signing in..." : "Sign in to dashboard"}
               </button>
@@ -1220,18 +1256,25 @@ function App() {
             <p className="mt-1 text-sm text-slate-500">
               Agent-based medicine stock and replenishment operations
             </p>
+            <p
+              className={`mt-3 max-w-2xl text-sm font-medium ${roleMeta.accent}`}
+            >
+              {roleMeta.description}
+            </p>
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 font-bold text-white">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-700 font-bold text-white">
                 {session.user.name.charAt(0).toUpperCase()}
               </div>
               <div className="text-left">
                 <p className="text-sm font-semibold text-slate-900">
                   {session.user.name}
                 </p>
-                <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${roleMeta.tone}`}>
+                <span
+                  className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${roleMeta.tone}`}
+                >
                   {session.user.role}
                 </span>
               </div>
@@ -1251,7 +1294,7 @@ function App() {
             <button
               onClick={openCreatePurchaseForm}
               disabled={medicines.length === 0 || suppliers.length === 0}
-              className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-600/20 transition hover:from-blue-500 hover:to-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Receive purchase
             </button>
@@ -2162,76 +2205,79 @@ function App() {
       </section>
 
       {report && (
-        <section className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">
-                Inventory analytics
-              </h2>
-              <p className="text-sm text-gray-500">
-                Operational metrics from recorded inventory activity.
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <p className="text-sm text-gray-500">Suppliers</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {report.supplierCount}
-              </p>
-            </div>
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <p className="text-sm text-gray-500">Batches</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {report.batchCount}
-              </p>
-            </div>
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <p className="text-sm text-gray-500">Units available</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {report.totalUnits}
-              </p>
-            </div>
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <p className="text-sm text-gray-500">Units issued</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {report.issuedUnits}
-              </p>
-            </div>
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <p className="text-sm text-gray-500">Inventory cost</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {report.inventoryCost.toFixed(2)}
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <h3 className="font-bold text-gray-900 mb-4">
-              Most issued medicines
-            </h3>
-            {report.topIssuedMedicines.length === 0 ? (
-              <p className="text-gray-500">
-                No stock-out activity has been recorded yet.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {report.topIssuedMedicines.map((medicine) => (
-                  <div
-                    key={medicine.medicineId}
-                    className="flex items-center justify-between text-sm"
-                  >
-                    <span className="font-medium text-gray-700">
-                      {medicine.medicineName}
-                    </span>
-                    <span className="text-gray-500">
-                      {medicine.quantityIssued} units issued
-                    </span>
-                  </div>
-                ))}
+        <details className="workspace-disclosure mb-8">
+          <summary>Reports and analytics</summary>
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Inventory analytics
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Operational metrics from recorded inventory activity.
+                </p>
               </div>
-            )}
-          </div>
-        </section>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                <p className="text-sm text-gray-500">Suppliers</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {report.supplierCount}
+                </p>
+              </div>
+              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                <p className="text-sm text-gray-500">Batches</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {report.batchCount}
+                </p>
+              </div>
+              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                <p className="text-sm text-gray-500">Units available</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {report.totalUnits}
+                </p>
+              </div>
+              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                <p className="text-sm text-gray-500">Units issued</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {report.issuedUnits}
+                </p>
+              </div>
+              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                <p className="text-sm text-gray-500">Inventory cost</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {report.inventoryCost.toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-gray-900 mb-4">
+                Most issued medicines
+              </h3>
+              {report.topIssuedMedicines.length === 0 ? (
+                <p className="text-gray-500">
+                  No stock-out activity has been recorded yet.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {report.topIssuedMedicines.map((medicine) => (
+                    <div
+                      key={medicine.medicineId}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="font-medium text-gray-700">
+                        {medicine.medicineName}
+                      </span>
+                      <span className="text-gray-500">
+                        {medicine.quantityIssued} units issued
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </details>
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -2324,372 +2370,381 @@ function App() {
         </div>
       </div>
 
-      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">Categories</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Category</th>
-                <th className="px-6 py-4">Description</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {categories.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={3}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    No categories have been added yet.
-                  </td>
-                </tr>
-              ) : (
-                categories.map((category) => (
-                  <tr key={category.id}>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {category.name}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {category.description || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {canWriteMedicines && (
-                        <button
-                          onClick={() => openEditCategoryForm(category)}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          Edit
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-xl font-bold text-gray-900">Suppliers</h2>
-          <label>
-            <span className="sr-only">Search suppliers</span>
-            <input
-              type="search"
-              value={supplierSearch}
-              onChange={(event) => setSupplierSearch(event.target.value)}
-              placeholder="Search suppliers"
-              className="w-full md:w-72 border border-gray-300 rounded-lg px-3 py-2"
-            />
-          </label>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Supplier</th>
-                <th className="px-6 py-4">Contact</th>
-                <th className="px-6 py-4">Batches</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredSuppliers.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    {suppliers.length === 0
-                      ? "No suppliers have been added yet."
-                      : "No suppliers match this search."}
-                  </td>
-                </tr>
-              ) : (
-                filteredSuppliers.map((supplier) => (
-                  <tr key={supplier.id}>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {supplier.name}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {supplier.contactInfo || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {supplier._count?.batches ?? 0}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {canManageSuppliers && (
-                        <button
-                          onClick={() => openEditSupplierForm(supplier)}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          Edit
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">Purchase history</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Purchase</th>
-                <th className="px-6 py-4">Supplier</th>
-                <th className="px-6 py-4">Items</th>
-                <th className="px-6 py-4">Created</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {purchases.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    No purchases have been recorded yet.
-                  </td>
-                </tr>
-              ) : (
-                purchases.map((purchase) => (
-                  <tr key={purchase.id}>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      #{purchase.id}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {purchase.supplier.name}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {purchase.items
-                        .map(
-                          (item) =>
-                            `${item.medicine.genericName} (${item.quantity})`,
-                        )
-                        .join(", ")}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {new Date(purchase.createdAt).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {purchase.status}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {purchase.status === "DRAFT" && canReceiveStock && (
-                        <button
-                          onClick={() => void receivePurchase(purchase.id)}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          Receive
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">Received batches</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Batch</th>
-                <th className="px-6 py-4">Medicine</th>
-                <th className="px-6 py-4">Supplier</th>
-                <th className="px-6 py-4">Expiry</th>
-                <th className="px-6 py-4 text-right">Quantity</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {batches.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    No batches have been received yet.
-                  </td>
-                </tr>
-              ) : (
-                batches.map((batch) => (
-                  <tr key={batch.id}>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {batch.batchNumber}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {batch.medicine.genericName}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {batch.supplier.name}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {new Date(batch.expiryDate).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600 text-right">
-                      {batch.quantity}
-                    </td>
-                    <td className="px-6 py-4 text-right whitespace-nowrap">
-                      {canWriteStock && (
-                        <>
-                          <button
-                            onClick={() => openStockForm(batch, "OUT")}
-                            className="text-blue-600 hover:text-blue-800 font-medium mr-3"
-                          >
-                            Issue
-                          </button>
-                          <button
-                            onClick={() => openStockForm(batch, "ADJ")}
-                            className="text-gray-600 hover:text-gray-900 font-medium"
-                          >
-                            Adjust
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">
-            Stock transaction history
-          </h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Time</th>
-                <th className="px-6 py-4">Medicine</th>
-                <th className="px-6 py-4">Batch</th>
-                <th className="px-6 py-4">Type</th>
-                <th className="px-6 py-4">Quantity</th>
-                <th className="px-6 py-4">Recorded by</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {transactions.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    No stock movements have been recorded yet.
-                  </td>
-                </tr>
-              ) : (
-                transactions.map((transaction) => (
-                  <tr key={transaction.id}>
-                    <td className="px-6 py-4 text-gray-600">
-                      {new Date(transaction.timestamp).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {transaction.batch.medicine.genericName}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {transaction.batch.batchNumber}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {transaction.type}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {transaction.quantity}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {transaction.user.name}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {canViewAudit && (
-        <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100">
-            <h2 className="text-xl font-bold text-gray-900">Audit log</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Recent operational changes recorded by the system.
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-                <tr>
-                  <th className="px-6 py-4">Time</th>
-                  <th className="px-6 py-4">Action</th>
-                  <th className="px-6 py-4">Entity</th>
-                  <th className="px-6 py-4">User</th>
-                  <th className="px-6 py-4">Details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {auditLogs.length === 0 ? (
+      <details className="workspace-disclosure mb-8">
+        <summary>Management and history</summary>
+        <div className="workspace-disclosure-content">
+          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900">Categories</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="px-6 py-8 text-center text-gray-500"
-                    >
-                      No audit events have been recorded yet.
-                    </td>
+                    <th className="px-6 py-4">Category</th>
+                    <th className="px-6 py-4">Description</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
-                ) : (
-                  auditLogs.map((log) => (
-                    <tr key={log.id}>
-                      <td className="px-6 py-4 text-gray-600">
-                        {new Date(log.createdAt).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 font-medium text-gray-900">
-                        {log.action.replaceAll("_", " ")}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {log.entity}
-                        {log.entityId === null ? "" : ` #${log.entityId}`}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {log.user.name} ({log.user.role.name})
-                      </td>
-                      <td className="px-6 py-4 text-gray-600 max-w-sm truncate">
-                        {log.details ?? "-"}
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {categories.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="px-6 py-8 text-center text-gray-500"
+                      >
+                        No categories have been added yet.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+                  ) : (
+                    categories.map((category) => (
+                      <tr key={category.id}>
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                          {category.name}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {category.description || "-"}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {canWriteMedicines && (
+                            <button
+                              onClick={() => openEditCategoryForm(category)}
+                              className="text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Suppliers</h2>
+              <label>
+                <span className="sr-only">Search suppliers</span>
+                <input
+                  type="search"
+                  value={supplierSearch}
+                  onChange={(event) => setSupplierSearch(event.target.value)}
+                  placeholder="Search suppliers"
+                  className="w-full md:w-72 border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </label>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4">Supplier</th>
+                    <th className="px-6 py-4">Contact</th>
+                    <th className="px-6 py-4">Batches</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredSuppliers.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="px-6 py-8 text-center text-gray-500"
+                      >
+                        {suppliers.length === 0
+                          ? "No suppliers have been added yet."
+                          : "No suppliers match this search."}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSuppliers.map((supplier) => (
+                      <tr key={supplier.id}>
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                          {supplier.name}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {supplier.contactInfo || "-"}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {supplier._count?.batches ?? 0}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {canManageSuppliers && (
+                            <button
+                              onClick={() => openEditSupplierForm(supplier)}
+                              className="text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900">
+                Purchase history
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4">Purchase</th>
+                    <th className="px-6 py-4">Supplier</th>
+                    <th className="px-6 py-4">Items</th>
+                    <th className="px-6 py-4">Created</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {purchases.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-6 py-8 text-center text-gray-500"
+                      >
+                        No purchases have been recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    purchases.map((purchase) => (
+                      <tr key={purchase.id}>
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                          #{purchase.id}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {purchase.supplier.name}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {purchase.items
+                            .map(
+                              (item) =>
+                                `${item.medicine.genericName} (${item.quantity})`,
+                            )
+                            .join(", ")}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {new Date(purchase.createdAt).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {purchase.status}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {purchase.status === "DRAFT" && canReceiveStock && (
+                            <button
+                              onClick={() => void receivePurchase(purchase.id)}
+                              className="text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              Receive
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900">
+                Received batches
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4">Batch</th>
+                    <th className="px-6 py-4">Medicine</th>
+                    <th className="px-6 py-4">Supplier</th>
+                    <th className="px-6 py-4">Expiry</th>
+                    <th className="px-6 py-4 text-right">Quantity</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {batches.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-6 py-8 text-center text-gray-500"
+                      >
+                        No batches have been received yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    batches.map((batch) => (
+                      <tr key={batch.id}>
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                          {batch.batchNumber}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {batch.medicine.genericName}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {batch.supplier.name}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {new Date(batch.expiryDate).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600 text-right">
+                          {batch.quantity}
+                        </td>
+                        <td className="px-6 py-4 text-right whitespace-nowrap">
+                          {canWriteStock && (
+                            <>
+                              <button
+                                onClick={() => openStockForm(batch, "OUT")}
+                                className="text-blue-600 hover:text-blue-800 font-medium mr-3"
+                              >
+                                Issue
+                              </button>
+                              <button
+                                onClick={() => openStockForm(batch, "ADJ")}
+                                className="text-gray-600 hover:text-gray-900 font-medium"
+                              >
+                                Adjust
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900">
+                Stock transaction history
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4">Time</th>
+                    <th className="px-6 py-4">Medicine</th>
+                    <th className="px-6 py-4">Batch</th>
+                    <th className="px-6 py-4">Type</th>
+                    <th className="px-6 py-4">Quantity</th>
+                    <th className="px-6 py-4">Recorded by</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {transactions.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-6 py-8 text-center text-gray-500"
+                      >
+                        No stock movements have been recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    transactions.map((transaction) => (
+                      <tr key={transaction.id}>
+                        <td className="px-6 py-4 text-gray-600">
+                          {new Date(transaction.timestamp).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                          {transaction.batch.medicine.genericName}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {transaction.batch.batchNumber}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {transaction.type}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {transaction.quantity}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {transaction.user.name}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {canViewAudit && (
+            <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-xl font-bold text-gray-900">Audit log</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Recent operational changes recorded by the system.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                    <tr>
+                      <th className="px-6 py-4">Time</th>
+                      <th className="px-6 py-4">Action</th>
+                      <th className="px-6 py-4">Entity</th>
+                      <th className="px-6 py-4">User</th>
+                      <th className="px-6 py-4">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {auditLogs.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-6 py-8 text-center text-gray-500"
+                        >
+                          No audit events have been recorded yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      auditLogs.map((log) => (
+                        <tr key={log.id}>
+                          <td className="px-6 py-4 text-gray-600">
+                            {new Date(log.createdAt).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 font-medium text-gray-900">
+                            {log.action.replaceAll("_", " ")}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600">
+                            {log.entity}
+                            {log.entityId === null ? "" : ` #${log.entityId}`}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600">
+                            {log.user.name} ({log.user.role.name})
+                          </td>
+                          <td className="px-6 py-4 text-gray-600 max-w-sm truncate">
+                            {log.details ?? "-"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+        </div>
+      </details>
     </div>
   );
 }
