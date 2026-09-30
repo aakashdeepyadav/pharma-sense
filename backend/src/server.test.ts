@@ -281,6 +281,22 @@ describe('PharmaSense API', () => {
       });
       assert.equal(oldTokenAfterReactivation.status, 401);
 
+      const resetPasswordResponse = await fetch(`${baseUrl}/api/v1/users/${createdUserId}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ password: 'new-managed-password' }),
+      });
+      assert.equal(resetPasswordResponse.status, 200);
+      const updatedPasswordLogin = await fetch(`${baseUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: 'new-managed-password' }),
+      });
+      assert.equal(updatedPasswordLogin.status, 200);
+
       const selfDemotionResponse = await fetch(`${baseUrl}/api/v1/users/1`, {
         method: 'PATCH',
         headers: {

@@ -793,6 +793,29 @@ function App() {
         throw new Error(extractErrorMessage(result, "Unable to save user."));
       }
 
+      if (editingUser && userForm.password.trim().length > 0) {
+        const passwordResponse = await apiFetch(
+          `/api/v1/users/${editingUser.id}/reset-password`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.token}`,
+            },
+            body: JSON.stringify({ password: userForm.password }),
+          },
+        );
+        const passwordResult = (await passwordResponse.json()) as {
+          success?: boolean;
+          error?: string | ApiErrorPayload;
+        };
+        if (!passwordResponse.ok || !passwordResult.success) {
+          throw new Error(
+            extractErrorMessage(passwordResult, "Unable to reset password."),
+          );
+        }
+      }
+
       await refreshUserAdministration();
       await refreshAuditLogs();
       setUserFormOpen(false);
@@ -2057,14 +2080,14 @@ function App() {
                   <span>
                     Account active
                     <span className="mt-1 block text-xs font-normal text-slate-500">
-                      Deactivation blocks sign-in and invalidates existing sessions.
+                      Deactivation blocks sign-in and invalidates existing
+                      sessions.
                     </span>
                   </span>
                 </label>
               )}
-              {!editingUser && (
-                <label className="block text-sm font-medium text-slate-700">
-                  Temporary password
+              <label className="block text-sm font-medium text-slate-700">
+                  {editingUser ? "Reset password (optional)" : "Temporary password"}
                   <input
                     type="password"
                     value={userForm.password}
@@ -2075,13 +2098,14 @@ function App() {
                     minLength={12}
                     maxLength={100}
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                    required
+                    required={!editingUser}
                   />
                   <span className="mt-1 block text-xs font-normal text-slate-500">
-                    Use at least 12 characters.
+                    {editingUser
+                      ? "Leave blank to keep the current password."
+                      : "Use at least 12 characters."}
                   </span>
                 </label>
-              )}
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button

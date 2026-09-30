@@ -65,6 +65,10 @@ export const userUpdateSchema = z.object({
   active: z.boolean().optional(),
 }).refine((value) => Object.keys(value).length > 0);
 
+export const userPasswordResetSchema = z.object({
+  password: z.string().min(12).max(100),
+});
+
 export const supplierQuerySchema = z.object({
   search: z.string().trim().max(150).optional(),
   page: z.coerce.number().int().min(1).default(1),

@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthenticatedRequest, requireRoles } from '../auth';
-import { userCreateSchema, userUpdateSchema } from '../validation/schemas';
+import { userCreateSchema, userPasswordResetSchema, userUpdateSchema } from '../validation/schemas';
 
 const router = Router();
 const safeUserSelect = {
@@ -175,6 +175,43 @@ router.patch('/:id', requireRoles('Admin'), async (req: AuthenticatedRequest, re
       return;
     }
     res.status(500).json({ success: false, error: 'Unable to update user' });
+  }
+});
+
+router.post('/:id/reset-password', requireRoles('Admin'), async (req: AuthenticatedRequest, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    res.status(400).json({ success: false, error: 'User id must be a positive integer' });
+    return;
+  }
+
+  const result = userPasswordResetSchema.safeParse(req.body);
+  if (!result.success) {
+    res.status(400).json({ success: false, error: 'Password must be between 12 and 100 characters' });
+    return;
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(result.data.password, 12);
+    const user = await prisma.$transaction(async (database) => {
+      const updatedUser = await database.user.update({
+        where: { id },
+        data: { passwordHash, sessionVersion: { increment: 1 } },
+        select: safeUserSelect,
+      });
+      await database.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: 'USER_PASSWORD_RESET',
+          entity: 'User',
+          entityId: updatedUser.id,
+        },
+      });
+      return updatedUser;
+    });
+    res.json({ success: true, data: user });
+  } catch {
+    res.status(404).json({ success: false, error: 'User not found' });
   }
 });
 
