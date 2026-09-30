@@ -103,7 +103,28 @@ test("shows a useful error for rejected credentials", async ({ page }) => {
 
   await signIn(page);
 
-  await expect(page.getByText("Invalid email or password.")).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveText("Invalid email or password.");
+});
+
+test("keeps the sign-in form keyboard usable without mobile overflow", async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 320, height: 720 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await expect(page.getByLabel("Email address")).toBeVisible();
+
+    const hasHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(hasHorizontalOverflow).toBe(false);
+
+    await page.keyboard.press("Tab");
+    await expect(page.getByLabel("Email address")).toBeFocused();
+  }
 });
 
 test("shows management and receiving actions to Admin", async ({ page }) => {

@@ -26,13 +26,13 @@ Agent-Based Medicine Stock Management System.
 
 ## Completion Status
 
-The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase receiving, stock movement, alerts, reporting, and role-checked API workflows are implemented. Browser coverage now includes five mocked role/login smoke tests plus a live PostgreSQL workflow for login, medicine/supplier creation, batch receiving, stock issue, quantity verification, audit logging, insufficient-stock rejection, and expired-batch rejection. Local validation passes; dataset validation reports documented synthetic-data warnings.
+The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase receiving, stock movement, alerts, reporting, and role-checked API workflows are implemented. Browser coverage includes six mocked login/role/keyboard/responsive checks plus a live PostgreSQL workflow for medicine/supplier creation, batch and purchase receiving, stock issue, alert acknowledgement, quantity verification, audit logging, insufficient-stock rejection, and expired-batch rejection. Local validation passes; dataset validation reports documented synthetic-data warnings.
 
 ## Next Work
 
 The current development line adds read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, and basic request throttling. Production readiness is still in progress; the current controls are local single-process implementations, not shared controls for horizontally scaled deployments.
 
-- Expand browser tests to cover purchase receiving and alert acknowledgement; finish responsive and accessibility review.
+- Expand browser coverage for purchase and alert edge cases; complete a broader responsive and screen-reader accessibility review.
 - Add controlled user and role administration; today, the seeded account is the only documented account-management path.
 - Replace file-backed token revocation and process-local rate limiting with shared production storage, and configure trusted proxy handling before deployment.
 - Obtain approved real or de-identified demand data before making model-performance claims; synthetic data remains research/test-only.

@@ -16,6 +16,7 @@ router.get('/transactions', async (req: AuthenticatedRequest, res: Response) => 
 
   try {
     const sortBy = query.data.sortBy ?? 'timestamp';
+    const sortOrder = req.query.sortOrder === undefined ? 'desc' : query.data.sortOrder;
     const [total, transactions] = await Promise.all([
       prisma.stockTransaction.count(),
       prisma.stockTransaction.findMany({
@@ -23,7 +24,7 @@ router.get('/transactions', async (req: AuthenticatedRequest, res: Response) => 
           batch: { include: { medicine: true, supplier: true } },
           user: { select: { name: true, email: true } },
         },
-        orderBy: { [sortBy]: query.data.sortOrder } as Record<string, 'asc' | 'desc'>,
+        orderBy: { [sortBy]: sortOrder } as Record<string, 'asc' | 'desc'>,
         skip: (query.data.page - 1) * query.data.pageSize,
         take: query.data.pageSize,
       }),
@@ -32,7 +33,7 @@ router.get('/transactions', async (req: AuthenticatedRequest, res: Response) => 
     res.json({
       success: true,
       data: transactions,
-      meta: buildPaginationMeta(total, query.data.page, query.data.pageSize, sortBy, query.data.sortOrder),
+      meta: buildPaginationMeta(total, query.data.page, query.data.pageSize, sortBy, sortOrder),
     });
   } catch {
     sendApiError(res, 500, 'FETCH_TRANSACTIONS_FAILED', 'Failed to fetch stock transactions');

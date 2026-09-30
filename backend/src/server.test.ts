@@ -264,6 +264,20 @@ describe('PharmaSense API', () => {
     assert.ok(result.meta.totalPages >= 0);
   });
 
+  it('defaults stock transaction history to newest first', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const response = await fetch(
+      `${baseUrl}/api/v1/inventory/transactions?page=1&pageSize=1`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    assert.equal(response.status, 200);
+    const result = (await response.json()) as {
+      meta: { sortBy: string; sortOrder: string };
+    };
+    assert.equal(result.meta.sortBy, 'timestamp');
+    assert.equal(result.meta.sortOrder, 'desc');
+  });
+
   it('denies Staff medicine writes', async () => {
     const response = await fetch(`${baseUrl}/api/v1/medicines`, {
       method: 'POST',
