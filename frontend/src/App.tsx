@@ -32,6 +32,21 @@ type Batch = {
   supplier: { name: string };
 };
 
+type Purchase = {
+  id: number;
+  status: "DRAFT" | "RECEIVED";
+  createdAt: string;
+  receivedAt: string | null;
+  supplier: { name: string };
+  createdBy: { name: string };
+  items: {
+    id: number;
+    batchNumber: string;
+    quantity: number;
+    medicine: { genericName: string };
+  }[];
+};
+
 type StockTransaction = {
   id: number;
   type: "IN" | "OUT" | "ADJ";
@@ -140,6 +155,7 @@ function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [report, setReport] = useState<ReportSummary | null>(null);
@@ -211,6 +227,7 @@ function App() {
           categoryResponse,
           supplierResponse,
           batchResponse,
+          purchaseResponse,
           transactionResponse,
           alertResponse,
           reportResponse,
@@ -219,6 +236,7 @@ function App() {
           fetch("http://localhost:5000/api/v1/categories", { headers }),
           fetch("http://localhost:5000/api/v1/suppliers", { headers }),
           fetch("http://localhost:5000/api/v1/batches", { headers }),
+          fetch("http://localhost:5000/api/v1/purchases", { headers }),
           fetch("http://localhost:5000/api/v1/inventory/transactions", {
             headers,
           }),
@@ -230,6 +248,7 @@ function App() {
           !categoryResponse.ok ||
           !supplierResponse.ok ||
           !batchResponse.ok ||
+          !purchaseResponse.ok ||
           !transactionResponse.ok ||
           !alertResponse.ok ||
           !reportResponse.ok
@@ -250,6 +269,10 @@ function App() {
           success: boolean;
           data: Batch[];
         };
+        const purchaseResult = (await purchaseResponse.json()) as {
+          success: boolean;
+          data: Purchase[];
+        };
         const transactionResult = (await transactionResponse.json()) as {
           success: boolean;
           data: StockTransaction[];
@@ -266,6 +289,7 @@ function App() {
         setCategories(categoryResult.data);
         setSuppliers(supplierResult.data);
         setBatches(batchResult.data);
+        setPurchases(purchaseResult.data);
         setTransactions(transactionResult.data);
         setAlerts(alertResult.data);
         setReport(reportResult.data);
@@ -352,6 +376,17 @@ function App() {
     if (response.ok) {
       const result = (await response.json()) as { data: AuditLog[] };
       setAuditLogs(result.data);
+    }
+  };
+
+  const refreshPurchases = async () => {
+    if (!session) return;
+    const response = await fetch("http://localhost:5000/api/v1/purchases", {
+      headers: { Authorization: `Bearer ${session.token}` },
+    });
+    if (response.ok) {
+      const result = (await response.json()) as { data: Purchase[] };
+      setPurchases(result.data);
     }
   };
 
@@ -658,6 +693,7 @@ function App() {
       setAlerts(
         ((await alertResponse.json()) as { data: InventoryAlert[] }).data,
       );
+      await refreshPurchases();
       setPurchaseFormOpen(false);
       await refreshAuditLogs();
     } catch (requestError) {
@@ -799,6 +835,39 @@ function App() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const receivePurchase = async (purchaseId: number) => {
+    if (!session) return;
+    const headers = { Authorization: `Bearer ${session.token}` };
+    const response = await fetch(
+      `http://localhost:5000/api/v1/purchases/${purchaseId}/receive`,
+      { method: "POST", headers },
+    );
+    const result = (await response.json()) as {
+      success: boolean;
+      error?: string;
+    };
+    if (!response.ok || !result.success) {
+      setError(result.error ?? "Unable to receive purchase.");
+      return;
+    }
+
+    const [batchResponse, medicineResponse, transactionResponse, alertResponse] =
+      await Promise.all([
+        fetch("http://localhost:5000/api/v1/batches", { headers }),
+        fetch("http://localhost:5000/api/v1/medicines", { headers }),
+        fetch("http://localhost:5000/api/v1/inventory/transactions", { headers }),
+        fetch("http://localhost:5000/api/v1/alerts", { headers }),
+      ]);
+    setBatches(((await batchResponse.json()) as { data: Batch[] }).data);
+    setMedicines(((await medicineResponse.json()) as ApiResponse).data);
+    setTransactions(
+      ((await transactionResponse.json()) as { data: StockTransaction[] }).data,
+    );
+    setAlerts(((await alertResponse.json()) as { data: InventoryAlert[] }).data);
+    await refreshPurchases();
+    await refreshAuditLogs();
   };
 
   const acknowledgeAlert = async (alertId: number) => {
@@ -1934,6 +2003,65 @@ function App() {
                           className="text-blue-600 hover:text-blue-800 font-medium"
                         >
                           Edit
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900">Purchase history</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4">Purchase</th>
+                <th className="px-6 py-4">Supplier</th>
+                <th className="px-6 py-4">Items</th>
+                <th className="px-6 py-4">Created</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {purchases.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    No purchases have been recorded yet.
+                  </td>
+                </tr>
+              ) : (
+                purchases.map((purchase) => (
+                  <tr key={purchase.id}>
+                    <td className="px-6 py-4 font-medium text-gray-900">
+                      #{purchase.id}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {purchase.supplier.name}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {purchase.items.map((item) => `${item.medicine.genericName} (${item.quantity})`).join(", ")}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {new Date(purchase.createdAt).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {purchase.status}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {purchase.status === "DRAFT" && canReceiveStock && (
+                        <button
+                          onClick={() => void receivePurchase(purchase.id)}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Receive
                         </button>
                       )}
                     </td>
