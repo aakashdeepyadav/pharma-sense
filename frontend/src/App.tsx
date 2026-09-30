@@ -679,7 +679,7 @@ function App() {
               expiryDate: purchaseForm.expiryDate,
               quantity: Number(purchaseForm.quantity),
               purchasePrice: Number(purchaseForm.purchasePrice),
-                sellingPrice: Number(purchaseForm.sellingPrice),
+              sellingPrice: Number(purchaseForm.sellingPrice),
             },
           ],
         }),
