@@ -30,11 +30,19 @@ Agent-Based Medicine Stock Management System.
 
 ## Completion Status
 
-The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase receiving, stock movement, alerts, reporting, and role-checked API workflows are implemented. Admins can list users, create accounts, and update name/email/role; password hashes are never returned, and role changes apply to already-issued tokens. Browser coverage includes login/role/keyboard/responsive checks plus a live PostgreSQL workflow for user management, purchasing, stock, alerts, and rejection paths. Local validation passes; dataset validation reports documented synthetic-data warnings.
+The core MVP was released as `v0.1.0` on `master`. Its inventory, purchase receiving, stock movement, alerts, reporting, and role-checked API workflows are implemented. Admins can list users, create accounts, update name/email/role, reset passwords, and deactivate/reactivate accounts; password hashes are never returned, and role/session changes apply immediately.
+
+### Verified progress snapshot
+
+- Core MVP functionality: complete.
+- Backend/API hardening and role enforcement: substantially complete for the current local/review scope.
+- Automated validation: 25 backend tests, 7 mocked Playwright browser tests, live PostgreSQL browser workflow, frontend lint/build, and dependency audits pass locally.
+- CI coverage: backend migrations/tests/research validation, frontend build/lint/browser smoke tests, live isolated-database workflow, and high/critical production dependency audits.
+- Overall product status: approximately 85-90% of the defined MVP/V1 scope; production deployment readiness remains separate work.
 
 ## Next Work
 
-The current development line adds read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, and basic request throttling. Production readiness is still in progress; the current controls are local single-process implementations, not shared controls for horizontally scaled deployments.
+The current development line adds read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, configurable login/API throttling, explicit CORS allow-lists, trusted-proxy controls, request correlation IDs, searchable/exportable audit history, and account lifecycle controls. Production readiness is still in progress; token revocation and throttling are local single-process implementations, not shared controls for horizontally scaled deployments.
 
 - Expand browser coverage for purchase and alert edge cases; complete a broader responsive and screen-reader accessibility review.
 - Complete broader account/accessibility hardening; self-service password change, Admin-managed reset, and safe deactivation/reactivation are implemented.
