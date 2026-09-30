@@ -322,6 +322,7 @@ function App() {
     ReplenishmentRecommendation[]
   >([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditSearch, setAuditSearch] = useState("");
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
   const [managedRoles, setManagedRoles] = useState<ManagedRole[]>([]);
   const [loading, setLoading] = useState(() => session !== null);
@@ -539,9 +540,12 @@ function App() {
           session.user.role === "Admin" ||
           session.user.role === "Inventory Manager"
         ) {
-          const auditResponse = await apiFetch("/api/v1/audit-logs?page=1&pageSize=100", {
-            headers,
-          });
+          const auditResponse = await apiFetch(
+            "/api/v1/audit-logs?page=1&pageSize=100",
+            {
+              headers,
+            },
+          );
           if (auditResponse.ok) {
             const auditResult = (await auditResponse.json()) as {
               data: AuditLog[];
@@ -611,7 +615,7 @@ function App() {
     }
   };
 
-  const refreshAuditLogs = async () => {
+  const refreshAuditLogs = async (search = auditSearch) => {
     if (
       !session ||
       !["Admin", "Inventory Manager"].includes(session.user.role)
@@ -619,7 +623,9 @@ function App() {
       return;
     }
 
-    const response = await apiFetch("/api/v1/audit-logs?page=1&pageSize=100", {
+    const query = new URLSearchParams({ page: "1", pageSize: "100" });
+    if (search.trim()) query.set("search", search.trim());
+    const response = await apiFetch(`/api/v1/audit-logs?${query.toString()}`, {
       headers: { Authorization: `Bearer ${session.token}` },
     });
     if (response.ok) {
@@ -3285,10 +3291,48 @@ function App() {
           {canViewAudit && (
             <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-100">
-                <h2 className="text-xl font-bold text-gray-900">Audit log</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Recent operational changes recorded by the system.
-                </p>
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Audit log</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Recent operational changes recorded by the system.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <label>
+                      <span className="sr-only">Search audit log</span>
+                      <input
+                        type="search"
+                        value={auditSearch}
+                        onChange={(event) => setAuditSearch(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") void refreshAuditLogs();
+                        }}
+                        placeholder="Search audit events"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm md:w-64"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void refreshAuditLogs()}
+                      className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                    >
+                      Search
+                    </button>
+                    {auditSearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuditSearch("");
+                          void refreshAuditLogs("");
+                        }}
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
