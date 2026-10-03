@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { apiFetch } from "./api";
 import "./App.css";
 
@@ -331,6 +331,8 @@ function App() {
   const [supplierSearch, setSupplierSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
+  const medicineNameInputRef = useRef<HTMLInputElement>(null);
+  const medicineReturnFocusRef = useRef<HTMLElement | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [supplierFormOpen, setSupplierFormOpen] = useState(false);
@@ -402,6 +404,15 @@ function App() {
     unit: "Tablet",
     reorderLevel: "0",
   });
+
+  useEffect(() => {
+    if (formOpen) {
+      medicineNameInputRef.current?.focus();
+      return;
+    }
+
+    medicineReturnFocusRef.current?.focus();
+  }, [formOpen]);
 
   const roleMeta = roleThemeMap[session?.user.role ?? "Staff"] ?? {
     tone: "bg-slate-100 text-slate-700 border-slate-200",
@@ -676,6 +687,10 @@ function App() {
   };
 
   const openCreateForm = () => {
+    medicineReturnFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     setEditingMedicine(null);
     setForm({
       genericName: "",
@@ -693,6 +708,10 @@ function App() {
   };
 
   const openEditForm = (medicine: Medicine) => {
+    medicineReturnFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     setEditingMedicine(medicine);
     setForm({
       genericName: medicine.genericName,
@@ -2482,13 +2501,47 @@ function App() {
       )}
 
       {formOpen && (
-        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+        <div
+          className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6"
+          role="presentation"
+        >
           <form
             onSubmit={handleMedicineSave}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setFormOpen(false);
+                return;
+              }
+              if (event.key !== "Tab") return;
+
+              const focusableElements =
+                event.currentTarget.querySelectorAll<HTMLElement>(
+                  'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+                );
+              const firstElement = focusableElements[0];
+              const lastElement = focusableElements[focusableElements.length - 1];
+              if (event.shiftKey && document.activeElement === firstElement) {
+                event.preventDefault();
+                lastElement?.focus();
+              } else if (
+                !event.shiftKey &&
+                document.activeElement === lastElement
+              ) {
+                event.preventDefault();
+                firstElement?.focus();
+              }
+            }}
+            aria-labelledby="medicine-form-title"
+            aria-modal="true"
+            role="dialog"
             className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2
+                id="medicine-form-title"
+                className="text-xl font-bold text-gray-900"
+              >
                 {editingMedicine ? "Edit medicine" : "Add medicine"}
               </h2>
               <button
@@ -2508,6 +2561,7 @@ function App() {
               <label className="text-sm font-medium text-gray-700">
                 Generic name
                 <input
+                  ref={medicineNameInputRef}
                   value={form.genericName}
                   onChange={(event) =>
                     setForm({ ...form, genericName: event.target.value })
