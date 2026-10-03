@@ -38,7 +38,7 @@ const tokenVerificationOptions: jwt.VerifyOptions = {
 
 export async function revokeAccessToken(token: string) {
   const payload = jwt.verify(token, getJwtSecret(), tokenVerificationOptions);
-  if (typeof payload === 'string' || typeof payload.exp !== 'number') {
+  if (typeof payload === 'string' || !('exp' in payload) || typeof payload.exp !== 'number') {
     throw new Error('Cannot revoke a token without an expiry');
   }
 
