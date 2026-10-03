@@ -1,0 +1,16 @@
+# Security and Operational Risk Register
+
+Review at each release and after changes to hosting, network boundaries, or authentication. Items marked open require an owner and evidence before production use.
+
+| ID | Risk | Severity | Current treatment | Required follow-up |
+| --- | --- | --- | --- | --- |
+| R1 | A development database password was committed in the earlier `develop` history; the current Compose setup requires an ignored root `.env` value and binds PostgreSQL to localhost. Existing initialized volumes retain their old password. | High until rotated | Fixed in the current tree; CI scans for leaked secrets and tracked env/dump files. | Treat the old value as exposed, rotate any existing volume or deployment deliberately, and never reuse it. Do not expose the local Compose service to a shared network. |
+| R2 | Token revocation and login throttling are process-local and can be bypassed or lost across multiple instances/restarts. | High for multi-instance deployment | Login throttling is 10 failed attempts per address in 15 minutes; tokens expire after two hours. | Move both controls to shared persistent storage and test restart/failover behavior before scaling. |
+| R3 | JWT secret strength is not validated at startup; an absent value fails token operations, but a weak configured value is accepted. | High | `.env.example` has a replacement placeholder; README/runbook require a unique random secret. | Enforce minimum entropy/length for production and verify secret injection during deployment rehearsal. |
+| R4 | Reverse-proxy client identity is not configured; relying on forwarded headers without a trusted-proxy boundary can invalidate or undermine IP-based throttling. | Medium | Express default proxy trust is not enabled. | Define trusted proxy hops and test spoofed and forwarded client addresses at the actual ingress. |
+| R5 | The repository does not provide a production deployment stack, TLS termination, or evidence of backup restoration. | High | Local rehearsal steps and recovery checklist are documented. | Select a hosting platform, restrict network access, enable HTTPS, and complete a restore rehearsal with recorded evidence. |
+| R6 | Browser security policy and transport headers depend on hosting configuration; CSP/HSTS are not configured by this API. | Medium | API sets frame/content-type/referrer headers. | Set and verify CSP/HSTS at the frontend/HTTPS edge; avoid HSTS until HTTPS is consistently available. |
+| R7 | Static development seed credentials could be reused outside local development. | High if reused | Seed is documented as local-only; the seed script is for development setup. | Ensure deployment automation never runs the development seed; create managed accounts with rotated credentials. |
+| R8 | CI dependency audits may surface new advisories after a release. | Medium | CI audits backend/frontend dependencies; Dependabot checks weekly. | Triage promptly, patch or record a time-bounded exception, and rerun the full validation suite. |
+
+No deployment risk is considered accepted solely because the app builds or local smoke tests pass. The release owner records accepted residual risks and an accountable owner in the release evidence.

@@ -4,7 +4,7 @@ Agent-Based Medicine Stock Management System.
 
 ## Prerequisites
 
-- Node.js (v18+)
+- Node.js 22 and npm
 - Docker (for database)
 
 ## Current MVP
@@ -20,7 +20,7 @@ Agent-Based Medicine Stock Management System.
 - Low-stock, out-of-stock, expired, and expiring-soon alerts with acknowledgement.
 - Operational reports, management-only audit logs, and transactional audit events for writes.
 - Read-only replenishment recommendations based on recent OUT demand and reorder levels; recommendations never place purchases automatically.
-- CI checks for migrations, backend tests, research validation, frontend lint, and frontend builds.
+- CI checks migrations, seeded backend HTTP/inventory smoke tests, research validation, frontend lint/build, leaked secrets, and dependency advisories; Dependabot proposes weekly dependency updates.
 
 The forecasting pipeline currently uses synthetic research data only. It must not be mixed with operational inventory or treated as evidence of production model performance. See [research/data/DATA_CONTRACT.md](research/data/DATA_CONTRACT.md) before using any real or de-identified data.
 
@@ -29,14 +29,17 @@ The forecasting pipeline currently uses synthetic research data only. It must no
 ### 1. Database
 
 ```bash
-docker-compose up -d
+cp .env.example .env
+docker compose up -d
 ```
+
+Set a unique local `POSTGRES_PASSWORD` in `.env`, then use the configured database username and password in `backend/.env`'s `DATABASE_URL`. The example values are placeholders only.
 
 ### 2. Backend
 
 ```bash
 cd backend
-npm install
+npm ci
 npx prisma migrate deploy
 npm run seed
 npm run dev
@@ -57,7 +60,7 @@ Change these credentials before using any shared or deployed environment.
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -69,6 +72,8 @@ Run these checks from the repository root:
 
 ```bash
 cd backend
+npx prisma migrate deploy
+npm run seed
 npm run build
 npm test
 npm run research:validate
@@ -85,7 +90,18 @@ npm run build
 - Dashboard logout revokes the current access token on the running API instance before clearing the local session.
 - Stock changes and inventory master-data writes create audit records tied to the authenticated user.
 - Keep `JWT_SECRET`, database credentials, and shared-environment credentials outside source control.
-- The seeded account and Docker database password are for local development only.
+- The seeded account is for local development only. Compose reads the database password from the ignored root `.env` and binds PostgreSQL to localhost; never reuse local values in shared environments.
+- CORS allows the configured `FRONTEND_URL`; request bodies are limited to 100 KB, and the API sets content-type, frame, and referrer headers.
+- Failed or malformed login attempts are limited to 10 per client address per 15 minutes. Token revocation and throttling are process-local, so they are not suitable as shared controls for multiple API instances.
+- CI runs Gitleaks and high-severity npm audits; pull requests receive dependency review. Configure GitHub branch protection to require these checks before merge.
+
+## DevOps Handoff
+
+- [Deployment and local rehearsal runbook](docs/DEPLOYMENT_RUNBOOK.md)
+- [Security review checklist](docs/SECURITY_REVIEW.md)
+- [Security and operational risk register](docs/SECURITY_RISK_REGISTER.md)
+- [Release and rollback checklist](docs/RELEASE_CHECKLIST.md)
+- [Smoke-test coverage and execution evidence](docs/DEVOPS_SMOKE_TEST_REPORT.md)
 
 ## Branch Workflow
 

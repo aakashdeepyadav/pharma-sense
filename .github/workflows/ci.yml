@@ -5,6 +5,11 @@ on:
     branches: [master, main, develop]
   pull_request:
     branches: [master, main, develop]
+  schedule:
+    - cron: '19 7 * * 1'
+
+permissions:
+  contents: read
 
 jobs:
   backend:
@@ -14,7 +19,7 @@ jobs:
         image: postgres:15-alpine
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password123
+          POSTGRES_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
           POSTGRES_DB: pharmasense
         ports:
           - 5432:5432
@@ -24,7 +29,7 @@ jobs:
           --health-timeout=5s
           --health-retries=5
     env:
-      DATABASE_URL: postgresql://postgres:password123@localhost:5432/pharmasense?schema=public
+      DATABASE_URL: postgresql://postgres:ci-${{ github.run_id }}-${{ github.run_attempt }}@localhost:5432/pharmasense?schema=public
       JWT_SECRET: ci-only-secret-replace-in-deployment
       PORT: 5000
       FRONTEND_URL: http://localhost:5173
@@ -76,3 +81,35 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Reject tracked local environment and database dump files
+        shell: bash
+        run: |
+          bad_files="$(git ls-files | grep -E '(^|/)\.env($|\.)|(^|/).*(\.dump|\.backup|\.sql\.gz|-dump\.sql|\.dump\.sql)$' | grep -vE '(^|/)\.env\.example$' || true)"
+          if [[ -n "$bad_files" ]]; then
+            printf 'Refusing to continue: tracked environment or database dump files found:\n%s\n' "$bad_files"
+            exit 1
+          fi
+      - name: Scan repository for leaked secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Audit backend dependencies
+        working-directory: backend
+        run: npm audit --audit-level=high
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
+      - name: Review pull request dependencies
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
