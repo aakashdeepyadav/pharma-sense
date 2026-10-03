@@ -172,7 +172,7 @@ function App() {
     return storedSession ? (JSON.parse(storedSession) as Session) : null;
   });
   const [email, setEmail] = useState("admin@pharmasense.local");
-  const [password, setPassword] = useState("admin12345");
+  const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [medicines, setMedicines] = useState<Medicine[]>([]);

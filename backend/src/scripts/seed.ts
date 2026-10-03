@@ -2,6 +2,14 @@ import bcrypt from 'bcrypt';
 import prisma from '../lib/prisma';
 
 async function seed() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('The development seed must not run in production');
+  }
+  const seedPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (!seedPassword || seedPassword.length < 16 || seedPassword.startsWith('replace-with-')) {
+    throw new Error('Set a unique SEED_ADMIN_PASSWORD of at least 16 characters for local seeding');
+  }
+
   const roles = [
     { name: 'Admin', permissions: 'all' },
     { name: 'Pharmacist', permissions: 'medicine:write,stock:write' },
@@ -20,7 +28,7 @@ async function seed() {
     update: {},
     create: { name: 'General', description: 'Default development category' },
   });
-  const passwordHash = await bcrypt.hash('admin12345', 12);
+  const passwordHash = await bcrypt.hash(seedPassword, 12);
 
   await prisma.user.upsert({
     where: { email: 'admin@pharmasense.local' },
@@ -33,7 +41,7 @@ async function seed() {
     },
   });
 
-  console.log('Development admin ready: admin@pharmasense.local / admin12345');
+  console.log('Development admin ready: admin@pharmasense.local');
 }
 
 seed()

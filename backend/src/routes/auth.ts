@@ -79,11 +79,15 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response) 
   }
 });
 
-router.post('/logout', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+router.post('/logout', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const authorization = req.header('authorization');
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
-  if (token) revokeAccessToken(token);
-  res.json({ success: true, data: { loggedOut: true } });
+  try {
+    if (token) await revokeAccessToken(token);
+    res.json({ success: true, data: { loggedOut: true } });
+  } catch {
+    res.status(503).json({ success: false, error: 'Unable to revoke authentication token' });
+  }
 });
 
 export default router;

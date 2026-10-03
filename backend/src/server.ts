@@ -12,9 +12,10 @@ import reportRoutes from './routes/reports';
 import auditRoutes from './routes/audit';
 import purchaseRoutes from './routes/purchases';
 import prisma from './lib/prisma';
-import { requireAuth } from './auth';
+import { requireAuth, validateJwtSecret } from './auth';
 
 dotenv.config();
+validateJwtSecret();
 
 export const app = express();
 const port = process.env.PORT || 5000;

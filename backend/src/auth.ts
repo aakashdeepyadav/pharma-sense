@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
+import prisma from './lib/prisma';
 
 export type AuthenticatedRequest = Request & {
   user?: {
@@ -9,37 +10,52 @@ export type AuthenticatedRequest = Request & {
   };
 };
 
+const JWT_ISSUER = 'pharmasense-api';
+const JWT_AUDIENCE = 'pharmasense-client';
+const JWT_ALGORITHM = 'HS256';
+const JWT_SECRET_PLACEHOLDERS = new Set(['replace-with-a-long-random-secret']);
+
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error('JWT_SECRET is not configured');
   }
+  if (Buffer.byteLength(secret, 'utf8') < 32 || JWT_SECRET_PLACEHOLDERS.has(secret)) {
+    throw new Error('JWT_SECRET must be a unique secret of at least 32 bytes');
+  }
   return secret;
 }
-
-const revokedAccessTokens = new Map<string, number>();
-const ACCESS_TOKEN_LIFETIME_MS = 2 * 60 * 60 * 1000;
 
 function tokenFingerprint(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-function isTokenRevoked(token: string) {
-  const fingerprint = tokenFingerprint(token);
-  const expiresAt = revokedAccessTokens.get(fingerprint);
-  if (!expiresAt) return false;
-  if (expiresAt <= Date.now()) {
-    revokedAccessTokens.delete(fingerprint);
-    return false;
+const tokenVerificationOptions: jwt.VerifyOptions = {
+  algorithms: [JWT_ALGORITHM],
+  issuer: JWT_ISSUER,
+  audience: JWT_AUDIENCE,
+};
+
+export async function revokeAccessToken(token: string) {
+  const payload = jwt.verify(token, getJwtSecret(), tokenVerificationOptions);
+  if (typeof payload === 'string' || !('exp' in payload) || typeof payload.exp !== 'number') {
+    throw new Error('Cannot revoke a token without an expiry');
   }
-  return true;
+
+  const tokenHash = tokenFingerprint(token);
+  await prisma.revokedAccessToken.upsert({
+    where: { tokenHash },
+    create: { tokenHash, expiresAt: new Date(payload.exp * 1000) },
+    update: { expiresAt: new Date(payload.exp * 1000) },
+  });
+  await prisma.revokedAccessToken.deleteMany({ where: { expiresAt: { lte: new Date() } } });
 }
 
-export function revokeAccessToken(token: string) {
-  revokedAccessTokens.set(tokenFingerprint(token), Date.now() + ACCESS_TOKEN_LIFETIME_MS);
+export function validateJwtSecret() {
+  getJwtSecret();
 }
 
-export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authorization = req.header('authorization');
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
 
@@ -48,27 +64,51 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
     return;
   }
 
-  if (isTokenRevoked(token)) {
+  let payload: string | jwt.JwtPayload;
+  try {
+    payload = jwt.verify(token, getJwtSecret(), tokenVerificationOptions);
+  } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired authentication token' });
     return;
   }
 
+  if (typeof payload === 'string' || !Number.isSafeInteger(payload.userId) || payload.userId < 1) {
+    res.status(401).json({ success: false, error: 'Invalid authentication token' });
+    return;
+  }
+
   try {
-    const payload = jwt.verify(token, getJwtSecret());
-    if (typeof payload === 'string' || typeof payload.userId !== 'number' || typeof payload.role !== 'string') {
-      res.status(401).json({ success: false, error: 'Invalid authentication token' });
+    const tokenHash = tokenFingerprint(token);
+    const revokedToken = await prisma.revokedAccessToken.findUnique({ where: { tokenHash } });
+    if (revokedToken && revokedToken.expiresAt > new Date()) {
+      res.status(401).json({ success: false, error: 'Invalid or expired authentication token' });
+      return;
+    }
+    if (revokedToken) {
+      await prisma.revokedAccessToken.deleteMany({ where: { tokenHash } });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      include: { role: true },
+    });
+    if (!user) {
+      res.status(401).json({ success: false, error: 'Invalid or expired authentication token' });
       return;
     }
 
-    req.user = { id: payload.userId, role: payload.role };
+    req.user = { id: user.id, role: user.role.name };
     next();
   } catch {
-    res.status(401).json({ success: false, error: 'Invalid or expired authentication token' });
+    res.status(503).json({ success: false, error: 'Authentication service unavailable' });
   }
 }
 
 export function createAccessToken(user: { id: number; role: string }) {
   return jwt.sign({ userId: user.id, role: user.role }, getJwtSecret(), {
+    algorithm: JWT_ALGORITHM,
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
     expiresIn: '2h',
     jwtid: crypto.randomUUID(),
   });
