@@ -32,7 +32,7 @@ async function seed() {
 
   await prisma.user.upsert({
     where: { email: 'admin@pharmasense.local' },
-    update: { roleId: role.id },
+    update: { roleId: role.id, active: true, sessionVersion: 0, passwordHash },
     create: {
       name: 'PharmaSense Admin',
       email: 'admin@pharmasense.local',

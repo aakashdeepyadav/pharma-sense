@@ -1,32 +1,40 @@
-# React + TypeScript + Vite
+# PharmaSense Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The frontend is a React, TypeScript, and Vite dashboard for pharmacy inventory operations. It uses the backend API for authentication, inventory, purchasing, alerts, reports, and Admin-only user/role management; the browser does not connect directly to PostgreSQL.
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Start PostgreSQL and the backend first. See the repository [README](../README.md) for database setup, migrations, and local role-test accounts.
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```powershell
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+By default, the frontend calls `http://localhost:5000`. To use a different API origin, create `.env` with:
+
+```dotenv
+VITE_API_URL=http://localhost:5000
+```
+
+Admins manage accounts under **Management and history → User access**. They can create accounts, update names/emails/roles, reset a managed password, and deactivate or reactivate accounts. Management users can search and export audit history as CSV. Signed-in users can use **Change password** in the header. Deactivation blocks login and invalidates existing sessions.
+
+## Checks
+
+```powershell
+npm run lint
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
+
+The mocked browser suite covers login feedback, responsive sign-in, keyboard access, and action visibility for Admin, Pharmacist, Inventory Manager, and Staff.
+
+The live browser workflow uses a disposable PostgreSQL database and writes records. Create and migrate a separate database (for example, `pharmasense_e2e`), seed it, then set `E2E_DATABASE_URL` to that database before running:
+
+```powershell
+$env:E2E_DATABASE_URL="postgresql://postgres:password123@localhost:5433/pharmasense_e2e?schema=public"
+npm run test:e2e:live
+```
+
+Never point `E2E_DATABASE_URL` at a shared or production database. CI provisions an isolated PostgreSQL database for this test.

@@ -1,0 +1,243 @@
+import { expect, test, type Page } from "@playwright/test";
+
+async function mockDashboardApi(page: Page, role: string) {
+  await page.route("**/api/v1/**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    let response: unknown = { success: true, data: [] };
+
+    if (pathname.endsWith("/auth/login")) {
+      response = {
+        success: true,
+        data: {
+          token: "browser-test-token",
+          user: { name: "QA User", role },
+        },
+      };
+    } else if (pathname.endsWith("/medicines")) {
+      response = {
+        success: true,
+        data: [
+          {
+            id: 1,
+            genericName: "QA medicine",
+            brandName: "QA brand",
+            categoryId: 1,
+            manufacturer: null,
+            dosageForm: null,
+            barcode: null,
+            active: true,
+            unit: "Tablet",
+            reorderLevel: 2,
+            batches: [{ quantity: 10 }],
+          },
+        ],
+      };
+    } else if (pathname.endsWith("/suppliers")) {
+      response = {
+        success: true,
+        data: [{ id: 1, name: "QA supplier", contactInfo: null, _count: { batches: 1 } }],
+      };
+    } else if (pathname.endsWith("/batches")) {
+      response = {
+        success: true,
+        data: [
+          {
+            id: 1,
+            medicineId: 1,
+            supplierId: 1,
+            batchNumber: "QA-BATCH-1",
+            mfgDate: "2026-01-01",
+            expiryDate: "2028-01-01",
+            quantity: 10,
+            purchasePrice: 1,
+            sellingPrice: 2,
+            medicine: { genericName: "QA medicine", brandName: "QA brand" },
+            supplier: { name: "QA supplier" },
+          },
+        ],
+      };
+    } else if (pathname.endsWith("/users/roles")) {
+      response = {
+        success: true,
+        data: [
+          { id: 1, name: "Admin" },
+          { id: 2, name: "Inventory Manager" },
+          { id: 3, name: "Pharmacist" },
+          { id: 4, name: "Staff" },
+        ],
+      };
+    } else if (pathname.endsWith("/users")) {
+      response = {
+        success: true,
+        data: [
+          {
+            id: 1,
+            name: "QA Admin",
+            email: "admin@pharmasense.local",
+            active: true,
+            role: { id: 1, name: "Admin" },
+          },
+        ],
+      };
+    } else if (pathname.endsWith("/reports/summary")) {
+      response = {
+        success: true,
+        data: {
+          medicineCount: 0,
+          supplierCount: 0,
+          batchCount: 0,
+          totalUnits: 0,
+          inventoryCost: 0,
+          issuedUnits: 0,
+          topIssuedMedicines: [],
+        },
+      };
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(response),
+    });
+  });
+}
+
+async function signIn(page: Page) {
+  await page.goto("/");
+  await page.getByLabel("Email address").fill("qa@pharmasense.local");
+  await page.getByLabel("Password").fill("test-password");
+  await page.getByRole("button", { name: "Sign in to dashboard" }).click();
+}
+
+test("shows a useful error for rejected credentials", async ({ page }) => {
+  await page.route("**/api/v1/auth/login", async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: false,
+        error: {
+          code: "INVALID_CREDENTIALS",
+          message: "Invalid email or password.",
+        },
+      }),
+    });
+  });
+
+  await signIn(page);
+
+  await expect(page.getByRole("alert")).toHaveText("Invalid email or password.");
+});
+
+test("keeps the sign-in form keyboard usable without mobile overflow", async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 320, height: 720 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await expect(page.getByLabel("Email address")).toBeVisible();
+
+    const hasHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(hasHorizontalOverflow).toBe(false);
+
+    await page.keyboard.press("Tab");
+    await expect(page.getByLabel("Email address")).toBeFocused();
+  }
+});
+
+test("shows management and receiving actions to Admin", async ({ page }) => {
+  await mockDashboardApi(page, "Admin");
+  await signIn(page);
+
+  await expect(
+    page.getByRole("heading", { name: "Inventory command center" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("banner").getByText("Admin", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ Supplier" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ Category" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "+ Add Medicine" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Receive purchase" }),
+  ).toBeVisible();
+  await page.getByText("Management and history", { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
+});
+
+test("lets Admin open the user form with available roles", async ({ page }) => {
+  await mockDashboardApi(page, "Admin");
+  await signIn(page);
+  await page.getByText("Management and history", { exact: true }).click();
+
+  await expect(page.getByRole("heading", { name: "User access" })).toBeVisible();
+  await expect(page.getByText("admin@pharmasense.local")).toBeVisible();
+  await page.getByRole("button", { name: "Add user" }).click();
+  await expect(page.getByRole("dialog", { name: "Add user" })).toBeVisible();
+  await expect(page.getByLabel("Temporary password")).toHaveAttribute(
+    "minlength",
+    "12",
+  );
+  await expect(page.getByRole("option", { name: "Staff" })).toBeAttached();
+});
+
+test("shows medicine and receiving actions to Pharmacist", async ({ page }) => {
+  await mockDashboardApi(page, "Pharmacist");
+  await signIn(page);
+
+  await expect(page.getByRole("button", { name: "+ Category" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "+ Add Medicine" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Receive purchase" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ Supplier" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ User" })).toHaveCount(0);
+  await page.getByText("Management and history", { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Audit log" })).toHaveCount(0);
+});
+
+test("shows supplier and audit tools to Inventory Manager", async ({ page }) => {
+  await mockDashboardApi(page, "Inventory Manager");
+  await signIn(page);
+
+  await expect(page.getByRole("button", { name: "+ Supplier" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ User" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Receive purchase" }),
+  ).toBeVisible();
+  await page.getByText("Management and history", { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
+});
+
+test("hides management and receiving actions from Staff", async ({ page }) => {
+  await mockDashboardApi(page, "Staff");
+  await signIn(page);
+
+  await expect(
+    page.getByRole("heading", { name: "Inventory command center" }),
+  ).toBeVisible();
+  await expect(page.getByText("Staff", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ Supplier" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ User" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ Category" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "+ Add Medicine" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Receive purchase" }),
+  ).toHaveCount(0);
+  await page.getByText("Management and history", { exact: true }).click();
+  const batchRow = page.getByRole("row").filter({ hasText: "QA-BATCH-1" });
+  await expect(batchRow.getByRole("button", { name: "Issue" })).toBeVisible();
+  await expect(batchRow.getByRole("button", { name: "Adjust" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Audit log" })).toHaveCount(0);
+});

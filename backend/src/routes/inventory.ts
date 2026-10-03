@@ -1,23 +1,42 @@
 import { Router, Response } from 'express';
 import prisma from '../lib/prisma';
+import { buildPaginationMeta, sendApiError } from '../lib/api';
 import { AuthenticatedRequest, requireRoles } from '../auth';
-import { stockTransactionSchema } from '../validation/schemas';
+import { listQuerySchema, stockTransactionSchema } from '../validation/schemas';
 import { calculateStockDelta, isBatchExpired, minimumQuantityForDelta } from '../domain/stockRules';
 
 const router = Router();
 
-router.get('/transactions', async (_req: AuthenticatedRequest, res: Response) => {
+router.get('/transactions', async (req: AuthenticatedRequest, res: Response) => {
+  const query = listQuerySchema.safeParse(req.query);
+  if (!query.success) {
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', query.error.issues);
+    return;
+  }
+
   try {
-    const transactions = await prisma.stockTransaction.findMany({
-      include: {
-        batch: { include: { medicine: true, supplier: true } },
-        user: { select: { name: true, email: true } },
-      },
-      orderBy: { timestamp: 'desc' },
+    const sortBy = query.data.sortBy ?? 'timestamp';
+    const sortOrder = req.query.sortOrder === undefined ? 'desc' : query.data.sortOrder;
+    const [total, transactions] = await Promise.all([
+      prisma.stockTransaction.count(),
+      prisma.stockTransaction.findMany({
+        include: {
+          batch: { include: { medicine: true, supplier: true } },
+          user: { select: { name: true, email: true } },
+        },
+        orderBy: { [sortBy]: sortOrder } as Record<string, 'asc' | 'desc'>,
+        skip: (query.data.page - 1) * query.data.pageSize,
+        take: query.data.pageSize,
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: transactions,
+      meta: buildPaginationMeta(total, query.data.page, query.data.pageSize, sortBy, sortOrder),
     });
-    res.json({ success: true, data: transactions });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to fetch stock transactions' });
+    sendApiError(res, 500, 'FETCH_TRANSACTIONS_FAILED', 'Failed to fetch stock transactions');
   }
 });
 

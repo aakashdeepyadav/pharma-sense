@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
+import { buildPaginationMeta, sendApiError } from '../lib/api';
 import { supplierQuerySchema, supplierSchema, supplierUpdateSchema } from '../validation/schemas';
 import { AuthenticatedRequest, requireRoles } from '../auth';
 
@@ -8,21 +9,39 @@ const router = Router();
 router.get('/', async (req: Request, res: Response) => {
   const query = supplierQuerySchema.safeParse(req.query);
   if (!query.success) {
-    res.status(400).json({ success: false, error: query.error.issues });
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', query.error.issues);
     return;
   }
 
   try {
-    const suppliers = await prisma.supplier.findMany({
-      where: query.data.search
-        ? { name: { contains: query.data.search, mode: 'insensitive' } }
-        : undefined,
-      include: { _count: { select: { batches: true } } },
-      orderBy: { name: 'asc' },
+    const where: any = query.data.search
+      ? { name: { contains: query.data.search, mode: 'insensitive' as const } }
+      : undefined;
+
+    const [total, suppliers] = await Promise.all([
+      prisma.supplier.count({ where: where ?? undefined }),
+      prisma.supplier.findMany({
+        where,
+        include: { _count: { select: { batches: true } } },
+        orderBy: { [query.data.sortBy]: query.data.sortOrder } as Record<string, 'asc' | 'desc'>,
+        skip: (query.data.page - 1) * query.data.pageSize,
+        take: query.data.pageSize,
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: suppliers,
+      meta: buildPaginationMeta(
+        total,
+        query.data.page,
+        query.data.pageSize,
+        query.data.sortBy,
+        query.data.sortOrder,
+      ),
     });
-    res.json({ success: true, data: suppliers });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to fetch suppliers' });
+    sendApiError(res, 500, 'FETCH_SUPPLIERS_FAILED', 'Failed to fetch suppliers');
   }
 });
 

@@ -15,10 +15,13 @@ The repository began as an early prototype. The current implementation has moved
 - PostgreSQL is available through `docker-compose.yml`.
 - Prisma already models users, roles, categories, medicines, suppliers, batches, and stock transactions.
 - The backend now uses protected, validated routes for inventory, purchases, alerts, reports, and audit logs.
+- Admin-only user listing, account creation, role updates, account activation controls, searchable audit history, and current-result CSV export are available; protected requests resolve the user's current role and session version so role changes and deactivation affect existing tokens.
 - The frontend dashboard reads live API data and supports medicine, category, supplier, batch, purchase, and stock workflows.
-- Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, and baseline tests are implemented; production deployment and advanced AI features remain open.
+- Authentication, validation, authorization, purchase receiving, alerts, audit logging, migrations, CI, baseline tests, a read-only replenishment recommendation, and paginated list API hardening are implemented; production deployment and advanced AI features remain open.
 
-The next work focuses on final release hardening. Camera/mobile scanning, advanced forecasting, AI agents, and replenishment recommendations remain later phases.
+The core MVP is released as `v0.1.0`. The current implementation extends it with read-only replenishment recommendations, paginated list responses, structured validation errors, persisted token revocation, route-scoped request throttling, current-database-role authorization, newest-first transaction history, and optional-barcode normalization. Local validation includes backend build/tests, frontend lint/build, research validation, mocked Playwright login/role/keyboard/responsive checks, and a live browser workflow against an isolated PostgreSQL database covering Admin user creation/role updates, purchase receiving, stock issue, alert acknowledgement, audit verification, insufficient-stock rejection, and expired-batch rejection. The research validator reports warnings because the dataset is synthetic and does not model stockout censoring or organization groups.
+
+Production readiness is not complete. Additional purchase/alert edge cases and a broader screen-reader/accessibility review, shared token-revocation and rate-limit state, approved operational demand data, human-approved replenishment, and a deployment/backup-restore rehearsal remain open. Camera/mobile scanning, advanced forecasting, and AI agents remain later phases.
 
 ## A. Executive Summary
 
@@ -63,6 +66,7 @@ The tenant boundary for the MVP is one organization per deployment. Multi-tenant
 
 - Authenticate users with login and logout behavior; issue short-lived JWT access tokens and support revocation/session invalidation.
 - Authorize actions for Admin, Pharmacist, Inventory Manager, and Staff roles.
+- Allow Admins to list/create users, update names/emails/roles, reset managed passwords, and deactivate/reactivate accounts; allow users to change their own passwords; prevent self-demotion, self-deactivation, or removal of the last active Admin.
 - Create, read, update, search, and filter medicines.
 - Store generic name, brand name, category, manufacturer, dosage/form, unit, reorder level, barcode, and active status.
 - Create, read, update, and search categories and suppliers.
@@ -90,12 +94,13 @@ The tenant boundary for the MVP is one organization per deployment. Multi-tenant
 ## F. Non-Functional Requirements
 
 - **Correctness:** stock changes use atomic database transactions and reject negative quantities.
-- **Security:** hashed passwords, validated input, least privilege, secure secrets, audit records, and protected production transport.
+- **Security:** hashed passwords, validated input, least privilege, secure secrets, audit records, request throttling, and protected production transport.
+- **Authorization:** each authenticated request resolves the user's current role from PostgreSQL; changing a role invalidates the old authorization claim without waiting for the JWT to expire.
 - **Availability:** core inventory remains operational if ML or agent services are down.
 - **Performance:** normal list and transaction operations should return within 500 ms in the local MVP dataset; measure rather than promise a production SLA.
 - **Maintainability:** modular routes/services, Prisma migrations, typed request/response contracts, and documented decisions.
 - **Usability:** common stock operations require few steps and show clear success/error states.
-- **Observability:** structured server logs, request correlation where practical, health endpoint, and error monitoring before production.
+- **Observability:** generated `X-Request-Id` response headers for request correlation, structured server logs, health endpoint, and error monitoring before production.
 - **Testability:** unit tests for business rules, API integration tests for critical workflows, and a repeatable local environment.
 - **Data integrity:** foreign keys, unique constraints, date checks, decimal money types, and controlled status/type values.
 - **Accessibility:** keyboard-operable forms, labels, readable contrast, and meaningful error messages.
@@ -119,7 +124,7 @@ PostgreSQL via Prisma
           +--> Optional agent service (later)
 ```
 
-The API is the authority for inventory state. The frontend never directly writes to PostgreSQL. ML and agent services consume approved API/data contracts and return predictions or recommendations; they do not mutate stock directly.
+The API is the authority for inventory state. The frontend never directly writes to PostgreSQL, and its forms are now aligned with the API's structured validation envelope and paginated list responses. ML and agent services consume approved API/data contracts and return predictions or recommendations; they do not mutate stock directly.
 
 Recommended backend layers:
 
@@ -202,6 +207,7 @@ Base path: `/api/v1`.
 | Area       | Endpoints                                                                       |
 | ---------- | ------------------------------------------------------------------------------- |
 | Auth       | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`                         |
+| Users      | `GET/POST /users`, `PATCH /users/:id`, `GET /users/roles` (Admin only)          |
 | Medicines  | `GET/POST /medicines`, `GET/PATCH /medicines/:id`, search/barcode filters       |
 | Categories | `GET/POST /categories`, `PATCH /categories/:id`                                 |
 | Suppliers  | `GET/POST /suppliers`, `GET/PATCH /suppliers/:id`                               |
@@ -212,7 +218,7 @@ Base path: `/api/v1`.
 | Audit      | `GET /audit-logs` for authorized administrators                                 |
 | System     | `GET /health`                                                                   |
 
-All endpoints should use a consistent envelope, for example `{ data, meta }` on success and `{ error: { code, message, details } }` on failure. Add pagination, filtering, and sorting before the datasets grow.
+All endpoints should use a consistent envelope, for example `{ data, meta }` on success and `{ error: { code, message, details } }` on failure. The medicine and supplier list endpoints now include validated pagination metadata and structured validation error responses, and the remaining routes can follow the same contract as the dataset grows.
 
 Every write endpoint must define its permission, validation schema, transaction boundary, and audit behavior. Avoid exposing raw Prisma errors to clients.
 
@@ -262,12 +268,13 @@ Unknown, duplicate, expired, and ambiguous barcodes must produce recoverable err
 ## N. Security Architecture
 
 - Hash passwords with a current adaptive password hash; never store plaintext passwords.
+- Refuse production startup when `JWT_SECRET` is missing, a placeholder, or shorter than 32 characters, or when database/CORS configuration is absent.
 - Use short-lived JWT access tokens, secure secret storage, and a documented logout/revocation strategy.
 - Enforce authorization server-side on every protected route; the frontend role check is only presentation.
 - Validate and normalize all request bodies, query parameters, and path IDs with Zod.
 - Use parameterized ORM queries and avoid raw SQL unless reviewed.
-- Configure CORS to known origins rather than unrestricted production CORS.
-- Apply security headers, request size limits, rate limits on login, and generic login failure messages.
+- Configure CORS with the comma-separated `FRONTEND_URLS` allow-list rather than unrestricted production CORS, and only trust forwarded client IPs when `TRUST_PROXY=true` is set behind a controlled reverse proxy.
+- Apply security headers, request size limits, configurable rate limits on login/API traffic, and generic login failure messages. Login and API limiter settings must be tuned independently for deployment traffic.
 - Keep secrets out of source control; provide `.env.example` with non-secret placeholders.
 - Use HTTPS in deployed environments and secure cookie/token handling appropriate to the chosen auth design.
 - Log security events without passwords, tokens, or unnecessary personal data.
@@ -333,6 +340,8 @@ MVP is not complete if it depends on mock frontend data, unauthenticated writes,
 
 After MVP hardening: richer reports, configurable alert thresholds, supplier purchase history, FEFO suggestions, export, dashboard trends, reconciliation tools, better audit search, and a read-only forecasting baseline.
 
+The first V1 slice is implemented: read-only replenishment recommendations use recent completed OUT demand and reorder levels and never create purchases automatically.
+
 ## T. Future Features
 
 Stockout prediction, replenishment recommendations, agent summaries, human approval queues, barcode camera scanning, PWA/mobile workflows, multi-organization tenancy, external integrations, and advanced models. Each requires an evidence-based justification and a separate security/data review.
@@ -341,6 +350,7 @@ Stockout prediction, replenishment recommendations, agent summaries, human appro
 
 - **Unit:** stock quantity rules, alert thresholds, FEFO ordering, permissions, validation, forecast metrics.
 - **API integration:** login, role restrictions, medicine CRUD, purchase receiving, stock IN/OUT, rollback on failure, alerts.
+- **User administration:** Admin-only listing/creation/role updates, safe response fields, duplicate emails, last-Admin protection, and immediate role enforcement.
 - **Database:** migration application, constraints, transaction rollback, reconciliation query.
 - **Frontend:** loading/error/empty states, protected navigation, forms, filtering, API failure behavior.
 - **End-to-end:** login -> create medicine -> create supplier -> receive batch -> issue stock -> observe alert/history.

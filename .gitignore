@@ -14,3 +14,6 @@ coverage/
 backend/.data/
 backend/.tmp-revoked-tokens.json
 frontend/test-results/
+frontend/playwright-report/
+.data/
+.tmp*
