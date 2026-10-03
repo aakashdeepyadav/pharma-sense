@@ -12,6 +12,7 @@ Review these controls for every release and whenever deployment topology changes
 - [x] JWT verification pins HS256, issuer, and audience; protected requests use the current database role rather than trusting the role claim in a token.
 - [x] Logout stores only a SHA-256 token fingerprint in PostgreSQL; protected requests fail closed if revocation/user lookup is unavailable.
 - [x] Passwords use bcrypt, login errors are generic, and protected routes enforce authentication and roles server-side.
+- [x] Development seeding requires an environment-provided password, rejects production mode, and does not log the secret.
 - [x] Health, authentication, anonymous protected-route rejection, and role-denial behavior have API tests.
 - [ ] Require MFA for privileged accounts before using operational inventory data.
 - [ ] Review CSP and HSTS at the actual frontend/HTTPS termination layer before deployment.

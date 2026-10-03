@@ -19,7 +19,7 @@ Copy-Item backend/.env.example backend/.env
 Copy-Item frontend/.env.example frontend/.env
 ```
 
-Replace the placeholder `POSTGRES_PASSWORD` in the root `.env` and use the configured database username/password in `backend/.env`'s `DATABASE_URL`. Replace `JWT_SECRET` with a separate unique random value. Compose binds PostgreSQL to localhost; these values and the seeded account are for local development only. Existing database volumes retain the password set when initialized; changing `.env` alone does not rotate an existing volume's database role password.
+Replace the placeholder `POSTGRES_PASSWORD` in the root `.env` and use the configured database username/password in `backend/.env`'s `DATABASE_URL`. Replace both `JWT_SECRET` and `SEED_ADMIN_PASSWORD` with unique local values; the seed requires at least 16 characters for its password and refuses to run in production. Compose binds PostgreSQL to localhost; these values and the seeded account are for local development only. Existing database volumes retain the password set when initialized; changing `.env` alone does not rotate an existing volume's database role password.
 
 In terminal 1:
 

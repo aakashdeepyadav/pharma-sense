@@ -45,16 +45,15 @@ npm run seed
 npm run dev
 ```
 
-Before starting the backend, copy `backend/.env.example` to `backend/.env` and replace `JWT_SECRET` with a long random value. Copy `frontend/.env.example` to `frontend/.env` if the API is not running at the local default URL.
+Before starting the backend, copy `backend/.env.example` to `backend/.env`; set `JWT_SECRET` to a unique random value and `SEED_ADMIN_PASSWORD` to a unique password of at least 16 characters. The development seed refuses to run in production and does not print the password. Copy `frontend/.env.example` to `frontend/.env` if the API is not running at the local default URL.
 
-The development seed creates this local administrator account:
+The development seed creates this local administrator account using the password configured in `backend/.env`:
 
 ```text
 Email: admin@pharmasense.local
-Password: admin12345
 ```
 
-Change these credentials before using any shared or deployed environment.
+Never reuse the local seed password in a shared or deployed environment.
 
 ### 3. Frontend
 

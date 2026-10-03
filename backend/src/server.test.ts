@@ -8,6 +8,7 @@ import prisma from './lib/prisma';
 
 let server: ReturnType<typeof app.listen>;
 let baseUrl = '';
+const seededAdminPassword = process.env.SEED_ADMIN_PASSWORD ?? '';
 
 async function createUserForRole(roleName: string) {
   const role = await prisma.role.findUnique({ where: { name: roleName } });
@@ -93,7 +94,7 @@ describe('PharmaSense API', () => {
     const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@pharmasense.local', password: 'admin12345' }),
+      body: JSON.stringify({ email: 'admin@pharmasense.local', password: seededAdminPassword }),
     });
     assert.equal(loginResponse.status, 200);
     const login = (await loginResponse.json()) as { data: { token: string } };
@@ -117,7 +118,7 @@ describe('PharmaSense API', () => {
       const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'admin@pharmasense.local', password: 'admin12345' }),
+        body: JSON.stringify({ email: 'admin@pharmasense.local', password: seededAdminPassword }),
       });
       assert.equal(loginResponse.status, 200);
       const login = (await loginResponse.json()) as { data: { token: string } };
@@ -202,7 +203,7 @@ describe('PharmaSense API', () => {
     const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@pharmasense.local', password: 'admin12345' }),
+      body: JSON.stringify({ email: 'admin@pharmasense.local', password: seededAdminPassword }),
     });
     const login = (await loginResponse.json()) as { data: { token: string } };
     const response = await fetch(`${baseUrl}/api/v1/reports/forecast-baseline?medicineId=1&horizon=0`, {
