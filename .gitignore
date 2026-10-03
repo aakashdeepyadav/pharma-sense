@@ -11,3 +11,6 @@ dist/
 *-dump.sql
 *.dump.sql
 coverage/
+backend/.data/
+backend/.tmp-revoked-tokens.json
+frontend/test-results/
