@@ -13,6 +13,10 @@ async function openManagementHistory(page: Page) {
 test("creates medicine and supplier, receives a batch, and issues stock", async ({
   page,
 }) => {
+  const adminPassword = process.env.E2E_ADMIN_PASSWORD;
+  if (!adminPassword) {
+    throw new Error("E2E_ADMIN_PASSWORD must be configured for live tests");
+  }
   const suffix = Date.now().toString();
   const medicineName = `Browser test medicine ${suffix}`;
   const brandName = `Browser test brand ${suffix}`;
@@ -28,7 +32,7 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
 
   await page.goto("/");
   await page.getByLabel("Email address").fill("admin@pharmasense.local");
-  await page.getByLabel("Password").fill("admin12345");
+  await page.getByLabel("Password").fill(adminPassword);
   await page.getByRole("button", { name: "Sign in to dashboard" }).click();
   await expect(
     page.getByRole("heading", { name: "Inventory command center" }),

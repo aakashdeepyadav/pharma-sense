@@ -99,6 +99,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Reject tracked local environment and database dump files
         shell: bash
         run: |
@@ -152,6 +154,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Generate ephemeral E2E credentials
+        run: |
+          seed_password="$(openssl rand -hex 24)"
+          echo "SEED_ADMIN_PASSWORD=$seed_password" >> "$GITHUB_ENV"
+          echo "E2E_ADMIN_PASSWORD=$seed_password" >> "$GITHUB_ENV"
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
