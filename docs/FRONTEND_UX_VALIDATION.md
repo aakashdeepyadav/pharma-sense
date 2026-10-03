@@ -6,6 +6,8 @@ Date: 2026-10-03 | Branch: `feature/frontend-ux`
 
 Added responsive and keyboard browser checks for the admin audit controls at 320px and 768px, and for the medicine form. The audit check verifies visibility, viewport bounds, no page-level horizontal overflow, and keyboard order from search through Search and Export CSV. The medicine form is now a named modal dialog: focus enters the first field, Tab wraps at the dialog boundaries, Escape closes it, and focus returns to the opener. Fixtures include an audit row and category so the tested actions are enabled.
 
+The sign-in screen now uses compact product identity and restrained feature rows; the dashboard shell uses tighter spacing, subtle borders, and flatter surfaces. Manual visual review covered 1440px desktop and 390px phone widths.
+
 ## Validation
 
 - `npm run lint` passed.
