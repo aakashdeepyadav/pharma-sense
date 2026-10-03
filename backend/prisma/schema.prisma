@@ -146,3 +146,11 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([createdAt])
 }
+
+model RevokedAccessToken {
+  tokenHash String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}

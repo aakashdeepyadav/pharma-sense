@@ -86,13 +86,14 @@ npm run build
 ## Security Notes
 
 - Passwords are stored as bcrypt hashes and login failures use a generic response.
-- Protected API routes enforce JWT authentication and role authorization on the server; frontend controls are presentation only.
-- Dashboard logout revokes the current access token on the running API instance before clearing the local session.
+- Protected API routes enforce JWT authentication and check the user's current database role on every request; frontend controls are presentation only.
+- JWTs are restricted to HS256 with an issuer and audience, and the application refuses to start without a signing key of at least 32 bytes. Use a separately generated high-entropy value.
+- Dashboard logout stores a SHA-256 token fingerprint in PostgreSQL; logout remains effective across API restarts and replicas. Existing tokens without the new issuer/audience must sign in again after this migration.
 - Stock changes and inventory master-data writes create audit records tied to the authenticated user.
 - Keep `JWT_SECRET`, database credentials, and shared-environment credentials outside source control.
 - The seeded account is for local development only. Compose reads the database password from the ignored root `.env` and binds PostgreSQL to localhost; never reuse local values in shared environments.
 - CORS allows the configured `FRONTEND_URL`; request bodies are limited to 100 KB, and the API sets content-type, frame, and referrer headers.
-- Failed or malformed login attempts are limited to 10 per client address per 15 minutes. Token revocation and throttling are process-local, so they are not suitable as shared controls for multiple API instances.
+- Failed or malformed login attempts are limited to 10 per client address per 15 minutes per API process. Use a shared edge limiter before horizontal scaling; database-backed token revocation does not replace login throttling.
 - CI runs Gitleaks and high-severity npm audits; pull requests receive dependency review. Configure GitHub branch protection to require these checks before merge.
 
 ## DevOps Handoff

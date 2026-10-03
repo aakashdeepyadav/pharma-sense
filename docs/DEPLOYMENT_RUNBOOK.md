@@ -64,7 +64,7 @@ npm run build
 
 For a rehearsal, use a separate disposable database and environment values, build the backend and frontend, then run the backend with `npm start` and the frontend with `npm run preview`. Keep both bound to localhost unless the rehearsal network is explicitly isolated. Do not use `npm run seed` with operational data or share the sample credentials.
 
-Before any real deployment, an owner must provide managed PostgreSQL, secret injection, HTTPS termination, restricted networking, an explicit trusted-proxy design, persistent/shared token revocation and rate-limit state, monitoring, and tested backup/restore procedures. The app's local in-memory login limiter and token revocation are not multi-instance controls. The current runbook does not establish that production deployment is safe.
+Before any real deployment, an owner must provide managed PostgreSQL, secret injection, HTTPS termination, restricted networking, an explicit trusted-proxy design, a shared login rate limiter, monitoring, and tested backup/restore procedures. Token revocations are stored in PostgreSQL and protected requests fail closed when that database is unavailable. The login limiter is still process-local. Existing tokens lacking the configured issuer/audience will be rejected after this release, requiring users to sign in again. This runbook does not establish that production deployment is safe.
 
 ## Release and Recovery
 

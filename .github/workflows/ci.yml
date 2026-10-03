@@ -30,12 +30,13 @@ jobs:
           --health-retries=5
     env:
       DATABASE_URL: postgresql://postgres:ci-${{ github.run_id }}-${{ github.run_attempt }}@localhost:5432/pharmasense?schema=public
-      JWT_SECRET: ci-only-secret-replace-in-deployment
       PORT: 5000
       FRONTEND_URL: http://localhost:5173
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Generate an ephemeral JWT signing key
+        run: echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

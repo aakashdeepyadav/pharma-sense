@@ -8,13 +8,15 @@ Review these controls for every release and whenever deployment topology changes
 - [x] JSON request bodies are limited to 100 KB.
 - [x] `X-Content-Type-Options`, `X-Frame-Options`, and `Referrer-Policy` headers are set; Express `X-Powered-By` is disabled.
 - [x] Login failures and malformed login requests are limited to 10 attempts per client address per 15-minute window.
-- [x] Missing `JWT_SECRET` prevents token signing/verification; use a unique high-entropy value from environment configuration.
+- [x] Startup rejects a missing, under-32-byte, or shipped placeholder `JWT_SECRET`; use a unique high-entropy value from environment configuration because length alone does not prove randomness.
+- [x] JWT verification pins HS256, issuer, and audience; protected requests use the current database role rather than trusting the role claim in a token.
+- [x] Logout stores only a SHA-256 token fingerprint in PostgreSQL; protected requests fail closed if revocation/user lookup is unavailable.
 - [x] Passwords use bcrypt, login errors are generic, and protected routes enforce authentication and roles server-side.
 - [x] Health, authentication, anonymous protected-route rejection, and role-denial behavior have API tests.
-- [ ] Enforce a minimum production JWT secret strength at startup; currently only absence is rejected by token operations.
+- [ ] Require MFA for privileged accounts before using operational inventory data.
 - [ ] Review CSP and HSTS at the actual frontend/HTTPS termination layer before deployment.
-- [ ] Define trusted proxy behavior before placing the API behind a reverse proxy; the current limiter uses the request address and has no shared state.
-- [ ] Replace process-local login throttling and token revocation with shared persistent controls before horizontal scaling.
+- [ ] Define trusted proxy behavior and shared login throttling before placing multiple API instances behind a reverse proxy.
+- [ ] Rotate the signing key through a documented key-rotation procedure; changing it invalidates all existing access tokens.
 
 ## Repository and Operations
 

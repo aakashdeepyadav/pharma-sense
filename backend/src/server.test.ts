@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { after, before, describe, it } from 'node:test';
 import type { AddressInfo } from 'node:net';
 import { app } from './server';
@@ -7,6 +8,19 @@ import prisma from './lib/prisma';
 
 let server: ReturnType<typeof app.listen>;
 let baseUrl = '';
+
+async function createUserForRole(roleName: string) {
+  const role = await prisma.role.findUnique({ where: { name: roleName } });
+  assert.ok(role, `Expected seeded ${roleName} role`);
+  return prisma.user.create({
+    data: {
+      name: `${roleName} Authorization Test`,
+      email: `authz-${crypto.randomUUID()}@pharmasense.local`,
+      passwordHash: 'test-only-unused-password-hash',
+      roleId: role.id,
+    },
+  });
+}
 
 before(async () => {
   server = app.listen(0);
@@ -44,6 +58,19 @@ describe('PharmaSense API', () => {
     assert.equal(response.status, 400);
   });
 
+  it('rejects undersized JWT signing secrets', () => {
+    const originalSecret = process.env.JWT_SECRET;
+    try {
+      process.env.JWT_SECRET = 'too-short';
+      assert.throws(() => createAccessToken({ id: 1, role: 'Admin' }), /at least 32 bytes/);
+      process.env.JWT_SECRET = 'replace-with-a-long-random-secret';
+      assert.throws(() => createAccessToken({ id: 1, role: 'Admin' }), /unique secret/);
+    } finally {
+      if (originalSecret === undefined) delete process.env.JWT_SECRET;
+      else process.env.JWT_SECRET = originalSecret;
+    }
+  });
+
   it('revokes a token on logout', async () => {
     const token = createAccessToken({ id: 1, role: 'Admin' });
     const logoutResponse = await fetch(`${baseUrl}/api/v1/auth/logout`, {
@@ -51,6 +78,10 @@ describe('PharmaSense API', () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(logoutResponse.status, 200);
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const savedRevocation = await prisma.revokedAccessToken.findUnique({ where: { tokenHash } });
+    assert.ok(savedRevocation);
+    assert.notEqual(savedRevocation.tokenHash, token);
 
     const protectedResponse = await fetch(`${baseUrl}/api/v1/reports/summary`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -220,15 +251,20 @@ describe('PharmaSense API', () => {
   });
 
   it('denies Staff medicine writes', async () => {
-    const response = await fetch(`${baseUrl}/api/v1/medicines`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${createAccessToken({ id: 1, role: 'Staff' })}`,
-      },
-      body: JSON.stringify({ genericName: 'Test', brandName: 'Test', categoryId: 1, unit: 'Tablet', reorderLevel: 1 }),
-    });
-    assert.equal(response.status, 403);
+    const staff = await createUserForRole('Staff');
+    try {
+      const response = await fetch(`${baseUrl}/api/v1/medicines`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${createAccessToken({ id: staff.id, role: 'Admin' })}`,
+        },
+        body: JSON.stringify({ genericName: 'Test', brandName: 'Test', categoryId: 1, unit: 'Tablet', reorderLevel: 1 }),
+      });
+      assert.equal(response.status, 403);
+    } finally {
+      await prisma.user.delete({ where: { id: staff.id } });
+    }
   });
 
   it('restricts audit visibility to management roles', async () => {
@@ -237,9 +273,14 @@ describe('PharmaSense API', () => {
     });
     assert.equal(adminResponse.status, 200);
 
-    const staffResponse = await fetch(`${baseUrl}/api/v1/audit-logs`, {
-      headers: { Authorization: `Bearer ${createAccessToken({ id: 1, role: 'Staff' })}` },
-    });
-    assert.equal(staffResponse.status, 403);
+    const staff = await createUserForRole('Staff');
+    try {
+      const staffResponse = await fetch(`${baseUrl}/api/v1/audit-logs`, {
+        headers: { Authorization: `Bearer ${createAccessToken({ id: staff.id, role: 'Admin' })}` },
+      });
+      assert.equal(staffResponse.status, 403);
+    } finally {
+      await prisma.user.delete({ where: { id: staff.id } });
+    }
   });
 });
