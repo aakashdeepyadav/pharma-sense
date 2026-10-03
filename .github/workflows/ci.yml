@@ -84,6 +84,12 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run browser smoke tests
+        working-directory: frontend
+        run: npm run test:e2e
 
   security:
     runs-on: ubuntu-latest
@@ -105,14 +111,74 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
       - name: Audit backend dependencies
         working-directory: backend
-        run: npm audit --audit-level=high
+        run: npm ci && npm audit --omit=dev --audit-level=high
       - name: Audit frontend dependencies
         working-directory: frontend
-        run: npm audit --audit-level=high
+        run: npm ci && npm audit --omit=dev --audit-level=high
       - name: Review pull request dependencies
         if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
+
+  e2e-live:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password123
+          POSTGRES_DB: pharmasense_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d pharmasense_e2e"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      E2E_DATABASE_URL: postgresql://postgres:password123@localhost:5432/pharmasense_e2e?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Apply database migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
+        run: npx prisma migrate deploy
+      - name: Seed isolated database
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
+        run: npm run seed
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run live inventory workflow
+        working-directory: frontend
+        run: npm run test:e2e:live
