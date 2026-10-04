@@ -251,6 +251,156 @@ describe('PharmaSense API', () => {
     assert.equal(response.status, 400);
   });
 
+  it('searches suppliers by contact information', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const runId = `supplier-search-${crypto.randomUUID()}`;
+    let supplierId: number | undefined;
+    try {
+      const createResponse = await fetch(`${baseUrl}/api/v1/suppliers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: `${runId}-name`, contactInfo: `${runId}-contact` }),
+      });
+      assert.equal(createResponse.status, 201);
+      supplierId = ((await createResponse.json()) as { data: { id: number } }).data.id;
+
+      const response = await fetch(`${baseUrl}/api/v1/suppliers?search=${runId}-contact`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert.equal(response.status, 200);
+      const result = (await response.json()) as { data: Array<{ id: number }> };
+      assert.equal(result.data.some((supplier) => supplier.id === supplierId), true);
+    } finally {
+      if (supplierId) await prisma.supplier.delete({ where: { id: supplierId } });
+    }
+  });
+
+  it('enforces session invalidation after an account lifecycle change', async () => {
+    const user = await createUserForRole('Staff');
+    const token = createAccessToken({ id: user.id, role: 'Staff', sessionVersion: user.sessionVersion });
+    try {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { sessionVersion: { increment: 1 } },
+      });
+      const response = await fetch(`${baseUrl}/api/v1/medicines`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert.equal(response.status, 401);
+    } finally {
+      await prisma.user.delete({ where: { id: user.id } });
+    }
+  });
+
+  it('atomically receives purchases and rejects duplicate, insufficient, and expired stock operations', async () => {
+    const token = createAccessToken({ id: 1, role: 'Admin' });
+    const runId = `purchase-${crypto.randomUUID()}`;
+    const category = await prisma.category.create({ data: { name: `${runId}-category` } });
+    const supplier = await prisma.supplier.create({ data: { name: `${runId}-supplier` } });
+    const medicine = await prisma.medicine.create({
+      data: {
+        genericName: `${runId}-medicine`,
+        brandName: `${runId}-brand`,
+        categoryId: category.id,
+        reorderLevel: 1,
+        unit: 'Tablet',
+      },
+    });
+    const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+    let purchaseId: number | undefined;
+    let duplicatePurchaseId: number | undefined;
+    let receivedBatchId: number | undefined;
+    let expiredBatchId: number | undefined;
+
+    try {
+      const purchaseBody = {
+        supplierId: supplier.id,
+        items: [{
+          medicineId: medicine.id,
+          batchNumber: `${runId}-batch`,
+          mfgDate: '2025-01-01',
+          expiryDate: '2030-01-01',
+          quantity: 3,
+          purchasePrice: 1,
+          sellingPrice: 2,
+        }],
+      };
+      const createResponse = await fetch(`${baseUrl}/api/v1/purchases`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(purchaseBody),
+      });
+      assert.equal(createResponse.status, 201);
+      purchaseId = ((await createResponse.json()) as { data: { id: number } }).data.id;
+
+      const receiveResponse = await fetch(`${baseUrl}/api/v1/purchases/${purchaseId}/receive`, {
+        method: 'POST',
+        headers,
+      });
+      assert.equal(receiveResponse.status, 200);
+      receivedBatchId = (await prisma.batch.findFirstOrThrow({
+        where: { medicineId: medicine.id, batchNumber: `${runId}-batch` },
+      })).id;
+
+      const duplicateCreateResponse = await fetch(`${baseUrl}/api/v1/purchases`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(purchaseBody),
+      });
+      assert.equal(duplicateCreateResponse.status, 201);
+      duplicatePurchaseId = ((await duplicateCreateResponse.json()) as { data: { id: number } }).data.id;
+      const duplicateReceiveResponse = await fetch(`${baseUrl}/api/v1/purchases/${duplicatePurchaseId}/receive`, {
+        method: 'POST',
+        headers,
+      });
+      assert.equal(duplicateReceiveResponse.status, 409);
+      assert.equal(await prisma.batch.count({ where: { medicineId: medicine.id } }), 1);
+
+      const insufficientResponse = await fetch(`${baseUrl}/api/v1/inventory/transactions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ batchId: receivedBatchId, type: 'OUT', quantity: 4 }),
+      });
+      assert.equal(insufficientResponse.status, 409);
+      assert.equal((await prisma.batch.findUniqueOrThrow({ where: { id: receivedBatchId } })).quantity, 3);
+
+      const expiredResponse = await fetch(`${baseUrl}/api/v1/batches`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          medicineId: medicine.id,
+          supplierId: supplier.id,
+          batchNumber: `${runId}-expired`,
+          mfgDate: '2020-01-01',
+          expiryDate: '2021-01-01',
+          quantity: 2,
+          purchasePrice: 1,
+          sellingPrice: 2,
+        }),
+      });
+      assert.equal(expiredResponse.status, 201);
+      expiredBatchId = ((await expiredResponse.json()) as { data: { id: number } }).data.id;
+      const expiredIssueResponse = await fetch(`${baseUrl}/api/v1/inventory/transactions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ batchId: expiredBatchId, type: 'OUT', quantity: 1 }),
+      });
+      assert.equal(expiredIssueResponse.status, 409);
+      assert.equal((await prisma.batch.findUniqueOrThrow({ where: { id: expiredBatchId } })).quantity, 2);
+    } finally {
+      await prisma.auditLog.deleteMany({ where: { userId: 1, entityId: { in: [purchaseId, duplicatePurchaseId, receivedBatchId, expiredBatchId].filter((id): id is number => id !== undefined) } } });
+      await prisma.stockTransaction.deleteMany({ where: { batchId: { in: [receivedBatchId, expiredBatchId].filter((id): id is number => id !== undefined) } } });
+      await prisma.batch.deleteMany({ where: { medicineId: medicine.id } });
+      await prisma.purchase.deleteMany({ where: { id: { in: [purchaseId, duplicatePurchaseId].filter((id): id is number => id !== undefined) } } });
+      await prisma.medicine.delete({ where: { id: medicine.id } });
+      await prisma.supplier.delete({ where: { id: supplier.id } });
+      await prisma.category.delete({ where: { id: category.id } });
+    }
+  });
+
   it('denies Staff medicine writes', async () => {
     const staff = await createUserForRole('Staff');
     try {
