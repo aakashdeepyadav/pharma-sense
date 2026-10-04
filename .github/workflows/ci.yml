@@ -155,7 +155,7 @@ jobs:
         image: postgres:15-alpine
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password123
+          POSTGRES_PASSWORD: ci-e2e-${{ github.run_id }}-${{ github.run_attempt }}
           POSTGRES_DB: pharmasense_e2e
         ports:
           - 5432:5432
@@ -165,7 +165,7 @@ jobs:
           --health-timeout=5s
           --health-retries=5
     env:
-      E2E_DATABASE_URL: postgresql://postgres:password123@localhost:5432/pharmasense_e2e?schema=public
+      E2E_DATABASE_URL: postgresql://postgres:ci-e2e-${{ github.run_id }}-${{ github.run_attempt }}@localhost:5432/pharmasense_e2e?schema=public
     steps:
       - name: Checkout
         uses: actions/checkout@v4
