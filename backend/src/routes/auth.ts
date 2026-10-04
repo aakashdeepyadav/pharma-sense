@@ -4,6 +4,7 @@ import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { createAccessToken, requireAuth, AuthenticatedRequest, revokeAccessToken } from '../auth';
 import { sendApiError } from '../lib/api';
+import { passwordChangeSchema } from '../validation/schemas';
 
 const router = Router();
 const loginSchema = z.object({
@@ -81,6 +82,48 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response) 
     });
   } catch {
     res.status(500).json({ success: false, error: 'Unable to load user profile' });
+  }
+});
+
+router.post('/change-password', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const result = passwordChangeSchema.safeParse(req.body);
+  if (!result.success) {
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
+    return;
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { passwordHash: true },
+    });
+    if (!user || !(await bcrypt.compare(result.data.currentPassword, user.passwordHash))) {
+      res.status(401).json({ success: false, error: 'Current password is incorrect' });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(result.data.newPassword, 12);
+    await prisma.$transaction(async (database) => {
+      await database.user.update({
+        where: { id: req.user!.id },
+        data: { passwordHash, sessionVersion: { increment: 1 } },
+      });
+      await database.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: 'AUTH_PASSWORD_CHANGED',
+          entity: 'User',
+          entityId: req.user!.id,
+        },
+      });
+    });
+
+    const authorization = req.header('authorization');
+    const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
+    if (token) await revokeAccessToken(token);
+    res.json({ success: true, data: { passwordChanged: true } });
+  } catch {
+    sendApiError(res, 503, 'PASSWORD_CHANGE_FAILED', 'Unable to change password');
   }
 });
 
