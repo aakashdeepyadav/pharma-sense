@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import bcrypt from 'bcrypt';
 import crypto from 'node:crypto';
 import { after, before, describe, it } from 'node:test';
 import type { AddressInfo } from 'node:net';
@@ -432,6 +433,50 @@ describe('PharmaSense API', () => {
       assert.equal(staffResponse.status, 403);
     } finally {
       await prisma.user.delete({ where: { id: staff.id } });
+    }
+  });
+
+  it('changes a user password and invalidates the previous session', async () => {
+    const role = await prisma.role.findUnique({ where: { name: 'Admin' } });
+    assert.ok(role);
+    const email = `password-test-${crypto.randomUUID()}@pharmasense.local`;
+    const oldPassword = 'old-password-for-test';
+    const newPassword = 'new-password-for-test';
+    const user = await prisma.user.create({
+      data: {
+        name: 'Password Change Test User',
+        email,
+        passwordHash: await bcrypt.hash(oldPassword, 12),
+        roleId: role.id,
+      },
+    });
+    const token = createAccessToken({ id: user.id, role: role.name });
+
+    try {
+      const response = await fetch(`${baseUrl}/api/v1/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPassword: oldPassword, newPassword }),
+      });
+      assert.equal(response.status, 200);
+
+      const staleSessionResponse = await fetch(`${baseUrl}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert.equal(staleSessionResponse.status, 401);
+
+      const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: newPassword }),
+      });
+      assert.equal(loginResponse.status, 200);
+    } finally {
+      await prisma.auditLog.deleteMany({ where: { entity: 'User', entityId: user.id } });
+      await prisma.user.delete({ where: { id: user.id } });
     }
   });
 });
