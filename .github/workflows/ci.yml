@@ -96,6 +96,15 @@ jobs:
       - name: Run browser smoke tests
         working-directory: frontend
         run: npm run test:e2e
+      - name: Upload browser smoke-test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-browser-test-results
+          path: |
+            frontend/test-results
+            frontend/playwright-report
+          if-no-files-found: ignore
 
   security:
     runs-on: ubuntu-latest
@@ -189,9 +198,28 @@ jobs:
         env:
           DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
         run: npm run seed
+      - name: Validate isolated database quality
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
+        run: npm run db:quality
+      - name: Reconcile isolated stock ledger
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
+        run: npm run db:reconcile
       - name: Install Playwright browser
         working-directory: frontend
         run: npx playwright install --with-deps chromium
       - name: Run live inventory workflow
         working-directory: frontend
         run: npm run test:e2e:live
+      - name: Upload live browser-test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-browser-test-results
+          path: |
+            frontend/test-results
+            frontend/playwright-report
+          if-no-files-found: ignore
