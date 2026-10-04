@@ -1,5 +1,16 @@
 import { z } from 'zod';
 
+const moneySchema = z.coerce.number()
+  .finite()
+  .min(0)
+  .max(9_999_999_999.99)
+  .refine((value) => {
+    const cents = value * 100;
+    return Math.abs(cents - Math.round(cents)) < Number.EPSILON * Math.max(1, Math.abs(cents)) * 2;
+  }, 'Amount must have no more than two decimal places');
+
+const nonnegativeQuantitySchema = z.coerce.number().int().min(0).max(2_147_483_647);
+
 export const categorySchema = z.object({
   name: z.string().trim().min(1).max(100),
   description: z.string().trim().max(500).optional(),
@@ -94,9 +105,9 @@ export const batchSchema = z.object({
   batchNumber: z.string().trim().min(1).max(100),
   mfgDate: z.coerce.date(),
   expiryDate: z.coerce.date(),
-  quantity: z.coerce.number().int().nonnegative(),
-  purchasePrice: z.coerce.number().nonnegative(),
-  sellingPrice: z.coerce.number().nonnegative(),
+  quantity: nonnegativeQuantitySchema,
+  purchasePrice: moneySchema,
+  sellingPrice: moneySchema,
 }).refine((value) => value.expiryDate > value.mfgDate, {
   message: 'Expiry date must be after manufacturing date',
   path: ['expiryDate'],
@@ -105,7 +116,7 @@ export const batchSchema = z.object({
 export const stockTransactionSchema = z.object({
   batchId: z.coerce.number().int().positive(),
   type: z.enum(['OUT', 'ADJ']),
-  quantity: z.coerce.number().int(),
+  quantity: z.coerce.number().int().min(-2_147_483_648).max(2_147_483_647),
   notes: z.string().trim().max(500).optional(),
 }).superRefine((value, context) => {
   if (value.type === 'OUT' && value.quantity <= 0) {
@@ -140,9 +151,9 @@ const purchaseItemSchema = z.object({
   batchNumber: z.string().trim().min(1).max(100),
   mfgDate: z.coerce.date(),
   expiryDate: z.coerce.date(),
-  quantity: z.coerce.number().int().positive(),
-  purchasePrice: z.coerce.number().nonnegative(),
-  sellingPrice: z.coerce.number().nonnegative(),
+  quantity: z.coerce.number().int().positive().max(2_147_483_647),
+  purchasePrice: moneySchema,
+  sellingPrice: moneySchema,
 }).refine((value) => value.expiryDate > value.mfgDate, {
   message: 'Expiry date must be after manufacturing date',
   path: ['expiryDate'],
