@@ -363,6 +363,7 @@ function App() {
       newPassword: "",
       confirmPassword: "",
     });
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [batchFormOpen, setBatchFormOpen] = useState(false);
   const [batchForm, setBatchForm] = useState<BatchForm>({
     medicineId: "",
@@ -1564,6 +1565,13 @@ function App() {
             </div>
 
             <button
+              onClick={() => setAccountSettingsOpen((isOpen) => !isOpen)}
+              aria-expanded={accountSettingsOpen}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Account settings
+            </button>
+            <button
               onClick={() => {
                 setFormError("");
                 setPasswordChangeForm({
@@ -1585,6 +1593,64 @@ function App() {
             </button>
           </div>
         </div>
+
+        {accountSettingsOpen && (
+          <section
+            aria-label="Account settings"
+            className="mt-5 border-t border-slate-200 pt-5"
+          >
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Account settings
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Review the identity and permissions attached to this session.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setFormError("");
+                  setPasswordChangeForm({
+                    currentPassword: "",
+                    newPassword: "",
+                    confirmPassword: "",
+                  });
+                  setPasswordChangeOpen(true);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                Change password
+              </button>
+            </div>
+            <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="border border-slate-200 bg-slate-50 p-4">
+                <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Name
+                </dt>
+                <dd className="mt-1 font-semibold text-slate-900">
+                  {session.user.name}
+                </dd>
+              </div>
+              <div className="border border-slate-200 bg-slate-50 p-4">
+                <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Email
+                </dt>
+                <dd className="mt-1 break-words font-semibold text-slate-900">
+                  {session.user.email ?? "Not provided by the API"}
+                </dd>
+              </div>
+              <div className="border border-slate-200 bg-slate-50 p-4">
+                <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Role and access
+                </dt>
+                <dd className="mt-1 font-semibold text-slate-900">
+                  {session.user.role}
+                </dd>
+              </div>
+            </dl>
+          </section>
+        )}
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
           {canReceiveStock && (

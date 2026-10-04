@@ -188,6 +188,10 @@ test("shows management and receiving actions to Admin", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Receive purchase" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Account settings" }).click();
+  await expect(
+    page.getByRole("region", { name: "Account settings" }),
+  ).toContainText("Admin");
   await page.getByText("Management and history", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
 });
