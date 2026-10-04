@@ -1453,12 +1453,8 @@ function App() {
       <main className="auth-shell min-h-screen">
         <div className="auth-card">
           <section className="auth-hero">
-            <div className="auth-brand">
-              PHARMASENSE
-            </div>
-            <h1 className="auth-title mt-6">
-              PharmaSense
-            </h1>
+            <div className="auth-brand">PHARMASENSE</div>
+            <h1 className="auth-title mt-6">PharmaSense</h1>
             <p className="auth-description mt-3 max-w-md">
               Medicine inventory, purchasing, and operational history.
             </p>
@@ -1477,12 +1473,8 @@ function App() {
 
           <section className="auth-form-shell">
             <div className="mb-6">
-              <p className="auth-eyebrow">
-                Sign in
-              </p>
-              <h2 className="auth-heading mt-2">
-                Welcome back
-              </h2>
+              <p className="auth-eyebrow">Sign in</p>
+              <h2 className="auth-heading mt-2">Welcome back</h2>
               <p className="auth-form-description mt-1">
                 Use your assigned account to continue.
               </p>
@@ -2511,7 +2503,10 @@ function App() {
             className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
           >
             <div className="mb-6 flex items-center justify-between">
-              <h2 id="profile-edit-title" className="text-xl font-bold text-slate-900">
+              <h2
+                id="profile-edit-title"
+                className="text-xl font-bold text-slate-900"
+              >
                 Edit profile
               </h2>
               <button
@@ -2523,7 +2518,10 @@ function App() {
               </button>
             </div>
             {formError && (
-              <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+              <p
+                role="alert"
+                className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700"
+              >
                 {formError}
               </p>
             )}
@@ -2545,7 +2543,10 @@ function App() {
                   type="email"
                   value={profileForm.email}
                   onChange={(event) =>
-                    setProfileForm({ ...profileForm, email: event.target.value })
+                    setProfileForm({
+                      ...profileForm,
+                      email: event.target.value,
+                    })
                   }
                   className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                   required
@@ -2728,7 +2729,8 @@ function App() {
                   'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
                 );
               const firstElement = focusableElements[0];
-              const lastElement = focusableElements[focusableElements.length - 1];
+              const lastElement =
+                focusableElements[focusableElements.length - 1];
               if (event.shiftKey && document.activeElement === firstElement) {
                 event.preventDefault();
                 lastElement?.focus();
