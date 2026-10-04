@@ -1,6 +1,6 @@
 # Frontend UX Validation
 
-Date: 2026-10-03 | Branch: `feature/frontend-ux`
+Date: 2026-10-04 | Branch: `master`
 
 ## Change
 
@@ -14,7 +14,7 @@ The sign-in screen now uses compact product identity and restrained feature rows
 - `npm run build` passed.
 - `npm run test:e2e` passed: 9 tests, including login, role visibility, admin user form, responsive dashboard controls, and medicine-dialog keyboard behavior.
 - Vite started at `http://127.0.0.1:4173/`.
-- The live workflow in `frontend/e2e-live/inventory-workflow.spec.ts` covers medicine creation, purchase receiving, stock issue, and alert acknowledgement using the seeded Admin. It now also signs in as a created Pharmacist, checks role-limited controls, and verifies that the real API rejects supplier creation with `403`. The workflow was not run locally because Docker is unavailable; CI must validate this latest test change.
+- The live workflow in `frontend/e2e-live/inventory-workflow.spec.ts` covers medicine creation, purchase receiving, stock issue, alert acknowledgement, and role-limited controls through the real API. It passed locally against the Docker PostgreSQL database with one test in 20 seconds; CI runs it again against an isolated database with ephemeral credentials.
 
 ## Impact
 
