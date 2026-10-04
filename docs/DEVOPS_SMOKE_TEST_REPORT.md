@@ -19,10 +19,8 @@ The workflow uses unique records and removes them after the test. Run it with `c
 
 ## Execution Evidence
 
-- CI definition: `.github/workflows/ci.yml` (`backend` job: migration, seed, then `npm test`).
-- Environment: Node.js `v24.19.0`; dependencies installed from both committed lockfiles with `npm ci`.
-- Passed: Prisma schema validation, backend TypeScript build, three database-independent backend test files, production-seed refusal check, tracked-source demo-password scan, research dataset validation (`PASS_WITH_WARNINGS`), frontend lint, and frontend production build.
-- Database migration and seed were not run: Docker is unavailable and no PostgreSQL service is listening on `127.0.0.1:5433`.
-- Full `npm test` was attempted with a temporary JWT key. The three database-independent domain suites and three server checks passed; database-dependent API checks failed because PostgreSQL was unreachable. The result is not a passing smoke report.
-- Security audit: frontend reports no vulnerabilities. Backend `npm audit --audit-level=high` fails on three high-severity Prisma CLI/config-chain advisories (`prisma`, `@prisma/config`, and `deepmerge-ts`); npm's suggested automatic fix is a breaking Prisma downgrade, so it was not applied without compatibility testing. The current CI security job will fail until these findings are resolved or formally handled.
-- Required completion evidence: run migration, seed, and full backend `npm test` in CI or against a disposable PostgreSQL environment, then resolve the backend audit findings before treating this handoff as complete.
+- CI definition: `.github/workflows/ci.yml` (`backend` job: migration, seed, database quality, reconciliation, build, tests, and research validation).
+- Local validation environment: PostgreSQL through Docker Compose, Node.js 22-compatible toolchain, and dependencies installed with `npm ci`.
+- Passed: the merged migration, secure development seed, backend build, all 23 backend tests, `db:quality` with `status: PASS`, `db:reconcile` with zero discrepancies, frontend lint/build, and 9 mocked Playwright browser tests.
+- Security audit: backend and frontend `npm audit --omit=dev --audit-level=high` report zero vulnerabilities. Prisma remains on 6.19.3 and the patched `deepmerge-ts` 8.0.2 override is locked and tested.
+- Remaining evidence gap: live browser workflow and production-like deployment/backup-restore rehearsal must still run in CI or an isolated environment before production release.
