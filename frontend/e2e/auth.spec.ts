@@ -188,12 +188,28 @@ test("shows management and receiving actions to Admin", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Receive purchase" }),
   ).toBeVisible();
+  await page.getByText("Management and history", { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
+  await page.getByText("Management and history", { exact: true }).click();
   await page.getByRole("button", { name: "Account settings" }).click();
   await expect(
     page.getByRole("region", { name: "Account settings" }),
   ).toContainText("Admin");
-  await page.getByText("Management and history", { exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
+  await page
+    .getByRole("region", { name: "Account settings" })
+    .getByRole("button", { name: "Change password" })
+    .click();
+  const passwordDialog = page.getByRole("dialog", { name: "Change password" });
+  await expect(passwordDialog).toBeVisible();
+  await passwordDialog.getByLabel("Current password").fill("old-password");
+  await passwordDialog
+    .getByLabel("New password", { exact: true })
+    .fill("new-password-123");
+  await passwordDialog
+    .getByLabel("Confirm new password")
+    .fill("new-password-123");
+  await passwordDialog.getByRole("button", { name: "Change password" }).click();
+  await expect(page.getByLabel("Email address")).toBeVisible();
 });
 
 test("lets Admin open the user form with available roles", async ({ page }) => {
