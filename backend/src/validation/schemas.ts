@@ -91,6 +91,11 @@ export const passwordChangeSchema = z.object({
   newPassword: z.string().min(12).max(100),
 });
 
+export const profileUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(150).optional(),
+  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()).optional(),
+}).refine((value) => Object.keys(value).length > 0);
+
 export const supplierQuerySchema = z.object({
   search: z.string().trim().max(150).optional(),
   contactInfo: z.string().trim().max(300).optional(),

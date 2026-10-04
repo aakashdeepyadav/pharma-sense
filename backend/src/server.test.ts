@@ -479,4 +479,51 @@ describe('PharmaSense API', () => {
       await prisma.user.delete({ where: { id: user.id } });
     }
   });
+
+  it('updates the current user profile and rejects duplicate email addresses', async () => {
+    const role = await prisma.role.findUnique({ where: { name: 'Admin' } });
+    assert.ok(role);
+    const email = `profile-test-${crypto.randomUUID()}@pharmasense.local`;
+    const duplicateEmail = 'admin@pharmasense.local';
+    const user = await prisma.user.create({
+      data: {
+        name: 'Profile Test User',
+        email,
+        passwordHash: 'test-only-unused-password-hash',
+        roleId: role.id,
+      },
+    });
+    const token = createAccessToken({ id: user.id, role: role.name });
+
+    try {
+      const updateResponse = await fetch(`${baseUrl}/api/v1/auth/me`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: 'Updated Profile User', email: `updated-${email}` }),
+      });
+      assert.equal(updateResponse.status, 200);
+      const updated = (await updateResponse.json()) as {
+        data: { name: string; email: string; role: string };
+      };
+      assert.equal(updated.data.name, 'Updated Profile User');
+      assert.equal(updated.data.email, `updated-${email}`);
+      assert.equal(updated.data.role, 'Admin');
+
+      const duplicateResponse = await fetch(`${baseUrl}/api/v1/auth/me`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email: duplicateEmail }),
+      });
+      assert.equal(duplicateResponse.status, 409);
+    } finally {
+      await prisma.auditLog.deleteMany({ where: { entity: 'User', entityId: user.id } });
+      await prisma.user.delete({ where: { id: user.id } });
+    }
+  });
 });
