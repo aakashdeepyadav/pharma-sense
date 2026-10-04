@@ -159,6 +159,11 @@ type PasswordChangeForm = {
   confirmPassword: string;
 };
 
+type ProfileForm = {
+  name: string;
+  email: string;
+};
+
 type BatchForm = {
   medicineId: string;
   supplierId: string;
@@ -363,6 +368,11 @@ function App() {
       newPassword: "",
       confirmPassword: "",
     });
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState<ProfileForm>({
+    name: "",
+    email: "",
+  });
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [batchFormOpen, setBatchFormOpen] = useState(false);
   const [batchForm, setBatchForm] = useState<BatchForm>({
@@ -1386,6 +1396,58 @@ function App() {
     }
   };
 
+  const handleProfileSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session) return;
+
+    setSaving(true);
+    setFormError("");
+    try {
+      const response = await apiFetch("/api/v1/auth/me", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify(profileForm),
+      });
+      const result = (await response.json()) as {
+        success?: boolean;
+        data?: { name: string; email: string; role: string };
+        error?: string | ApiErrorPayload;
+      };
+      if (!response.ok || !result.success || !result.data) {
+        throw new Error(
+          extractErrorMessage(result, "Unable to update profile."),
+        );
+      }
+
+      const updatedSession = {
+        ...session,
+        user: {
+          ...session.user,
+          name: result.data.name,
+          email: result.data.email,
+          role: result.data.role,
+        },
+      };
+      sessionStorage.setItem(
+        "pharmasense-session",
+        JSON.stringify(updatedSession),
+      );
+      setSession(updatedSession);
+      setProfileEditOpen(false);
+    } catch (requestError) {
+      setFormError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to update profile.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!session) {
     return (
       <main className="auth-shell min-h-screen">
@@ -1608,20 +1670,35 @@ function App() {
                   Review the identity and permissions attached to this session.
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  setFormError("");
-                  setPasswordChangeForm({
-                    currentPassword: "",
-                    newPassword: "",
-                    confirmPassword: "",
-                  });
-                  setPasswordChangeOpen(true);
-                }}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              >
-                Change password
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    setFormError("");
+                    setProfileForm({
+                      name: session.user.name,
+                      email: session.user.email ?? "",
+                    });
+                    setProfileEditOpen(true);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Edit profile
+                </button>
+                <button
+                  onClick={() => {
+                    setFormError("");
+                    setPasswordChangeForm({
+                      currentPassword: "",
+                      newPassword: "",
+                      confirmPassword: "",
+                    });
+                    setPasswordChangeOpen(true);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Change password
+                </button>
+              </div>
             </div>
             <dl className="mt-4 grid gap-3 sm:grid-cols-3">
               <div className="border border-slate-200 bg-slate-50 p-4">
@@ -2418,6 +2495,77 @@ function App() {
                 className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving ? "Changing..." : "Change password"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {profileEditOpen && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-950/40 p-4">
+          <form
+            onSubmit={handleProfileSave}
+            aria-labelledby="profile-edit-title"
+            aria-modal="true"
+            role="dialog"
+            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+          >
+            <div className="mb-6 flex items-center justify-between">
+              <h2 id="profile-edit-title" className="text-xl font-bold text-slate-900">
+                Edit profile
+              </h2>
+              <button
+                type="button"
+                onClick={() => setProfileEditOpen(false)}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+            {formError && (
+              <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                {formError}
+              </p>
+            )}
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Name
+                <input
+                  value={profileForm.name}
+                  onChange={(event) =>
+                    setProfileForm({ ...profileForm, name: event.target.value })
+                  }
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Email
+                <input
+                  type="email"
+                  value={profileForm.email}
+                  onChange={(event) =>
+                    setProfileForm({ ...profileForm, email: event.target.value })
+                  }
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  required
+                />
+              </label>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setProfileEditOpen(false)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save profile"}
               </button>
             </div>
           </form>

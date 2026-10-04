@@ -13,6 +13,19 @@ async function mockDashboardApi(page: Page, role: string) {
           user: { name: "QA User", role },
         },
       };
+    } else if (
+      pathname.endsWith("/auth/me") &&
+      route.request().method() === "PATCH"
+    ) {
+      response = {
+        success: true,
+        data: {
+          id: 1,
+          name: "Updated QA User",
+          email: "updated.qa@pharmasense.local",
+          role,
+        },
+      };
     } else if (pathname.endsWith("/medicines")) {
       response = {
         success: true,
@@ -192,6 +205,21 @@ test("shows management and receiving actions to Admin", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
   await page.getByText("Management and history", { exact: true }).click();
   await page.getByRole("button", { name: "Account settings" }).click();
+  await page
+    .getByRole("region", { name: "Account settings" })
+    .getByRole("button", { name: "Edit profile" })
+    .click();
+  const profileDialog = page.getByRole("dialog", { name: "Edit profile" });
+  await profileDialog
+    .getByLabel("Name", { exact: true })
+    .fill("Updated QA User");
+  await profileDialog
+    .getByLabel("Email", { exact: true })
+    .fill("updated.qa@pharmasense.local");
+  await profileDialog.getByRole("button", { name: "Save profile" }).click();
+  await expect(
+    page.getByRole("region", { name: "Account settings" }),
+  ).toContainText("Updated QA User");
   await expect(
     page.getByRole("region", { name: "Account settings" }),
   ).toContainText("Admin");

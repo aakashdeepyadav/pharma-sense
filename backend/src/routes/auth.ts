@@ -4,7 +4,7 @@ import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { createAccessToken, requireAuth, AuthenticatedRequest, revokeAccessToken } from '../auth';
 import { sendApiError } from '../lib/api';
-import { passwordChangeSchema } from '../validation/schemas';
+import { passwordChangeSchema, profileUpdateSchema } from '../validation/schemas';
 
 const router = Router();
 const loginSchema = z.object({
@@ -82,6 +82,51 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response) 
     });
   } catch {
     res.status(500).json({ success: false, error: 'Unable to load user profile' });
+  }
+});
+
+router.patch('/me', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const result = profileUpdateSchema.safeParse(req.body);
+  if (!result.success) {
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
+    return;
+  }
+
+  try {
+    if (result.data.email) {
+      const existing = await prisma.user.findFirst({
+        where: { email: result.data.email, NOT: { id: req.user!.id } },
+      });
+      if (existing) {
+        res.status(409).json({ success: false, error: 'That email address is already in use' });
+        return;
+      }
+    }
+
+    const user = await prisma.$transaction(async (database) => {
+      const updated = await database.user.update({
+        where: { id: req.user!.id },
+        data: result.data,
+        include: { role: true },
+      });
+      await database.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: 'AUTH_PROFILE_UPDATED',
+          entity: 'User',
+          entityId: req.user!.id,
+          details: JSON.stringify({ fields: Object.keys(result.data) }),
+        },
+      });
+      return updated;
+    });
+
+    res.json({
+      success: true,
+      data: { id: user.id, name: user.name, email: user.email, role: user.role.name },
+    });
+  } catch {
+    sendApiError(res, 503, 'PROFILE_UPDATE_FAILED', 'Unable to update user profile');
   }
 });
 
