@@ -23,7 +23,7 @@ Agent-Based Medicine Stock Management System.
 - Role-aware dashboard controls for Admin, Inventory Manager, Pharmacist, and Staff; frontend permissions are presentation-only and the API remains authoritative.
 - Responsive, keyboard-accessible sign-in and dashboard workflows, including focus-managed medicine dialogs and usable audit search/export controls on narrow screens.
 - Read-only replenishment recommendations based on recent OUT demand and reorder levels; recommendations never place purchases automatically.
-- CI checks migrations, seeded backend HTTP/inventory smoke tests, research validation, frontend lint/build, mocked browser tests, live PostgreSQL browser workflows, leaked secrets, and dependency advisories; Dependabot proposes weekly updates for backend, frontend, and GitHub Actions dependencies.
+- CI checks migrations, seed data, database quality, stock reconciliation, backend HTTP/inventory tests, research validation, frontend lint/build, mocked browser tests, live PostgreSQL browser workflows, leaked secrets, and dependency advisories; Dependabot proposes weekly updates for backend, frontend, and GitHub Actions dependencies.
 
 The forecasting pipeline currently uses synthetic research data only. It must not be mixed with operational inventory or treated as evidence of production model performance. See [research/data/DATA_CONTRACT.md](research/data/DATA_CONTRACT.md) before using any real or de-identified data.
 
