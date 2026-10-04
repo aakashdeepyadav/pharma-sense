@@ -40,7 +40,7 @@ router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async
   try {
     const result = categorySchema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ success: false, error: result.error.issues });
+      sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
       return;
     }
 
@@ -64,7 +64,7 @@ router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async
     });
     res.status(201).json({ success: true, data: category });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to add category' });
+    sendApiError(res, 500, 'CREATE_CATEGORY_FAILED', 'Failed to add category');
   }
 });
 
@@ -72,11 +72,11 @@ router.patch('/:id', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), a
   const id = Number(req.params.id);
   const result = categoryUpdateSchema.safeParse(req.body);
   if (!Number.isInteger(id) || id < 1) {
-    res.status(400).json({ success: false, error: 'Category id must be a positive integer' });
+    sendApiError(res, 400, 'INVALID_CATEGORY_ID', 'Category id must be a positive integer');
     return;
   }
   if (!result.success || Object.keys(result.data).length === 0) {
-    res.status(400).json({ success: false, error: 'Provide at least one valid category field' });
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Provide at least one valid category field');
     return;
   }
   if (!req.user) {
@@ -100,7 +100,7 @@ router.patch('/:id', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), a
     });
     res.json({ success: true, data: category });
   } catch {
-    res.status(404).json({ success: false, error: 'Category not found' });
+    sendApiError(res, 404, 'CATEGORY_NOT_FOUND', 'Category not found');
   }
 });
 

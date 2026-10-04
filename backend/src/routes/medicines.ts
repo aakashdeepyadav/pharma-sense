@@ -59,7 +59,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) {
-    res.status(400).json({ success: false, error: 'Medicine id must be a positive integer' });
+    sendApiError(res, 400, 'INVALID_MEDICINE_ID', 'Medicine id must be a positive integer');
     return;
   }
 
@@ -69,12 +69,12 @@ router.get('/:id', async (req: Request, res: Response) => {
       include: { category: true, batches: true },
     });
     if (!medicine) {
-      res.status(404).json({ success: false, error: 'Medicine not found' });
+      sendApiError(res, 404, 'MEDICINE_NOT_FOUND', 'Medicine not found');
       return;
     }
     res.json({ success: true, data: medicine });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to fetch medicine' });
+    sendApiError(res, 500, 'FETCH_MEDICINE_FAILED', 'Failed to fetch medicine');
   }
 });
 
@@ -83,7 +83,7 @@ router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async
   try {
     const result = medicineSchema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ success: false, error: result.error.issues });
+      sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
       return;
     }
 
@@ -107,7 +107,7 @@ router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async
     });
     res.status(201).json({ success: true, data: medicine });
   } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to add medicine' });
+    sendApiError(res, 500, 'CREATE_MEDICINE_FAILED', 'Failed to add medicine');
   }
 });
 
@@ -115,11 +115,11 @@ router.patch('/:id', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), a
   const id = Number(req.params.id);
   const result = medicineUpdateSchema.safeParse(req.body);
   if (!Number.isInteger(id) || id < 1) {
-    res.status(400).json({ success: false, error: 'Medicine id must be a positive integer' });
+    sendApiError(res, 400, 'INVALID_MEDICINE_ID', 'Medicine id must be a positive integer');
     return;
   }
   if (!result.success || Object.keys(result.data).length === 0) {
-    res.status(400).json({ success: false, error: 'Provide at least one valid medicine field' });
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Provide at least one valid medicine field');
     return;
   }
 
@@ -144,7 +144,7 @@ router.patch('/:id', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), a
     });
     res.json({ success: true, data: medicine });
   } catch {
-    res.status(404).json({ success: false, error: 'Medicine not found' });
+    sendApiError(res, 404, 'MEDICINE_NOT_FOUND', 'Medicine not found');
   }
 });
 

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { AuthenticatedRequest } from '../auth';
+import { sendApiError } from '../lib/api';
 
 const router = Router();
 const EXPIRY_WARNING_DAYS = 30;
@@ -99,14 +100,14 @@ router.get('/', async (_req: Request, res: Response) => {
     });
     res.json({ success: true, data: currentAlerts, meta: { generatedAt: now, expiryWarningDays: EXPIRY_WARNING_DAYS } });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to calculate inventory alerts' });
+    sendApiError(res, 500, 'CALCULATE_ALERTS_FAILED', 'Failed to calculate inventory alerts');
   }
 });
 
 router.patch('/:id/acknowledge', async (req: AuthenticatedRequest, res: Response) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) {
-    res.status(400).json({ success: false, error: 'Alert id must be a positive integer' });
+    sendApiError(res, 400, 'INVALID_ALERT_ID', 'Alert id must be a positive integer');
     return;
   }
   if (!req.user) {
@@ -132,7 +133,7 @@ router.patch('/:id/acknowledge', async (req: AuthenticatedRequest, res: Response
     });
     res.json({ success: true, data: alert });
   } catch {
-    res.status(404).json({ success: false, error: 'Alert not found' });
+    sendApiError(res, 404, 'ALERT_NOT_FOUND', 'Alert not found');
   }
 });
 
