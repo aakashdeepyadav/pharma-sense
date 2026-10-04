@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { apiFetch } from "./api";
 import "./App.css";
 
@@ -331,6 +331,8 @@ function App() {
   const [supplierSearch, setSupplierSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
+  const medicineNameInputRef = useRef<HTMLInputElement>(null);
+  const medicineReturnFocusRef = useRef<HTMLElement | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [supplierFormOpen, setSupplierFormOpen] = useState(false);
@@ -402,6 +404,15 @@ function App() {
     unit: "Tablet",
     reorderLevel: "0",
   });
+
+  useEffect(() => {
+    if (formOpen) {
+      medicineNameInputRef.current?.focus();
+      return;
+    }
+
+    medicineReturnFocusRef.current?.focus();
+  }, [formOpen]);
 
   const roleMeta = roleThemeMap[session?.user.role ?? "Staff"] ?? {
     tone: "bg-slate-100 text-slate-700 border-slate-200",
@@ -676,6 +687,10 @@ function App() {
   };
 
   const openCreateForm = () => {
+    medicineReturnFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     setEditingMedicine(null);
     setForm({
       genericName: "",
@@ -693,6 +708,10 @@ function App() {
   };
 
   const openEditForm = (medicine: Medicine) => {
+    medicineReturnFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     setEditingMedicine(medicine);
     setForm({
       genericName: medicine.genericName,
@@ -1371,48 +1390,42 @@ function App() {
       <main className="auth-shell min-h-screen">
         <div className="auth-card">
           <section className="auth-hero">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.22em] text-cyan-50 backdrop-blur-sm">
+            <div className="auth-brand">
               PHARMASENSE
             </div>
-            <h1 className="mt-6 text-4xl font-black leading-tight text-white">
-              Better pharmacy operations,
-              <span className="block text-cyan-200">
-                in one secure workspace.
-              </span>
+            <h1 className="auth-title mt-6">
+              PharmaSense
             </h1>
-            <p className="mt-4 max-w-md text-sm leading-6 text-slate-200">
-              Monitor stock, receive purchase orders, manage suppliers, and keep
-              your medicine flow compliant across every role.
+            <p className="auth-description mt-3 max-w-md">
+              Medicine inventory, purchasing, and operational history.
             </p>
 
-            <div className="mt-8 grid gap-3 text-sm text-slate-100 sm:grid-cols-2">
+            <div className="auth-feature-list mt-8">
               {[
-                "Live medicine visibility",
-                "Audit-ready transactions",
-                "Role-aware approvals",
-                "Forecast and reorder support",
+                "Live stock visibility",
+                "Traceable movements",
+                "Role-based access",
+                "Reorder guidance",
               ].map((feature) => (
-                <div
-                  key={feature}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5"
-                >
-                  {feature}
-                </div>
+                <div key={feature}>{feature}</div>
               ))}
             </div>
           </section>
 
           <section className="auth-form-shell">
             <div className="mb-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">
+              <p className="auth-eyebrow">
                 Sign in
               </p>
-              <h2 className="mt-2 text-3xl font-bold text-slate-900">
+              <h2 className="auth-heading mt-2">
                 Welcome back
               </h2>
+              <p className="auth-form-description mt-1">
+                Use your assigned account to continue.
+              </p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-5">
+            <form onSubmit={handleLogin}>
               {loginError && (
                 <p
                   role="alert"
@@ -1513,8 +1526,8 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4 md:p-8">
-      <header className="mb-8 rounded-[28px] border border-slate-200 bg-white/80 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur md:p-7">
+    <div className="dashboard-shell min-h-screen bg-slate-100 p-3 sm:p-5 lg:p-8">
+      <header className="dashboard-header mb-6 border border-slate-200 bg-white p-5 shadow-sm md:p-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-cyan-700">
@@ -2482,13 +2495,47 @@ function App() {
       )}
 
       {formOpen && (
-        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+        <div
+          className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6"
+          role="presentation"
+        >
           <form
             onSubmit={handleMedicineSave}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setFormOpen(false);
+                return;
+              }
+              if (event.key !== "Tab") return;
+
+              const focusableElements =
+                event.currentTarget.querySelectorAll<HTMLElement>(
+                  'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+                );
+              const firstElement = focusableElements[0];
+              const lastElement = focusableElements[focusableElements.length - 1];
+              if (event.shiftKey && document.activeElement === firstElement) {
+                event.preventDefault();
+                lastElement?.focus();
+              } else if (
+                !event.shiftKey &&
+                document.activeElement === lastElement
+              ) {
+                event.preventDefault();
+                firstElement?.focus();
+              }
+            }}
+            aria-labelledby="medicine-form-title"
+            aria-modal="true"
+            role="dialog"
             className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2
+                id="medicine-form-title"
+                className="text-xl font-bold text-gray-900"
+              >
                 {editingMedicine ? "Edit medicine" : "Add medicine"}
               </h2>
               <button
@@ -2508,6 +2555,7 @@ function App() {
               <label className="text-sm font-medium text-gray-700">
                 Generic name
                 <input
+                  ref={medicineNameInputRef}
                   value={form.genericName}
                   onChange={(event) =>
                     setForm({ ...form, genericName: event.target.value })

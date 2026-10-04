@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { expect, test, type Page } from "@playwright/test";
 
 async function openManagementHistory(page: Page) {
@@ -23,6 +24,8 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
   const supplierName = `Browser test supplier ${suffix}`;
   const batchNumber = `E2E-${suffix}`;
   const issueReason = `Browser workflow verification ${suffix}`;
+  const managedUserEmail = `browser.user.${suffix}@pharmasense.local`;
+  const managedUserPassword = `Browser-user-${suffix}`;
   const manufacturingDate = new Date(Date.now() - 30 * 86_400_000)
     .toISOString()
     .slice(0, 10);
@@ -38,7 +41,6 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
     page.getByRole("heading", { name: "Inventory command center" }),
   ).toBeVisible();
 
-  const managedUserEmail = `browser.user.${suffix}@pharmasense.local`;
   await page.getByRole("button", { name: "+ User" }).click();
   await page.getByLabel("Name", { exact: true }).fill(`Browser User ${suffix}`);
   await page.getByLabel("Email", { exact: true }).fill(managedUserEmail);
@@ -47,7 +49,7 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
     .selectOption({ label: "Staff" });
   await page
     .getByLabel("Temporary password")
-    .fill(`Browser-user-${suffix}`);
+    .fill(managedUserPassword);
   await page.getByRole("button", { name: "Create user" }).click();
   await openManagementHistory(page);
   const userAccessSection = page
@@ -64,6 +66,46 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
   await page.getByRole("button", { name: "Save changes" }).click();
   await openManagementHistory(page);
   await expect(managedUserRow).toContainText("Pharmacist");
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByLabel("Email address")).toBeVisible();
+  await page.getByLabel("Email address").fill(managedUserEmail);
+  await page.getByLabel("Password").fill(managedUserPassword);
+  await page.getByRole("button", { name: "Sign in to dashboard" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Inventory command center" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("banner").getByText("Pharmacist", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ Supplier" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Receive purchase" }),
+  ).toBeVisible();
+
+  const restrictedToken = await page.evaluate(() => {
+    const storedSession = sessionStorage.getItem("pharmasense-session");
+    return storedSession
+      ? (JSON.parse(storedSession) as { token: string }).token
+      : "";
+  });
+  const restrictedSupplierResponse = await page.request.post(
+    "http://127.0.0.1:5101/api/v1/suppliers",
+    {
+      headers: { Authorization: `Bearer ${restrictedToken}` },
+      data: { name: `Restricted role check ${suffix}` },
+    },
+  );
+  expect(restrictedSupplierResponse.status()).toBe(403);
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByLabel("Email address")).toBeVisible();
+  await page.getByLabel("Email address").fill("admin@pharmasense.local");
+  await page.getByLabel("Password").fill(adminPassword);
+  await page.getByRole("button", { name: "Sign in to dashboard" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Inventory command center" }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "+ Supplier" }).click();
   await page.getByLabel("Supplier name").fill(supplierName);
