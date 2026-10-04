@@ -42,7 +42,7 @@ router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async
   try {
     const result = batchSchema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ success: false, error: result.error.issues });
+      sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
       return;
     }
 
@@ -78,10 +78,10 @@ router.post('/', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async
     res.status(201).json({ success: true, data: batch });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      res.status(409).json({ success: false, error: 'A batch with this medicine and batch number already exists' });
+      sendApiError(res, 409, 'DUPLICATE_BATCH', 'A batch with this medicine and batch number already exists');
       return;
     }
-    res.status(500).json({ success: false, error: 'Failed to add batch' });
+    sendApiError(res, 500, 'CREATE_BATCH_FAILED', 'Failed to add batch');
   }
 });
 

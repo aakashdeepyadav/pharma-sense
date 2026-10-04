@@ -43,7 +43,7 @@ router.get('/transactions', async (req: AuthenticatedRequest, res: Response) => 
 router.post('/transactions', requireRoles('Admin', 'Pharmacist', 'Inventory Manager', 'Staff'), async (req: AuthenticatedRequest, res: Response) => {
   const result = stockTransactionSchema.safeParse(req.body);
   if (!result.success) {
-    res.status(400).json({ success: false, error: result.error.issues });
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
     return;
   }
   if (!req.user) {
@@ -70,7 +70,7 @@ router.post('/transactions', requireRoles('Admin', 'Pharmacist', 'Inventory Mana
         throw new Error('INSUFFICIENT_STOCK');
       }
 
-      return database.stockTransaction.create({
+      const transaction = await database.stockTransaction.create({
         data: {
           batchId: result.data.batchId,
           userId: req.user!.id,
@@ -80,33 +80,33 @@ router.post('/transactions', requireRoles('Admin', 'Pharmacist', 'Inventory Mana
         },
         include: { batch: { include: { medicine: true, supplier: true } } },
       });
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user.id,
-        action: result.data.type === 'OUT' ? 'STOCK_OUT' : 'STOCK_ADJUSTMENT',
-        entity: 'Batch',
-        entityId: result.data.batchId,
-        details: JSON.stringify({ quantity: result.data.quantity, notes: result.data.notes }),
-      },
+      await database.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: result.data.type === 'OUT' ? 'STOCK_OUT' : 'STOCK_ADJUSTMENT',
+          entity: 'Batch',
+          entityId: result.data.batchId,
+          details: JSON.stringify({ quantity: result.data.quantity, notes: result.data.notes }),
+        },
+      });
+      return transaction;
     });
 
     res.status(201).json({ success: true, data: transaction });
   } catch (error) {
     if (error instanceof Error && error.message === 'BATCH_NOT_FOUND') {
-      res.status(404).json({ success: false, error: 'Batch not found' });
+      sendApiError(res, 404, 'BATCH_NOT_FOUND', 'Batch not found');
       return;
     }
     if (error instanceof Error && error.message === 'INSUFFICIENT_STOCK') {
-      res.status(409).json({ success: false, error: 'Insufficient stock for this operation' });
+      sendApiError(res, 409, 'INSUFFICIENT_STOCK', 'Insufficient stock for this operation');
       return;
     }
     if (error instanceof Error && error.message === 'EXPIRED_BATCH') {
-      res.status(409).json({ success: false, error: 'Expired batches cannot be issued' });
+      sendApiError(res, 409, 'EXPIRED_BATCH', 'Expired batches cannot be issued');
       return;
     }
-    res.status(500).json({ success: false, error: 'Failed to record stock transaction' });
+    sendApiError(res, 500, 'CREATE_STOCK_TRANSACTION_FAILED', 'Failed to record stock transaction');
   }
 });
 

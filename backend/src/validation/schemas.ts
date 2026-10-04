@@ -93,6 +93,7 @@ export const passwordChangeSchema = z.object({
 
 export const supplierQuerySchema = z.object({
   search: z.string().trim().max(150).optional(),
+  contactInfo: z.string().trim().max(300).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
   sortBy: z.enum(['name', 'contactInfo', 'id']).default('name'),

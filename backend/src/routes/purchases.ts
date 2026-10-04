@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthenticatedRequest, requireRoles } from '../auth';
 import { purchaseSchema } from '../validation/schemas';
+import { sendApiError } from '../lib/api';
 
 const router = Router();
 const receivingRoles = ['Admin', 'Pharmacist', 'Inventory Manager'];
@@ -26,7 +27,7 @@ router.get('/', async (_req: AuthenticatedRequest, res: Response) => {
 router.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
   const purchaseId = Number(req.params.id);
   if (!Number.isInteger(purchaseId) || purchaseId < 1) {
-    res.status(400).json({ success: false, error: 'Purchase id must be a positive integer' });
+    sendApiError(res, 400, 'INVALID_PURCHASE_ID', 'Purchase id must be a positive integer');
     return;
   }
 
@@ -40,19 +41,19 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
       },
     });
     if (!purchase) {
-      res.status(404).json({ success: false, error: 'Purchase not found' });
+      sendApiError(res, 404, 'PURCHASE_NOT_FOUND', 'Purchase not found');
       return;
     }
     res.json({ success: true, data: purchase });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to fetch purchase' });
+    sendApiError(res, 500, 'FETCH_PURCHASE_FAILED', 'Failed to fetch purchase');
   }
 });
 
 router.post('/', requireRoles(...receivingRoles), async (req: AuthenticatedRequest, res: Response) => {
   const result = purchaseSchema.safeParse(req.body);
   if (!result.success) {
-    res.status(400).json({ success: false, error: result.error.issues });
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
     return;
   }
   if (!req.user) {
@@ -84,14 +85,14 @@ router.post('/', requireRoles(...receivingRoles), async (req: AuthenticatedReque
     });
     res.status(201).json({ success: true, data: purchase });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to create purchase' });
+    sendApiError(res, 500, 'CREATE_PURCHASE_FAILED', 'Failed to create purchase');
   }
 });
 
 router.post('/:id/receive', requireRoles(...receivingRoles), async (req: AuthenticatedRequest, res: Response) => {
   const purchaseId = Number(req.params.id);
   if (!Number.isInteger(purchaseId) || purchaseId < 1) {
-    res.status(400).json({ success: false, error: 'Purchase id must be a positive integer' });
+    sendApiError(res, 400, 'INVALID_PURCHASE_ID', 'Purchase id must be a positive integer');
     return;
   }
   if (!req.user) {
@@ -151,18 +152,18 @@ router.post('/:id/receive', requireRoles(...receivingRoles), async (req: Authent
     res.json({ success: true, data: purchase });
   } catch (error) {
     if (error instanceof Error && error.message === 'PURCHASE_NOT_FOUND') {
-      res.status(404).json({ success: false, error: 'Purchase not found' });
+      sendApiError(res, 404, 'PURCHASE_NOT_FOUND', 'Purchase not found');
       return;
     }
     if (error instanceof Error && error.message === 'PURCHASE_ALREADY_RECEIVED') {
-      res.status(409).json({ success: false, error: 'Purchase has already been received' });
+      sendApiError(res, 409, 'PURCHASE_ALREADY_RECEIVED', 'Purchase has already been received');
       return;
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      res.status(409).json({ success: false, error: 'A batch with this medicine and batch number already exists' });
+      sendApiError(res, 409, 'DUPLICATE_BATCH', 'A batch with this medicine and batch number already exists');
       return;
     }
-    res.status(500).json({ success: false, error: 'Failed to receive purchase' });
+    sendApiError(res, 500, 'RECEIVE_PURCHASE_FAILED', 'Failed to receive purchase');
   }
 });
 

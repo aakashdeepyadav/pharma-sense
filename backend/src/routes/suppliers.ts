@@ -14,8 +14,20 @@ router.get('/', async (req: Request, res: Response) => {
   }
 
   try {
-    const where: any = query.data.search
-      ? { name: { contains: query.data.search, mode: 'insensitive' as const } }
+    const where = query.data.search || query.data.contactInfo
+      ? {
+          ...(query.data.search
+            ? {
+                OR: [
+                  { name: { contains: query.data.search, mode: 'insensitive' as const } },
+                  { contactInfo: { contains: query.data.search, mode: 'insensitive' as const } },
+                ],
+              }
+            : {}),
+          ...(query.data.contactInfo
+            ? { contactInfo: { contains: query.data.contactInfo, mode: 'insensitive' as const } }
+            : {}),
+        }
       : undefined;
 
     const [total, suppliers] = await Promise.all([
@@ -48,13 +60,13 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/', requireRoles('Admin', 'Inventory Manager'), async (req: AuthenticatedRequest, res: Response) => {
   const result = supplierSchema.safeParse(req.body);
   if (!result.success) {
-    res.status(400).json({ success: false, error: result.error.issues });
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
     return;
   }
 
   try {
     if (!req.user) {
-      res.status(401).json({ success: false, error: 'Authentication required' });
+      sendApiError(res, 401, 'AUTHENTICATION_REQUIRED', 'Authentication required');
       return;
     }
 
@@ -73,7 +85,7 @@ router.post('/', requireRoles('Admin', 'Inventory Manager'), async (req: Authent
     });
     res.status(201).json({ success: true, data: supplier });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to add supplier' });
+    sendApiError(res, 500, 'CREATE_SUPPLIER_FAILED', 'Failed to add supplier');
   }
 });
 
@@ -81,17 +93,17 @@ router.patch('/:id', requireRoles('Admin', 'Inventory Manager'), async (req: Aut
   const id = Number(req.params.id);
   const result = supplierUpdateSchema.safeParse(req.body);
   if (!Number.isInteger(id) || id < 1) {
-    res.status(400).json({ success: false, error: 'Supplier id must be a positive integer' });
+    sendApiError(res, 400, 'INVALID_SUPPLIER_ID', 'Supplier id must be a positive integer');
     return;
   }
   if (!result.success || Object.keys(result.data).length === 0) {
-    res.status(400).json({ success: false, error: 'Provide at least one valid supplier field' });
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Provide at least one valid supplier field');
     return;
   }
 
   try {
     if (!req.user) {
-      res.status(401).json({ success: false, error: 'Authentication required' });
+      sendApiError(res, 401, 'AUTHENTICATION_REQUIRED', 'Authentication required');
       return;
     }
 
@@ -110,7 +122,7 @@ router.patch('/:id', requireRoles('Admin', 'Inventory Manager'), async (req: Aut
     });
     res.json({ success: true, data: supplier });
   } catch {
-    res.status(404).json({ success: false, error: 'Supplier not found' });
+    sendApiError(res, 404, 'SUPPLIER_NOT_FOUND', 'Supplier not found');
   }
 });
 

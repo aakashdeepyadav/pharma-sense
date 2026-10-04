@@ -6,6 +6,7 @@ import { forecastQuerySchema } from '../validation/schemas';
 import { replenishmentQuerySchema } from '../validation/schemas';
 import { assessForecastReadiness, movingAverageForecast, movingAverageMae } from '../domain/forecasting';
 import { calculateReplenishment } from '../domain/replenishment';
+import { sendApiError } from '../lib/api';
 
 const router = Router();
 
@@ -52,14 +53,14 @@ router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
       },
     });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to calculate report summary' });
+    sendApiError(res, 500, 'CALCULATE_REPORT_FAILED', 'Failed to calculate report summary');
   }
 });
 
 router.get('/demand-history', async (req: AuthenticatedRequest, res: Response) => {
   const result = demandHistoryQuerySchema.safeParse(req.query);
   if (!result.success) {
-    res.status(400).json({ success: false, error: result.error.issues });
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
     return;
   }
 
@@ -102,14 +103,14 @@ router.get('/demand-history', async (req: AuthenticatedRequest, res: Response) =
       },
     });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to prepare demand history' });
+    sendApiError(res, 500, 'PREPARE_DEMAND_HISTORY_FAILED', 'Failed to prepare demand history');
   }
 });
 
 router.get('/forecast-baseline', async (req: AuthenticatedRequest, res: Response) => {
   const result = forecastQuerySchema.safeParse(req.query);
   if (!result.success) {
-    res.status(400).json({ success: false, error: result.error.issues });
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
     return;
   }
 
@@ -129,7 +130,7 @@ router.get('/forecast-baseline', async (req: AuthenticatedRequest, res: Response
       }),
     ]);
     if (!medicine) {
-      res.status(404).json({ success: false, error: 'Medicine not found' });
+      sendApiError(res, 404, 'MEDICINE_NOT_FOUND', 'Medicine not found');
       return;
     }
 
@@ -168,14 +169,14 @@ router.get('/forecast-baseline', async (req: AuthenticatedRequest, res: Response
       },
     });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to calculate forecast baseline' });
+    sendApiError(res, 500, 'CALCULATE_FORECAST_FAILED', 'Failed to calculate forecast baseline');
   }
 });
 
 router.get('/replenishment', async (req: AuthenticatedRequest, res: Response) => {
   const result = replenishmentQuerySchema.safeParse(req.query);
   if (!result.success) {
-    res.status(400).json({ success: false, error: result.error.issues });
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
     return;
   }
 
@@ -224,7 +225,7 @@ router.get('/replenishment', async (req: AuthenticatedRequest, res: Response) =>
       meta: { from: from.toISOString(), to: to.toISOString(), model: 'rule_based_average_demand' },
     });
   } catch {
-    res.status(500).json({ success: false, error: 'Failed to calculate replenishment recommendations' });
+    sendApiError(res, 500, 'CALCULATE_REPLENISHMENT_FAILED', 'Failed to calculate replenishment recommendations');
   }
 });
 

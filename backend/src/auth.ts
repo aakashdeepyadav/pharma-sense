@@ -7,6 +7,7 @@ export type AuthenticatedRequest = Request & {
   user?: {
     id: number;
     role: string;
+    sessionVersion: number;
   };
 };
 
@@ -92,20 +93,27 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       where: { id: payload.userId },
       include: { role: true },
     });
-    if (!user) {
+    if (!user || (
+      typeof payload.sessionVersion === 'number'
+      && payload.sessionVersion !== user.sessionVersion
+    )) {
       res.status(401).json({ success: false, error: 'Invalid or expired authentication token' });
       return;
     }
 
-    req.user = { id: user.id, role: user.role.name };
+    req.user = { id: user.id, role: user.role.name, sessionVersion: user.sessionVersion };
     next();
   } catch {
     res.status(503).json({ success: false, error: 'Authentication service unavailable' });
   }
 }
 
-export function createAccessToken(user: { id: number; role: string }) {
-  return jwt.sign({ userId: user.id, role: user.role }, getJwtSecret(), {
+export function createAccessToken(user: { id: number; role: string; sessionVersion?: number }) {
+  return jwt.sign({
+    userId: user.id,
+    role: user.role,
+    ...(user.sessionVersion === undefined ? {} : { sessionVersion: user.sessionVersion }),
+  }, getJwtSecret(), {
     algorithm: JWT_ALGORITHM,
     issuer: JWT_ISSUER,
     audience: JWT_AUDIENCE,

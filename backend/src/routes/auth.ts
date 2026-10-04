@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { createAccessToken, requireAuth, AuthenticatedRequest, revokeAccessToken } from '../auth';
+import { sendApiError } from '../lib/api';
 
 const router = Router();
 const loginSchema = z.object({
@@ -50,7 +51,11 @@ router.post('/login', async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        token: createAccessToken({ id: user.id, role: user.role.name }),
+        token: createAccessToken({
+          id: user.id,
+          role: user.role.name,
+          sessionVersion: user.sessionVersion,
+        }),
         user: { id: user.id, name: user.name, email: user.email, role: user.role.name },
       },
     });
@@ -84,9 +89,17 @@ router.post('/logout', requireAuth, async (req: AuthenticatedRequest, res: Respo
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
   try {
     if (token) await revokeAccessToken(token);
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.id,
+        action: 'AUTH_LOGGED_OUT',
+        entity: 'User',
+        entityId: req.user!.id,
+      },
+    });
     res.json({ success: true, data: { loggedOut: true } });
   } catch {
-    res.status(503).json({ success: false, error: 'Unable to revoke authentication token' });
+    sendApiError(res, 503, 'LOGOUT_FAILED', 'Unable to revoke authentication token');
   }
 });
 
