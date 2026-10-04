@@ -37,6 +37,11 @@ async function mockDashboardApi(page: Page, role: string) {
         success: true,
         data: [{ id: 1, name: "QA supplier", contactInfo: null, _count: { batches: 1 } }],
       };
+    } else if (pathname.endsWith("/categories")) {
+      response = {
+        success: true,
+        data: [{ id: 1, name: "QA category", description: null }],
+      };
     } else if (pathname.endsWith("/batches")) {
       response = {
         success: true,
@@ -91,6 +96,21 @@ async function mockDashboardApi(page: Page, role: string) {
           issuedUnits: 0,
           topIssuedMedicines: [],
         },
+      };
+    } else if (pathname.endsWith("/audit-logs")) {
+      response = {
+        success: true,
+        data: [
+          {
+            id: 1,
+            action: "MEDICINE_CREATED",
+            entity: "Medicine",
+            entityId: 1,
+            details: null,
+            createdAt: "2026-10-03T12:00:00.000Z",
+            user: { name: "QA Admin", role: { name: "Admin" } },
+          },
+        ],
       };
     }
 
@@ -240,4 +260,70 @@ test("hides management and receiving actions from Staff", async ({ page }) => {
   await expect(batchRow.getByRole("button", { name: "Issue" })).toBeVisible();
   await expect(batchRow.getByRole("button", { name: "Adjust" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Audit log" })).toHaveCount(0);
+});
+
+test("keeps dashboard and audit controls usable on narrow screens", async ({
+  page,
+}) => {
+  await mockDashboardApi(page, "Admin");
+  await page.setViewportSize({ width: 320, height: 900 });
+  await signIn(page);
+  await page.getByText("Management and history", { exact: true }).click();
+
+  const auditControls = [
+    page.getByRole("searchbox", { name: "Search audit log" }),
+    page.getByRole("button", { name: "Search", exact: true }),
+    page.getByRole("button", { name: "Export CSV" }),
+  ];
+
+  for (const width of [320, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const control of auditControls) {
+      await expect(control).toBeVisible();
+      const bounds = await control.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    }
+
+    if (width === 320) {
+      await auditControls[0].focus();
+      await page.keyboard.press("Tab");
+      await expect(auditControls[1]).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(auditControls[2]).toBeFocused();
+    }
+
+    const hasHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(hasHorizontalOverflow).toBe(false);
+  }
+});
+
+test("opens the medicine form as a named, keyboard-ready dialog", async ({
+  page,
+}) => {
+  await mockDashboardApi(page, "Admin");
+  await signIn(page);
+  await page.getByRole("button", { name: "+ Add Medicine" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Add medicine" });
+  await expect(dialog).toBeVisible();
+  await expect(page.getByLabel("Generic name")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByLabel("Brand name")).toBeFocused();
+
+  const closeButton = dialog.getByRole("button", { name: "Close" });
+  const saveButton = dialog.getByRole("button", { name: "Save medicine" });
+  await saveButton.focus();
+  await page.keyboard.press("Tab");
+  await expect(closeButton).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(saveButton).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "+ Add Medicine" }),
+  ).toBeFocused();
 });
