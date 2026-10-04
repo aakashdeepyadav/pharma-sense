@@ -54,6 +54,12 @@ jobs:
       - name: Seed test data
         working-directory: backend
         run: npm run seed
+      - name: Validate database quality
+        working-directory: backend
+        run: npm run db:quality
+      - name: Reconcile stock ledger
+        working-directory: backend
+        run: npm run db:reconcile
       - name: Build backend
         working-directory: backend
         run: npm run build
