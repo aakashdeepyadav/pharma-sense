@@ -19,8 +19,11 @@ Agent-Based Medicine Stock Management System.
 - Expiry-aware batch ordering and protection against issuing expired stock.
 - Low-stock, out-of-stock, expired, and expiring-soon alerts with acknowledgement.
 - Operational reports, management-only audit logs, and transactional audit events for writes.
+- Admin user and role management, account activation/deactivation, password reset, and self-service password change with immediate session invalidation.
+- Role-aware dashboard controls for Admin, Inventory Manager, Pharmacist, and Staff; frontend permissions are presentation-only and the API remains authoritative.
+- Responsive, keyboard-accessible sign-in and dashboard workflows, including focus-managed medicine dialogs and usable audit search/export controls on narrow screens.
 - Read-only replenishment recommendations based on recent OUT demand and reorder levels; recommendations never place purchases automatically.
-- CI checks migrations, seeded backend HTTP/inventory smoke tests, research validation, frontend lint/build, leaked secrets, and dependency advisories; Dependabot proposes weekly dependency updates.
+- CI checks migrations, seeded backend HTTP/inventory smoke tests, research validation, frontend lint/build, mocked browser tests, live PostgreSQL browser workflows, leaked secrets, and dependency advisories; Dependabot proposes weekly updates for backend, frontend, and GitHub Actions dependencies.
 
 The forecasting pipeline currently uses synthetic research data only. It must not be mixed with operational inventory or treated as evidence of production model performance. See [research/data/DATA_CONTRACT.md](research/data/DATA_CONTRACT.md) before using any real or de-identified data.
 
@@ -76,10 +79,20 @@ npm run seed
 npm run build
 npm test
 npm run research:validate
+npm audit --omit=dev --audit-level=high
 
 cd ../frontend
 npm run lint
 npm run build
+npm run test:e2e
+npm audit --omit=dev --audit-level=high
+```
+
+The live inventory workflow requires a disposable PostgreSQL database and is run in CI with an ephemeral administrator password:
+
+```bash
+cd frontend
+npm run test:e2e:live
 ```
 
 ## Security Notes
@@ -94,6 +107,7 @@ npm run build
 - CORS allows the configured `FRONTEND_URL`; request bodies are limited to 100 KB, and the API sets content-type, frame, and referrer headers.
 - Failed or malformed login attempts are limited to 10 per client address per 15 minutes per API process. Use a shared edge limiter before horizontal scaling; database-backed token revocation does not replace login throttling.
 - CI runs Gitleaks and high-severity npm audits; pull requests receive dependency review. Configure GitHub branch protection to require these checks before merge.
+- Prisma's transitive `deepmerge-ts` dependency is pinned to a patched release through the backend npm override; do not use `npm audit fix --force` without reviewing Prisma compatibility.
 
 ## DevOps Handoff
 
@@ -102,6 +116,7 @@ npm run build
 - [Security and operational risk register](docs/SECURITY_RISK_REGISTER.md)
 - [Release and rollback checklist](docs/RELEASE_CHECKLIST.md)
 - [Smoke-test coverage and execution evidence](docs/DEVOPS_SMOKE_TEST_REPORT.md)
+- [Frontend UX and accessibility validation](docs/FRONTEND_UX_VALIDATION.md)
 
 ## Branch Workflow
 
@@ -109,3 +124,4 @@ npm run build
 - `develop` is the integration branch for the next release.
 - `feature/*` branches contain one focused change and should merge into `develop` through a pull request.
 - Use small commits with behavior-focused messages, and require CI to pass before merging.
+- Protect `master` and `develop` with pull requests, at least one approval, required CI checks, and resolved review conversations; release changes flow from `develop` into `master`.
