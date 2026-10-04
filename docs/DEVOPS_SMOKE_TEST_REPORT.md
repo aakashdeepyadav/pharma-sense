@@ -22,5 +22,6 @@ The workflow uses unique records and removes them after the test. Run it with `c
 - CI definition: `.github/workflows/ci.yml` (`backend` job: migration, seed, database quality, reconciliation, build, tests, and research validation).
 - Local validation environment: PostgreSQL through Docker Compose, Node.js 22-compatible toolchain, and dependencies installed with `npm ci`.
 - Passed: the merged migration, secure development seed, backend build, all 23 backend tests, `db:quality` with `status: PASS`, `db:reconcile` with zero discrepancies, frontend lint/build, and 9 mocked Playwright browser tests.
+- Passed: the live inventory workflow against local PostgreSQL with one Playwright test in 20 seconds, including real authentication, receiving, issuing, alerts, user management, and role restrictions.
 - Security audit: backend and frontend `npm audit --omit=dev --audit-level=high` report zero vulnerabilities. Prisma remains on 6.19.3 and the patched `deepmerge-ts` 8.0.2 override is locked and tested.
-- Remaining evidence gap: live browser workflow and production-like deployment/backup-restore rehearsal must still run in CI or an isolated environment before production release.
+- Remaining evidence gap: production-like deployment and backup/restore rehearsal must still run in an isolated environment before production release; CI remains the authoritative clean-environment live test.

@@ -50,6 +50,8 @@ With the backend database running and seeded:
 ```powershell
 Set-Location backend
 npm test
+npm run db:quality
+npm run db:reconcile
 npm run research:validate
 npm run build
 
@@ -57,6 +59,8 @@ Set-Location ../frontend
 npm run lint
 npm run build
 ```
+
+For the real browser workflow, use a disposable database and set `E2E_DATABASE_URL` and `E2E_ADMIN_PASSWORD` before running `npm run test:e2e:live` from `frontend`.
 
 `npm test` includes HTTP checks for health, login, anonymous access denial, role enforcement, and an authenticated receive-and-issue inventory workflow. The CI backend job runs migrations and seed before these checks against a fresh PostgreSQL service.
 
