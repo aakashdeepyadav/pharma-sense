@@ -14,7 +14,7 @@ The sign-in screen now uses compact product identity and restrained feature rows
 - `npm run build` passed.
 - `npm run test:e2e` passed: 9 tests, including login, role visibility, admin user form, responsive dashboard controls, and medicine-dialog keyboard behavior.
 - Vite started at `http://127.0.0.1:4173/`.
-- The existing live workflow in `frontend/e2e-live/inventory-workflow.spec.ts` covers medicine creation, purchase receiving, stock issue, and alert acknowledgement. It was not run in this environment because Docker is unavailable; seeded Admin and restricted-role API checks therefore remain outstanding.
+- The live workflow in `frontend/e2e-live/inventory-workflow.spec.ts` covers medicine creation, purchase receiving, stock issue, and alert acknowledgement using the seeded Admin. It now also signs in as a created Pharmacist, checks role-limited controls, and verifies that the real API rejects supplier creation with `403`. The workflow was not run locally because Docker is unavailable; CI must validate this latest test change.
 
 ## Impact
 
