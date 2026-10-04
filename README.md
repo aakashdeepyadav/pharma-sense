@@ -75,6 +75,8 @@ npx prisma migrate deploy
 npm run seed
 npm run build
 npm test
+npm run db:quality
+npm run db:reconcile
 npm run research:validate
 
 cd ../frontend
@@ -98,6 +100,7 @@ npm run build
 ## DevOps Handoff
 
 - [Deployment and local rehearsal runbook](docs/DEPLOYMENT_RUNBOOK.md)
+- [Database quality, reconciliation, and migration rehearsal](docs/DATABASE_QUALITY.md)
 - [Security review checklist](docs/SECURITY_REVIEW.md)
 - [Security and operational risk register](docs/SECURITY_RISK_REGISTER.md)
 - [Release and rollback checklist](docs/RELEASE_CHECKLIST.md)
