@@ -182,7 +182,7 @@ describe('PharmaSense API', () => {
       });
       assert.equal(issueResponse.status, 201);
 
-      const batchListResponse = await fetch(`${baseUrl}/api/v1/batches`, { headers });
+      const batchListResponse = await fetch(`${baseUrl}/api/v1/batches?pageSize=100`, { headers });
       assert.equal(batchListResponse.status, 200);
       const batches = (await batchListResponse.json()) as {
         data: Array<{ id: number; quantity: number }>;

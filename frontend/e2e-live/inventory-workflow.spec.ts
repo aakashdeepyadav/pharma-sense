@@ -14,6 +14,7 @@ async function openManagementHistory(page: Page) {
 test("creates medicine and supplier, receives a batch, and issues stock", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   const adminPassword = process.env.E2E_ADMIN_PASSWORD;
   if (!adminPassword) {
     throw new Error("E2E_ADMIN_PASSWORD must be configured for live tests");

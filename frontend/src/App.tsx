@@ -520,10 +520,10 @@ function App() {
           forecastRiskResponse,
           replenishmentResponse,
         ] = await Promise.all([
-          apiFetch("/api/v1/medicines", { headers }),
+          apiFetch("/api/v1/medicines?pageSize=100", { headers }),
           apiFetch("/api/v1/categories", { headers }),
           apiFetch("/api/v1/suppliers", { headers }),
-          apiFetch("/api/v1/batches", { headers }),
+          apiFetch("/api/v1/batches?pageSize=100", { headers }),
           apiFetch("/api/v1/purchases", { headers }),
           apiFetch("/api/v1/inventory/transactions", {
             headers,
@@ -895,7 +895,7 @@ function App() {
 
       setFormOpen(false);
       setEditingMedicine(null);
-      const refreshed = await apiFetch("/api/v1/medicines", {
+      const refreshed = await apiFetch("/api/v1/medicines?pageSize=100", {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       const refreshedResult = (await refreshed.json()) as ApiResponse;
@@ -1230,8 +1230,8 @@ function App() {
         transactionResponse,
         alertResponse,
       ] = await Promise.all([
-        apiFetch("/api/v1/batches", { headers: authHeaders }),
-        apiFetch("/api/v1/medicines", {
+        apiFetch("/api/v1/batches?pageSize=100", { headers: authHeaders }),
+        apiFetch("/api/v1/medicines?pageSize=100", {
           headers: authHeaders,
         }),
         apiFetch("/api/v1/inventory/transactions", {
@@ -1296,8 +1296,8 @@ function App() {
 
       const headers = { Authorization: `Bearer ${session.token}` };
       const [batchResponse, medicineResponse] = await Promise.all([
-        apiFetch("/api/v1/batches", { headers }),
-        apiFetch("/api/v1/medicines", { headers }),
+        apiFetch("/api/v1/batches?pageSize=100", { headers }),
+        apiFetch("/api/v1/medicines?pageSize=100", { headers }),
       ]);
       const batchResult = (await batchResponse.json()) as { data: Batch[] };
       const medicineResult = (await medicineResponse.json()) as ApiResponse;
@@ -1359,8 +1359,8 @@ function App() {
       const headers = { Authorization: `Bearer ${session.token}` };
       const [batchResponse, medicineResponse, transactionResponse] =
         await Promise.all([
-          apiFetch("/api/v1/batches", { headers }),
-          apiFetch("/api/v1/medicines", { headers }),
+          apiFetch("/api/v1/batches?pageSize=100", { headers }),
+          apiFetch("/api/v1/medicines?pageSize=100", { headers }),
           apiFetch("/api/v1/inventory/transactions", {
             headers,
           }),
@@ -1408,8 +1408,8 @@ function App() {
       transactionResponse,
       alertResponse,
     ] = await Promise.all([
-      apiFetch("/api/v1/batches", { headers }),
-      apiFetch("/api/v1/medicines", { headers }),
+      apiFetch("/api/v1/batches?pageSize=100", { headers }),
+      apiFetch("/api/v1/medicines?pageSize=100", { headers }),
       apiFetch("/api/v1/inventory/transactions", { headers }),
       apiFetch("/api/v1/alerts", { headers }),
     ]);
@@ -2921,7 +2921,7 @@ function App() {
 
       {formOpen && (
         <div
-          className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6"
+          className="fixed inset-0 z-10 overflow-y-auto bg-gray-900/40 flex items-start justify-center p-6"
           role="presentation"
         >
           <form
@@ -2955,7 +2955,7 @@ function App() {
             aria-labelledby="medicine-form-title"
             aria-modal="true"
             role="dialog"
-            className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
+            className="my-auto max-h-[calc(100vh-3rem)] w-full max-w-lg overflow-y-auto bg-white rounded-xl shadow-xl p-6"
           >
             <div className="flex items-center justify-between mb-6">
               <h2
