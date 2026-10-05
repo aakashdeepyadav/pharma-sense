@@ -1,10 +1,10 @@
 import { Router, Response } from 'express';
 import prisma from '../lib/prisma';
-import { AuthenticatedRequest } from '../auth';
+import { AuthenticatedRequest, requireRoles } from '../auth';
 import { demandHistoryQuerySchema } from '../validation/schemas';
 import { forecastQuerySchema } from '../validation/schemas';
-import { replenishmentQuerySchema } from '../validation/schemas';
-import { assessForecastReadiness, movingAverageForecast, movingAverageMae } from '../domain/forecasting';
+import { replenishmentDecisionSchema, replenishmentQuerySchema } from '../validation/schemas';
+import { assessDemandRisk, assessForecastReadiness, movingAverageForecast, movingAverageMae } from '../domain/forecasting';
 import { calculateReplenishment } from '../domain/replenishment';
 import { sendApiError } from '../lib/api';
 
@@ -104,6 +104,85 @@ router.get('/demand-history', async (req: AuthenticatedRequest, res: Response) =
     });
   } catch {
     sendApiError(res, 500, 'PREPARE_DEMAND_HISTORY_FAILED', 'Failed to prepare demand history');
+  }
+});
+
+router.get('/forecast-risk', async (_req: AuthenticatedRequest, res: Response) => {
+  const to = new Date();
+  const from = new Date(to.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+  try {
+    const [medicines, transactions] = await Promise.all([
+      prisma.medicine.findMany({
+        where: { active: true },
+        select: {
+          id: true,
+          genericName: true,
+          reorderLevel: true,
+          batches: { select: { quantity: true } },
+        },
+        orderBy: { genericName: 'asc' },
+      }),
+      prisma.stockTransaction.findMany({
+        where: {
+          type: 'OUT',
+          timestamp: { gte: from, lte: to },
+        },
+        select: {
+          quantity: true,
+          timestamp: true,
+          batch: { select: { medicineId: true } },
+        },
+        orderBy: { timestamp: 'asc' },
+      }),
+    ]);
+
+    const demandByMedicine = new Map<number, Map<string, number>>();
+    for (const transaction of transactions) {
+      const medicineId = transaction.batch.medicineId;
+      const dateKey = transaction.timestamp.toISOString().slice(0, 10);
+      const medicineMap = demandByMedicine.get(medicineId) ?? new Map<string, number>();
+      medicineMap.set(dateKey, (medicineMap.get(dateKey) ?? 0) + transaction.quantity);
+      demandByMedicine.set(medicineId, medicineMap);
+    }
+
+    const currentDate = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
+    const endDate = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
+    const forecastData = medicines.map((medicine) => {
+      const values: number[] = [];
+      const workingDate = new Date(currentDate);
+      while (workingDate <= endDate) {
+        const dateKey = workingDate.toISOString().slice(0, 10);
+        values.push(demandByMedicine.get(medicine.id)?.get(dateKey) ?? 0);
+        workingDate.setUTCDate(workingDate.getUTCDate() + 1);
+      }
+
+      const currentStock = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
+      const risk = assessDemandRisk(values, currentStock, medicine.reorderLevel, 7);
+      return {
+        medicineId: medicine.id,
+        medicineName: medicine.genericName,
+        currentStock,
+        reorderLevel: medicine.reorderLevel,
+        predictedDailyDemand: Number(risk.predictedDailyDemand.toFixed(2)),
+        coverDays: risk.coverDays === null ? null : Number(risk.coverDays.toFixed(2)),
+        projectedStockAfter7Days: Number(risk.projectedStockAfter7Days.toFixed(2)),
+        riskLevel: risk.riskLevel,
+        message: risk.message,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: forecastData,
+      meta: {
+        from: from.toISOString(),
+        to: to.toISOString(),
+        windowDays: 7,
+      },
+    });
+  } catch {
+    sendApiError(res, 500, 'CALCULATE_FORECAST_RISK_FAILED', 'Failed to calculate forecast risk summary');
   }
 });
 
@@ -226,6 +305,49 @@ router.get('/replenishment', async (req: AuthenticatedRequest, res: Response) =>
     });
   } catch {
     sendApiError(res, 500, 'CALCULATE_REPLENISHMENT_FAILED', 'Failed to calculate replenishment recommendations');
+  }
+});
+
+router.post('/replenishment/decision', requireRoles('Admin', 'Pharmacist', 'Inventory Manager'), async (req: AuthenticatedRequest, res: Response) => {
+  const result = replenishmentDecisionSchema.safeParse(req.body);
+  if (!result.success) {
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
+    return;
+  }
+
+  try {
+    const medicine = await prisma.medicine.findUnique({
+      where: { id: result.data.medicineId },
+      select: { id: true, genericName: true },
+    });
+
+    if (!medicine) {
+      sendApiError(res, 404, 'MEDICINE_NOT_FOUND', 'Medicine not found');
+      return;
+    }
+
+    const summary = `${result.data.decision === 'APPROVED' ? 'Approved' : 'Dismissed'} replenishment review for ${medicine.genericName}`;
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.id,
+        action: 'REPLENISHMENT_DECISION',
+        entity: 'Medicine',
+        entityId: medicine.id,
+        details: `${summary}${result.data.notes ? `: ${result.data.notes}` : ''}`,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        medicineId: medicine.id,
+        medicineName: medicine.genericName,
+        decision: result.data.decision,
+        notes: result.data.notes ?? null,
+      },
+    });
+  } catch {
+    sendApiError(res, 500, 'RECORD_REPLENISHMENT_DECISION_FAILED', 'Failed to record replenishment review decision');
   }
 });
 

@@ -200,6 +200,62 @@ describe('PharmaSense API', () => {
     }
   });
 
+  it('records a replenishment review decision for a medicine', async () => {
+    const medicine = await prisma.medicine.findFirst();
+    assert.ok(medicine, 'Expected a seeded medicine for replenishment review testing');
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@pharmasense.local', password: seededAdminPassword }),
+    });
+    assert.equal(loginResponse.status, 200);
+    const login = (await loginResponse.json()) as { data: { token: string } };
+
+    const response = await fetch(`${baseUrl}/api/v1/reports/replenishment/decision`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${login.data.token}`,
+      },
+      body: JSON.stringify({ medicineId: medicine.id, decision: 'APPROVED', notes: 'Approved for review' }),
+    });
+
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as { success: boolean; data: { medicineId: number; decision: string } };
+    assert.equal(body.success, true);
+    assert.equal(body.data.medicineId, medicine.id);
+    assert.equal(body.data.decision, 'APPROVED');
+
+    const audit = await prisma.auditLog.findFirst({
+      where: {
+        action: 'REPLENISHMENT_DECISION',
+        entity: 'Medicine',
+        entityId: medicine.id,
+      },
+    });
+    assert.ok(audit);
+    assert.match(audit.details ?? '', /APPROVED|Approved/i);
+  });
+
+  it('returns a forecast risk summary for medicines', async () => {
+    const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@pharmasense.local', password: seededAdminPassword }),
+    });
+    const login = (await loginResponse.json()) as { data: { token: string } };
+    const response = await fetch(`${baseUrl}/api/v1/reports/forecast-risk`, {
+      headers: { Authorization: `Bearer ${login.data.token}` },
+    });
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as { success: boolean; data: Array<{ medicineId: number; riskLevel: string }> };
+    assert.equal(body.success, true);
+    assert.ok(Array.isArray(body.data));
+    assert.ok(body.data.some((item) => typeof item.medicineId === 'number'));
+    assert.ok(body.data.every((item) => ['LOW', 'MEDIUM', 'HIGH', 'INSUFFICIENT_DATA'].includes(item.riskLevel)));
+  });
+
   it('rejects invalid forecast parameters', async () => {
     const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
       method: 'POST',

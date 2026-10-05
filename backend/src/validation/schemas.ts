@@ -175,3 +175,9 @@ export const replenishmentQuerySchema = z.object({
   window: z.coerce.number().int().min(7).max(90).default(30),
   targetDays: z.coerce.number().int().min(1).max(60).default(14),
 });
+
+export const replenishmentDecisionSchema = z.object({
+  medicineId: z.coerce.number().int().positive(),
+  decision: z.enum(['APPROVED', 'DISMISSED']),
+  notes: z.string().trim().max(500).optional(),
+});
