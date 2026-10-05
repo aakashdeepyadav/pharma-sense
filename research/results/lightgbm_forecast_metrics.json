@@ -1,0 +1,96 @@
+{
+  "model": "LightGBM baseline",
+  "dataset": "research\\data\\operational_demand.csv",
+  "data_source": "operational",
+  "production_ready": true,
+  "production_ready_structure": {
+    "time_based_split": true,
+    "feature_validation": true,
+    "explainability": true,
+    "business_decision_layer": true
+  },
+  "validation": {
+    "rows": 3340,
+    "medicines": 10,
+    "date_from": "2025-01-31T00:00:00+00:00",
+    "date_to": "2025-12-30T00:00:00+00:00"
+  },
+  "forecast_horizon_days": 1,
+  "metrics": {
+    "mae": 1.3775002425219298,
+    "rmse": 2.0037801052943305,
+    "train_rows": 2670,
+    "test_rows": 670,
+    "baseline_naive_mae": 3.2724348407217643,
+    "top_feature_importance": [
+      {
+        "feature": "num__rolling_mean_7",
+        "importance": 2303.0
+      },
+      {
+        "feature": "num__week_of_year",
+        "importance": 2014.0
+      },
+      {
+        "feature": "num__rolling_mean_30",
+        "importance": 1836.0
+      },
+      {
+        "feature": "num__rolling_mean_14",
+        "importance": 1781.0
+      },
+      {
+        "feature": "num__day_of_week",
+        "importance": 1305.0
+      },
+      {
+        "feature": "num__lag_30",
+        "importance": 1268.0
+      },
+      {
+        "feature": "num__lag_7",
+        "importance": 1266.0
+      },
+      {
+        "feature": "num__lag_14",
+        "importance": 1209.0
+      },
+      {
+        "feature": "num__lag_1",
+        "importance": 942.0
+      },
+      {
+        "feature": "num__month",
+        "importance": 437.0
+      }
+    ]
+  },
+  "feature_names": [
+    "cat__medicine_id_1",
+    "cat__medicine_id_10",
+    "cat__medicine_id_2",
+    "cat__medicine_id_3",
+    "cat__medicine_id_4",
+    "cat__medicine_id_5",
+    "cat__medicine_id_6",
+    "cat__medicine_id_7",
+    "cat__medicine_id_8",
+    "cat__medicine_id_9",
+    "num__day_of_week",
+    "num__month",
+    "num__week_of_year",
+    "num__is_weekend",
+    "num__lag_1",
+    "num__lag_7",
+    "num__lag_14",
+    "num__lag_30",
+    "num__rolling_mean_7",
+    "num__rolling_mean_14",
+    "num__rolling_mean_30"
+  ],
+  "notes": [
+    "Operational data is preferred for production evaluation; a synthetic fallback is used only when operational history is insufficient.",
+    "This is a baseline pipeline and not evidence of production forecasting performance unless the dataset is approved and operational.",
+    "Operational production deployment requires an approved real or de-identified dataset and human sign-off."
+  ]
+}

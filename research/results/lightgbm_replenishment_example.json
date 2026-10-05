@@ -1,0 +1,7 @@
+{
+  "status": "REPLENISH",
+  "recommended_units": 257.22,
+  "projected_need": 252.22,
+  "target_cover": 30.0,
+  "current_stock": 25.0
+}
