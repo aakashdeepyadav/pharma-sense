@@ -4,7 +4,7 @@ import { AuthenticatedRequest, requireRoles } from '../auth';
 import { demandHistoryQuerySchema } from '../validation/schemas';
 import { forecastQuerySchema } from '../validation/schemas';
 import { replenishmentDecisionSchema, replenishmentQuerySchema } from '../validation/schemas';
-import { assessDemandRisk, assessForecastQuality, assessForecastReadiness, movingAverageForecast, movingAverageMae } from '../domain/forecasting';
+import { assessDemandDrift, assessDemandRisk, assessForecastQuality, assessForecastReadiness, movingAverageForecast, movingAverageMae } from '../domain/forecasting';
 import { calculateReplenishment } from '../domain/replenishment';
 import { sendApiError } from '../lib/api';
 
@@ -69,12 +69,20 @@ router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
         }),
         { maxMae: 1.5, maxRmse: 2.5 },
       );
+      const drift = assessDemandDrift(values, 7);
+      const monitoringStatus = drift.status === 'WATCH' || quality.status === 'WATCH'
+        ? 'WATCH'
+        : quality.status === 'INSUFFICIENT_DATA' || drift.status === 'INSUFFICIENT_DATA'
+          ? 'INSUFFICIENT_DATA'
+          : 'OK';
 
       return {
         medicineId: medicine.id,
         medicineName: medicine.genericName,
         riskLevel: risk.riskLevel,
-        monitoringStatus: quality.status,
+        monitoringStatus,
+        driftStatus: drift.status,
+        driftMessage: drift.message,
       };
     });
 
@@ -222,6 +230,12 @@ router.get('/forecast-risk', async (_req: AuthenticatedRequest, res: Response) =
         return forecast;
       });
       const forecastQuality = assessForecastQuality(actualValues, predictions, { maxMae: 1.5, maxRmse: 2.5 });
+      const drift = assessDemandDrift(values, 7);
+      const monitoringStatus = drift.status === 'WATCH' || forecastQuality.status === 'WATCH'
+        ? 'WATCH'
+        : forecastQuality.status === 'INSUFFICIENT_DATA' || drift.status === 'INSUFFICIENT_DATA'
+          ? 'INSUFFICIENT_DATA'
+          : 'OK';
 
       return {
         medicineId: medicine.id,
@@ -232,7 +246,9 @@ router.get('/forecast-risk', async (_req: AuthenticatedRequest, res: Response) =
         coverDays: risk.coverDays === null ? null : Number(risk.coverDays.toFixed(2)),
         projectedStockAfter7Days: Number(risk.projectedStockAfter7Days.toFixed(2)),
         riskLevel: risk.riskLevel,
-        monitoringStatus: forecastQuality.status,
+        monitoringStatus,
+        driftStatus: drift.status,
+        driftMessage: drift.message,
         message: risk.message,
       };
     });

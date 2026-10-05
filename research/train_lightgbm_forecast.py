@@ -12,6 +12,15 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
 REQUIRED_COLUMNS = {'date', 'medicine_id', 'quantity_issued'}
+OPTIONAL_FEATURE_COLUMNS = {
+    'medicine_name',
+    'medicine_category',
+    'organization_group',
+    'is_stockout_censored',
+    'available_units_at_start',
+    'expiry_units_at_start',
+    'supplier_lead_days',
+}
 
 ROOT = Path(__file__).resolve().parent.parent
 FEATURE_TABLE_PATH = ROOT / 'research' / 'results' / 'forecast_feature_table.csv'
@@ -74,6 +83,15 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     out['week_of_year'] = out['date'].dt.isocalendar().week.astype(int)
     out['is_weekend'] = out['day_of_week'].isin([5, 6]).astype(int)
 
+    if 'is_stockout_censored' in out.columns:
+        out['is_stockout_censored'] = out['is_stockout_censored'].astype(str).str.lower().eq('true').astype(int)
+    if 'available_units_at_start' in out.columns:
+        out['available_units_at_start'] = pd.to_numeric(out['available_units_at_start'], errors='coerce').fillna(0)
+    if 'expiry_units_at_start' in out.columns:
+        out['expiry_units_at_start'] = pd.to_numeric(out['expiry_units_at_start'], errors='coerce').fillna(0)
+    if 'supplier_lead_days' in out.columns:
+        out['supplier_lead_days'] = pd.to_numeric(out['supplier_lead_days'], errors='coerce').fillna(0)
+
     for lag in [1, 7, 14, 30]:
         out[f'lag_{lag}'] = out.groupby('medicine_id')['quantity_issued'].transform(lambda s: s.shift(lag))
 
@@ -91,6 +109,13 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def train_model(train_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[Pipeline, pd.DataFrame, dict, list[str]]:
     categorical = ['medicine_id']
+    if 'medicine_category' in train_df.columns:
+        categorical.append('medicine_category')
+    if 'organization_group' in train_df.columns:
+        categorical.append('organization_group')
+    if 'medicine_name' in train_df.columns:
+        categorical.append('medicine_name')
+
     numeric = [
         'day_of_week',
         'month',
@@ -104,6 +129,9 @@ def train_model(train_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[Pipeline
         'rolling_mean_14',
         'rolling_mean_30',
     ]
+    for column in ['is_stockout_censored', 'available_units_at_start', 'expiry_units_at_start', 'supplier_lead_days']:
+        if column in train_df.columns:
+            numeric.append(column)
 
     preprocessor = ColumnTransformer(
         transformers=[

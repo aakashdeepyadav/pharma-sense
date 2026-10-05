@@ -32,6 +32,49 @@ export function assessForecastReadiness(values: number[], window: number) {
   } as const;
 }
 
+export function assessDemandDrift(
+  values: number[],
+  window = 7,
+  thresholds: { maxRelativeChange?: number; minSamples?: number } = {},
+) {
+  const maxRelativeChange = thresholds.maxRelativeChange ?? 0.5;
+  const minSamples = thresholds.minSamples ?? Math.max(window, 14);
+
+  if (values.length < minSamples) {
+    return {
+      baselineAverage: values.length === 0 ? 0 : values.reduce((total, value) => total + value, 0) / values.length,
+      recentAverage: values.length === 0 ? 0 : values.reduce((total, value) => total + value, 0) / values.length,
+      changeRatio: 0,
+      status: 'INSUFFICIENT_DATA',
+      message: 'Not enough historical demand to assess drift with confidence.',
+    } as const;
+  }
+
+  const baselineValues = values.slice(0, Math.max(1, values.length - window));
+  const recentValues = values.slice(-window);
+  const baselineAverage = baselineValues.reduce((total, value) => total + value, 0) / baselineValues.length;
+  const recentAverage = recentValues.reduce((total, value) => total + value, 0) / recentValues.length;
+  const changeRatio = baselineAverage === 0 ? (recentAverage === 0 ? 0 : 1) : Math.abs(recentAverage - baselineAverage) / baselineAverage;
+
+  if (changeRatio > maxRelativeChange) {
+    return {
+      baselineAverage,
+      recentAverage,
+      changeRatio,
+      status: 'WATCH',
+      message: `Recent demand is ${(changeRatio * 100).toFixed(2)}% above the historical baseline and should be reviewed for drift.`,
+    } as const;
+  }
+
+  return {
+    baselineAverage,
+    recentAverage,
+    changeRatio,
+    status: 'OK',
+    message: 'Recent demand remains within the expected operating band.',
+  } as const;
+}
+
 export function assessForecastQuality(
   actualValues: number[],
   predictedValues: number[],

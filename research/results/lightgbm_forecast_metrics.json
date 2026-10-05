@@ -10,72 +10,118 @@
     "business_decision_layer": true
   },
   "validation": {
-    "rows": 3340,
-    "medicines": 10,
-    "date_from": "2025-01-31T00:00:00+00:00",
-    "date_to": "2025-12-30T00:00:00+00:00"
+    "rows": 19460,
+    "medicines": 20,
+    "date_from": "2024-01-31T00:00:00+00:00",
+    "date_to": "2026-09-29T00:00:00+00:00"
   },
   "forecast_horizon_days": 1,
   "metrics": {
-    "mae": 1.3775002425219298,
-    "rmse": 2.0037801052943305,
-    "train_rows": 2670,
-    "test_rows": 670,
-    "baseline_naive_mae": 3.2724348407217643,
+    "mae": 0.6573981127058152,
+    "rmse": 1.1550714611233035,
+    "train_rows": 15560,
+    "test_rows": 3900,
+    "baseline_naive_mae": 1.1046236686390534,
     "top_feature_importance": [
       {
         "feature": "num__rolling_mean_7",
-        "importance": 2303.0
+        "importance": 2075.0
       },
       {
         "feature": "num__week_of_year",
-        "importance": 2014.0
+        "importance": 1707.0
       },
       {
-        "feature": "num__rolling_mean_30",
-        "importance": 1836.0
-      },
-      {
-        "feature": "num__rolling_mean_14",
-        "importance": 1781.0
-      },
-      {
-        "feature": "num__day_of_week",
-        "importance": 1305.0
-      },
-      {
-        "feature": "num__lag_30",
-        "importance": 1268.0
-      },
-      {
-        "feature": "num__lag_7",
-        "importance": 1266.0
-      },
-      {
-        "feature": "num__lag_14",
-        "importance": 1209.0
+        "feature": "num__available_units_at_start",
+        "importance": 1602.0
       },
       {
         "feature": "num__lag_1",
-        "importance": 942.0
+        "importance": 1483.0
       },
       {
-        "feature": "num__month",
-        "importance": 437.0
+        "feature": "num__rolling_mean_30",
+        "importance": 1318.0
+      },
+      {
+        "feature": "num__rolling_mean_14",
+        "importance": 1255.0
+      },
+      {
+        "feature": "num__day_of_week",
+        "importance": 1078.0
+      },
+      {
+        "feature": "num__lag_30",
+        "importance": 922.0
+      },
+      {
+        "feature": "num__lag_7",
+        "importance": 585.0
+      },
+      {
+        "feature": "num__lag_14",
+        "importance": 407.0
       }
     ]
   },
   "feature_names": [
-    "cat__medicine_id_1",
-    "cat__medicine_id_10",
-    "cat__medicine_id_2",
-    "cat__medicine_id_3",
-    "cat__medicine_id_4",
-    "cat__medicine_id_5",
-    "cat__medicine_id_6",
-    "cat__medicine_id_7",
-    "cat__medicine_id_8",
-    "cat__medicine_id_9",
+    "cat__medicine_id_MED-001",
+    "cat__medicine_id_MED-002",
+    "cat__medicine_id_MED-003",
+    "cat__medicine_id_MED-004",
+    "cat__medicine_id_MED-005",
+    "cat__medicine_id_MED-006",
+    "cat__medicine_id_MED-007",
+    "cat__medicine_id_MED-008",
+    "cat__medicine_id_MED-009",
+    "cat__medicine_id_MED-010",
+    "cat__medicine_id_MED-011",
+    "cat__medicine_id_MED-012",
+    "cat__medicine_id_MED-013",
+    "cat__medicine_id_MED-014",
+    "cat__medicine_id_MED-015",
+    "cat__medicine_id_MED-016",
+    "cat__medicine_id_MED-017",
+    "cat__medicine_id_MED-018",
+    "cat__medicine_id_MED-019",
+    "cat__medicine_id_MED-020",
+    "cat__medicine_category_Analgesic",
+    "cat__medicine_category_Anthelmintic",
+    "cat__medicine_category_Anti-inflammatory",
+    "cat__medicine_category_Antibiotic",
+    "cat__medicine_category_Antihistamine",
+    "cat__medicine_category_Cardiovascular",
+    "cat__medicine_category_Diabetes",
+    "cat__medicine_category_Endocrine",
+    "cat__medicine_category_Gastrointestinal",
+    "cat__medicine_category_Respiratory",
+    "cat__medicine_category_Supplement",
+    "cat__organization_group_Central",
+    "cat__organization_group_East",
+    "cat__organization_group_North",
+    "cat__organization_group_South",
+    "cat__organization_group_West",
+    "cat__medicine_name_Albendazole 400mg",
+    "cat__medicine_name_Amlodipine 5mg",
+    "cat__medicine_name_Amoxicillin 250mg",
+    "cat__medicine_name_Atorvastatin 20mg",
+    "cat__medicine_name_Azithromycin 250mg",
+    "cat__medicine_name_Cetrizine 10mg",
+    "cat__medicine_name_Cough Syrup",
+    "cat__medicine_name_Fexofenadine 180mg",
+    "cat__medicine_name_Ibuprofen 400mg",
+    "cat__medicine_name_Insulin Glargine",
+    "cat__medicine_name_Levothyroxine 50mcg",
+    "cat__medicine_name_Losartan 50mg",
+    "cat__medicine_name_Metformin 500mg",
+    "cat__medicine_name_Multivitamin Complex",
+    "cat__medicine_name_Omeprazole 20mg",
+    "cat__medicine_name_Paracetamol 500mg",
+    "cat__medicine_name_Prednisolone 5mg",
+    "cat__medicine_name_Ranitidine 150mg",
+    "cat__medicine_name_Salbutamol Inhaler",
+    "cat__medicine_name_Vitamin D3",
     "num__day_of_week",
     "num__month",
     "num__week_of_year",
@@ -86,7 +132,11 @@
     "num__lag_30",
     "num__rolling_mean_7",
     "num__rolling_mean_14",
-    "num__rolling_mean_30"
+    "num__rolling_mean_30",
+    "num__is_stockout_censored",
+    "num__available_units_at_start",
+    "num__expiry_units_at_start",
+    "num__supplier_lead_days"
   ],
   "notes": [
     "Operational data is preferred for production evaluation; a synthetic fallback is used only when operational history is insufficient.",
