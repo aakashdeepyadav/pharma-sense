@@ -759,11 +759,18 @@ function App() {
           data?: ForecastBaseline;
           error?: string | ApiErrorPayload;
         };
-        if (!result.success || !result.data) {
+        const baseline = result.data;
+        if (
+          !result.success ||
+          !baseline ||
+          typeof baseline !== "object" ||
+          !baseline.evaluation ||
+          !Array.isArray(baseline.forecast)
+        ) {
           setForecastBaseline(null);
           return;
         }
-        setForecastBaseline(result.data);
+        setForecastBaseline(baseline);
       } catch {
         setForecastBaseline(null);
       }
@@ -3469,9 +3476,9 @@ function App() {
                         MAE
                       </p>
                       <p className="mt-1 text-2xl font-bold text-gray-900">
-                        {forecastBaseline.evaluation.mae === null
+                        {forecastBaseline.evaluation?.mae == null
                           ? "n/a"
-                          : forecastBaseline.evaluation.mae.toFixed(2)}
+                          : Number(forecastBaseline.evaluation.mae).toFixed(2)}
                       </p>
                     </div>
                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
@@ -3479,7 +3486,7 @@ function App() {
                         Observations
                       </p>
                       <p className="mt-1 text-2xl font-bold text-gray-900">
-                        {forecastBaseline.evaluation.observations}
+                        {forecastBaseline.evaluation?.observations ?? 0}
                       </p>
                     </div>
                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
@@ -3487,7 +3494,7 @@ function App() {
                         Status
                       </p>
                       <p className="mt-1 text-lg font-bold text-gray-900">
-                        {forecastBaseline.evaluation.readiness.status ===
+                        {forecastBaseline.evaluation?.readiness?.status ===
                         "READY_FOR_BASELINE"
                           ? "Ready"
                           : "Insufficient history"}
@@ -3509,7 +3516,8 @@ function App() {
                             {new Date(point.date).toLocaleDateString()}
                           </span>
                           <span className="text-gray-900">
-                            {point.predictedQuantity.toFixed(2)} units
+                            {Number(point.predictedQuantity ?? 0).toFixed(2)}{" "}
+                            units
                           </span>
                         </div>
                       ))}
