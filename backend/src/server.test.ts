@@ -249,11 +249,15 @@ describe('PharmaSense API', () => {
       headers: { Authorization: `Bearer ${login.data.token}` },
     });
     assert.equal(response.status, 200);
-    const body = (await response.json()) as { success: boolean; data: Array<{ medicineId: number; riskLevel: string }> };
+    const body = (await response.json()) as {
+      success: boolean;
+      data: Array<{ medicineId: number; riskLevel: string; monitoringStatus?: string }>;
+    };
     assert.equal(body.success, true);
     assert.ok(Array.isArray(body.data));
     assert.ok(body.data.some((item) => typeof item.medicineId === 'number'));
     assert.ok(body.data.every((item) => ['LOW', 'MEDIUM', 'HIGH', 'INSUFFICIENT_DATA'].includes(item.riskLevel)));
+    assert.ok(body.data.every((item) => !item.monitoringStatus || ['OK', 'WATCH', 'INSUFFICIENT_DATA'].includes(item.monitoringStatus)));
   });
 
   it('rejects invalid forecast parameters', async () => {

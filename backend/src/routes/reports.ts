@@ -4,7 +4,7 @@ import { AuthenticatedRequest, requireRoles } from '../auth';
 import { demandHistoryQuerySchema } from '../validation/schemas';
 import { forecastQuerySchema } from '../validation/schemas';
 import { replenishmentDecisionSchema, replenishmentQuerySchema } from '../validation/schemas';
-import { assessDemandRisk, assessForecastReadiness, movingAverageForecast, movingAverageMae } from '../domain/forecasting';
+import { assessDemandRisk, assessForecastQuality, assessForecastReadiness, movingAverageForecast, movingAverageMae } from '../domain/forecasting';
 import { calculateReplenishment } from '../domain/replenishment';
 import { sendApiError } from '../lib/api';
 
@@ -13,12 +13,20 @@ const router = Router();
 router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
   try {
     const [medicines, suppliers, batches, transactions] = await Promise.all([
-      prisma.medicine.findMany({ select: { id: true, genericName: true } }),
+      prisma.medicine.findMany({
+        where: { active: true },
+        select: {
+          id: true,
+          genericName: true,
+          reorderLevel: true,
+          batches: { select: { quantity: true } },
+        },
+      }),
       prisma.supplier.count(),
       prisma.batch.findMany({ select: { quantity: true, purchasePrice: true } }),
       prisma.stockTransaction.findMany({
         where: { type: 'OUT' },
-        select: { quantity: true, batch: { select: { medicineId: true } } },
+        select: { quantity: true, timestamp: true, batch: { select: { medicineId: true } } },
       }),
     ]);
 
@@ -29,6 +37,46 @@ router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
         (issuedByMedicine.get(transaction.batch.medicineId) ?? 0) + transaction.quantity,
       );
     }
+
+    const to = new Date();
+    const from = new Date(to.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const demandByMedicine = new Map<number, Map<string, number>>();
+    for (const transaction of transactions) {
+      const medicineId = transaction.batch.medicineId;
+      const dateKey = transaction.timestamp.toISOString().slice(0, 10);
+      const medicineMap = demandByMedicine.get(medicineId) ?? new Map<string, number>();
+      medicineMap.set(dateKey, (medicineMap.get(dateKey) ?? 0) + transaction.quantity);
+      demandByMedicine.set(medicineId, medicineMap);
+    }
+
+    const monitoringExposure = medicines.map((medicine) => {
+      const values: number[] = [];
+      let currentDate = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
+      const endDate = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
+      while (currentDate <= endDate) {
+        const dateKey = currentDate.toISOString().slice(0, 10);
+        values.push(demandByMedicine.get(medicine.id)?.get(dateKey) ?? 0);
+        currentDate = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth(), currentDate.getUTCDate() + 1));
+      }
+
+      const currentStock = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
+      const risk = assessDemandRisk(values, currentStock, medicine.reorderLevel, 7);
+      const quality = assessForecastQuality(
+        values.slice(7),
+        values.slice(7).map((_, index) => {
+          const windowValues = values.slice(index, index + 7);
+          return windowValues.length === 0 ? 0 : windowValues.reduce((total, value) => total + value, 0) / windowValues.length;
+        }),
+        { maxMae: 1.5, maxRmse: 2.5 },
+      );
+
+      return {
+        medicineId: medicine.id,
+        medicineName: medicine.genericName,
+        riskLevel: risk.riskLevel,
+        monitoringStatus: quality.status,
+      };
+    });
 
     const topIssuedMedicines = medicines
       .map((medicine) => ({
@@ -49,6 +97,14 @@ router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
         totalUnits: batches.reduce((total, batch) => total + batch.quantity, 0),
         inventoryCost: batches.reduce((total, batch) => total + batch.quantity * Number(batch.purchasePrice), 0),
         issuedUnits: transactions.reduce((total, transaction) => total + transaction.quantity, 0),
+        forecastWatchCount: monitoringExposure.filter(
+          (item) => item.monitoringStatus === 'WATCH' || item.riskLevel === 'MEDIUM' || item.riskLevel === 'HIGH',
+        ).length,
+        monitoringBreakdown: {
+          ok: monitoringExposure.filter((item) => item.monitoringStatus === 'OK').length,
+          watch: monitoringExposure.filter((item) => item.monitoringStatus === 'WATCH').length,
+          insufficientData: monitoringExposure.filter((item) => item.monitoringStatus === 'INSUFFICIENT_DATA').length,
+        },
         topIssuedMedicines,
       },
     });
@@ -159,6 +215,14 @@ router.get('/forecast-risk', async (_req: AuthenticatedRequest, res: Response) =
 
       const currentStock = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
       const risk = assessDemandRisk(values, currentStock, medicine.reorderLevel, 7);
+      const actualValues = values.slice(7);
+      const predictions = actualValues.map((_, index) => {
+        const windowValues = values.slice(index, index + 7);
+        const forecast = windowValues.length === 0 ? 0 : windowValues.reduce((total, value) => total + value, 0) / windowValues.length;
+        return forecast;
+      });
+      const forecastQuality = assessForecastQuality(actualValues, predictions, { maxMae: 1.5, maxRmse: 2.5 });
+
       return {
         medicineId: medicine.id,
         medicineName: medicine.genericName,
@@ -168,6 +232,7 @@ router.get('/forecast-risk', async (_req: AuthenticatedRequest, res: Response) =
         coverDays: risk.coverDays === null ? null : Number(risk.coverDays.toFixed(2)),
         projectedStockAfter7Days: Number(risk.projectedStockAfter7Days.toFixed(2)),
         riskLevel: risk.riskLevel,
+        monitoringStatus: forecastQuality.status,
         message: risk.message,
       };
     });

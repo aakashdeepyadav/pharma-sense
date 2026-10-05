@@ -1,4 +1,10 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { apiFetch } from "./api";
 import "./App.css";
 
@@ -114,6 +120,7 @@ type ForecastRisk = {
   coverDays: number | null;
   projectedStockAfter7Days: number;
   riskLevel: "LOW" | "MEDIUM" | "HIGH" | "INSUFFICIENT_DATA";
+  monitoringStatus?: "OK" | "WATCH" | "INSUFFICIENT_DATA";
   message: string;
 };
 
@@ -729,37 +736,40 @@ function App() {
     }
   };
 
-  const loadForecastBaseline = async (medicineId: number | null) => {
-    if (!session || !medicineId) {
-      setForecastBaseline(null);
-      return;
-    }
+  const loadForecastBaseline = useCallback(
+    async (medicineId: number | null) => {
+      if (!session || !medicineId) {
+        setForecastBaseline(null);
+        return;
+      }
 
-    try {
-      const response = await apiFetch(
-        `/api/v1/reports/forecast-baseline?medicineId=${medicineId}&window=7&horizon=7`,
-        {
-          headers: { Authorization: `Bearer ${session.token}` },
-        },
-      );
-      if (!response.ok) {
+      try {
+        const response = await apiFetch(
+          `/api/v1/reports/forecast-baseline?medicineId=${medicineId}&window=7&horizon=7`,
+          {
+            headers: { Authorization: `Bearer ${session.token}` },
+          },
+        );
+        if (!response.ok) {
+          setForecastBaseline(null);
+          return;
+        }
+        const result = (await response.json()) as {
+          success?: boolean;
+          data?: ForecastBaseline;
+          error?: string | ApiErrorPayload;
+        };
+        if (!result.success || !result.data) {
+          setForecastBaseline(null);
+          return;
+        }
+        setForecastBaseline(result.data);
+      } catch {
         setForecastBaseline(null);
-        return;
       }
-      const result = (await response.json()) as {
-        success?: boolean;
-        data?: ForecastBaseline;
-        error?: string | ApiErrorPayload;
-      };
-      if (!result.success || !result.data) {
-        setForecastBaseline(null);
-        return;
-      }
-      setForecastBaseline(result.data);
-    } catch {
-      setForecastBaseline(null);
-    }
-  };
+    },
+    [session],
+  );
 
   const exportAuditLogs = () => {
     const escapeCsv = (value: string) => `"${value.replaceAll('"', '""')}"`;
@@ -1553,6 +1563,33 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    sessionStorage.setItem(
+      "pharmasense-replenishment-decisions",
+      JSON.stringify(replenishmentDecisions),
+    );
+  }, [replenishmentDecisions]);
+
+  useEffect(() => {
+    if (!session || medicines.length === 0) {
+      setForecastBaseline(null);
+      return;
+    }
+
+    const preferredMedicineId = medicines.some(
+      (medicine) => medicine.id === selectedForecastMedicineId,
+    )
+      ? selectedForecastMedicineId
+      : medicines[0].id;
+
+    if (preferredMedicineId !== selectedForecastMedicineId) {
+      setSelectedForecastMedicineId(preferredMedicineId);
+      return;
+    }
+
+    void loadForecastBaseline(preferredMedicineId);
+  }, [session, medicines, selectedForecastMedicineId, loadForecastBaseline]);
+
   if (!session) {
     return (
       <main className="auth-shell min-h-screen">
@@ -1641,13 +1678,6 @@ function App() {
     );
   }
 
-  useEffect(() => {
-    sessionStorage.setItem(
-      "pharmasense-replenishment-decisions",
-      JSON.stringify(replenishmentDecisions),
-    );
-  }, [replenishmentDecisions]);
-
   const lowStockCount = medicines.filter((medicine) => {
     const quantity = medicine.batches.reduce(
       (total, batch) => total + batch.quantity,
@@ -1701,25 +1731,6 @@ function App() {
   const filteredSuppliers = suppliers.filter((supplier) =>
     supplier.name.toLowerCase().includes(supplierSearch.trim().toLowerCase()),
   );
-  useEffect(() => {
-    if (!session || medicines.length === 0) {
-      setForecastBaseline(null);
-      return;
-    }
-
-    const preferredMedicineId = medicines.some(
-      (medicine) => medicine.id === selectedForecastMedicineId,
-    )
-      ? selectedForecastMedicineId
-      : medicines[0].id;
-
-    if (preferredMedicineId !== selectedForecastMedicineId) {
-      setSelectedForecastMedicineId(preferredMedicineId);
-      return;
-    }
-
-    void loadForecastBaseline(preferredMedicineId);
-  }, [session, medicines, selectedForecastMedicineId]);
 
   const handleReplenishmentDecision = async (
     medicineId: number,
@@ -3146,6 +3157,12 @@ function App() {
                 INSUFFICIENT_DATA:
                   "bg-slate-100 text-slate-700 border-slate-200",
               }[item.riskLevel];
+              const monitoringTone = {
+                OK: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                WATCH: "bg-amber-50 text-amber-700 border-amber-200",
+                INSUFFICIENT_DATA:
+                  "bg-slate-100 text-slate-700 border-slate-200",
+              }[item.monitoringStatus ?? "OK"];
               return (
                 <div
                   key={item.medicineId}
@@ -3160,11 +3177,18 @@ function App() {
                         Current stock: {item.currentStock}
                       </p>
                     </div>
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${riskTone}`}
-                    >
-                      {item.riskLevel}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${riskTone}`}
+                      >
+                        {item.riskLevel}
+                      </span>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${monitoringTone}`}
+                      >
+                        {item.monitoringStatus ?? "OK"}
+                      </span>
+                    </div>
                   </div>
                   <div className="mt-3 space-y-2 text-sm text-gray-600">
                     <p>

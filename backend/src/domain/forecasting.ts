@@ -32,6 +32,60 @@ export function assessForecastReadiness(values: number[], window: number) {
   } as const;
 }
 
+export function assessForecastQuality(
+  actualValues: number[],
+  predictedValues: number[],
+  thresholds: { maxMae?: number; maxRmse?: number; minObservationRate?: number } = {},
+) {
+  const maxMae = thresholds.maxMae ?? 1.5;
+  const maxRmse = thresholds.maxRmse ?? 2.5;
+  const minObservationRate = thresholds.minObservationRate ?? 0.3;
+
+  if (actualValues.length === 0 || predictedValues.length === 0 || actualValues.length !== predictedValues.length) {
+    return {
+      mae: null,
+      rmse: null,
+      observationRate: 0,
+      status: 'INSUFFICIENT_DATA',
+    } as const;
+  }
+
+  const squaredError = actualValues.reduce((total, actual, index) => {
+    const difference = actual - predictedValues[index];
+    return total + difference * difference;
+  }, 0);
+  const absoluteError = actualValues.reduce((total, actual, index) => total + Math.abs(actual - predictedValues[index]), 0);
+  const mae = absoluteError / actualValues.length;
+  const rmse = Math.sqrt(squaredError / actualValues.length);
+  const daysWithDemand = actualValues.filter((value) => value > 0).length;
+  const observationRate = daysWithDemand / actualValues.length;
+
+  if (observationRate < minObservationRate || actualValues.length < 14) {
+    return {
+      mae,
+      rmse,
+      observationRate,
+      status: 'INSUFFICIENT_DATA',
+    } as const;
+  }
+
+  if (mae > maxMae || rmse > maxRmse) {
+    return {
+      mae,
+      rmse,
+      observationRate,
+      status: 'WATCH',
+    } as const;
+  }
+
+  return {
+    mae,
+    rmse,
+    observationRate,
+    status: 'OK',
+  } as const;
+}
+
 export function naiveForecast(values: number[], horizon: number) {
   const lastValue = values.length === 0 ? 0 : values[values.length - 1];
   return Array.from({ length: horizon }, () => lastValue);
