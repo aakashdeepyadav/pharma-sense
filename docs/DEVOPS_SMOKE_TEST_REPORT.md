@@ -4,16 +4,16 @@
 
 The backend HTTP test suite covers:
 
-| Check | Expected result |
-| --- | --- |
-| `GET /health` with migrated database | `200` with database status `ok` |
-| Seeded administrator login | `200` and an access token |
-| Anonymous `GET /api/v1/medicines` | `401` |
-| Staff attempt at a prohibited write | `403` |
-| Staff account with an Admin role claim | `403` based on the current database role |
-| Logout | Revocation fingerprint is stored in PostgreSQL and the token is rejected afterward |
-| Weak or shipped-placeholder JWT secret | Token creation is rejected |
-| Authenticated inventory workflow | Create category/supplier/medicine, receive a batch, issue five units, and verify remaining quantity is seven |
+| Check                                  | Expected result                                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `GET /health` with migrated database   | `200` with database status `ok`                                                                              |
+| Seeded administrator login             | `200` and an access token                                                                                    |
+| Anonymous `GET /api/v1/medicines`      | `401`                                                                                                        |
+| Staff attempt at a prohibited write    | `403`                                                                                                        |
+| Staff account with an Admin role claim | `403` based on the current database role                                                                     |
+| Logout                                 | Revocation fingerprint is stored in PostgreSQL and the token is rejected afterward                           |
+| Weak or shipped-placeholder JWT secret | Token creation is rejected                                                                                   |
+| Authenticated inventory workflow       | Create category/supplier/medicine, receive a batch, issue five units, and verify remaining quantity is seven |
 
 The workflow uses unique records and removes them after the test. Run it with `cd backend; npm test` after applying migrations and running the development seed. CI performs those setup steps against its isolated PostgreSQL service.
 

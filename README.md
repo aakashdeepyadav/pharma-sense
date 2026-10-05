@@ -114,6 +114,7 @@ npm run test:e2e:live
 
 ## DevOps Handoff
 
+- [Project report and workflow summary](docs/PROJECT_REPORT.md)
 - [Deployment and local rehearsal runbook](docs/DEPLOYMENT_RUNBOOK.md)
 - [Database quality, reconciliation, and migration rehearsal](docs/DATABASE_QUALITY.md)
 - [Security review checklist](docs/SECURITY_REVIEW.md)

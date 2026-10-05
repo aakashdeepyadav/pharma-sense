@@ -18,9 +18,18 @@ Required columns:
 | ---------------------- | -------------------- | ------------------------------------------------------------------------------------------ |
 | `date`                 | ISO date             | UTC calendar day; no future dates                                                          |
 | `medicine_id`          | pseudonymous string  | Stable within the dataset; must not encode a product name or identifier                    |
+| `medicine_name`        | string               | Human-readable medicine label for operational reporting                                    |
+| `medicine_category`    | string               | Standardized category label such as Antibiotic or Analgesic                                |
 | `quantity_issued`      | non-negative integer | Completed stock OUT quantity after returns policy is applied                               |
 | `is_stockout_censored` | boolean              | True when observed demand may be lower than requested demand because stock was unavailable |
 | `organization_group`   | pseudonymous string  | Optional for pooled research; never a real organization name                               |
+
+Enhanced optional columns:
+
+- `available_units_at_start`, non-negative integer
+- `expiry_units_at_start`, non-negative integer
+- `supplier_lead_days`, non-negative integer
+- `is_synthetic`, boolean
 
 Optional explanatory columns:
 

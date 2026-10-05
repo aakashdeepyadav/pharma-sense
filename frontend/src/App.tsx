@@ -1,4 +1,10 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { apiFetch } from "./api";
 import "./App.css";
 
@@ -101,6 +107,44 @@ type ReplenishmentRecommendation = {
   recommendedUnits: number;
   status: "REPLENISH" | "NO_ACTION";
   explanation: string;
+};
+
+type ReplenishmentDecision = "PENDING" | "APPROVED" | "DISMISSED";
+
+type ForecastRisk = {
+  medicineId: number;
+  medicineName: string;
+  currentStock: number;
+  reorderLevel: number;
+  predictedDailyDemand: number;
+  coverDays: number | null;
+  projectedStockAfter7Days: number;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "INSUFFICIENT_DATA";
+  monitoringStatus?: "OK" | "WATCH" | "INSUFFICIENT_DATA";
+  message: string;
+};
+
+type ForecastBaseline = {
+  medicineId: number;
+  medicineName: string;
+  model: string;
+  window: number;
+  horizon: number;
+  forecast: {
+    date: string;
+    predictedQuantity: number;
+  }[];
+  evaluation: {
+    mae: number | null;
+    observations: number;
+    readiness: {
+      totalDays: number;
+      daysWithDemand: number;
+      zeroDemandDays: number;
+      observationRate: number;
+      status: "READY_FOR_BASELINE" | "INSUFFICIENT_HISTORY";
+    };
+  };
 };
 
 type AuditLog = {
@@ -323,9 +367,34 @@ function App() {
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [report, setReport] = useState<ReportSummary | null>(null);
+  const [forecastRisk, setForecastRisk] = useState<ForecastRisk[]>([]);
+  const [forecastBaseline, setForecastBaseline] =
+    useState<ForecastBaseline | null>(null);
+  const [selectedForecastMedicineId, setSelectedForecastMedicineId] = useState<
+    number | null
+  >(null);
   const [replenishment, setReplenishment] = useState<
     ReplenishmentRecommendation[]
   >([]);
+  const [replenishmentDecisions, setReplenishmentDecisions] = useState<
+    Record<number, ReplenishmentDecision>
+  >(() => {
+    try {
+      const storedValue = sessionStorage.getItem(
+        "pharmasense-replenishment-decisions",
+      );
+      if (!storedValue) return {};
+      const parsed = JSON.parse(storedValue) as Record<
+        string,
+        ReplenishmentDecision
+      >;
+      return Object.fromEntries(
+        Object.entries(parsed).map(([key, value]) => [Number(key), value]),
+      );
+    } catch {
+      return {};
+    }
+  });
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [auditSearch, setAuditSearch] = useState("");
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
@@ -448,6 +517,7 @@ function App() {
           transactionResponse,
           alertResponse,
           reportResponse,
+          forecastRiskResponse,
           replenishmentResponse,
         ] = await Promise.all([
           apiFetch("/api/v1/medicines", { headers }),
@@ -460,6 +530,7 @@ function App() {
           }),
           apiFetch("/api/v1/alerts", { headers }),
           apiFetch("/api/v1/reports/summary", { headers }),
+          apiFetch("/api/v1/reports/forecast-risk", { headers }),
           apiFetch("/api/v1/reports/replenishment", { headers }),
         ]);
         if (
@@ -471,6 +542,7 @@ function App() {
           !transactionResponse.ok ||
           !alertResponse.ok ||
           !reportResponse.ok ||
+          !forecastRiskResponse.ok ||
           !replenishmentResponse.ok
         ) {
           throw new Error("The inventory service returned an error.");
@@ -516,6 +588,11 @@ function App() {
           data?: ReportSummary;
           error?: string | ApiErrorPayload;
         };
+        const forecastRiskResult = (await forecastRiskResponse.json()) as {
+          success?: boolean;
+          data?: ForecastRisk[];
+          error?: string | ApiErrorPayload;
+        };
         const replenishmentResult = (await replenishmentResponse.json()) as {
           success?: boolean;
           data?: ReplenishmentRecommendation[];
@@ -531,6 +608,7 @@ function App() {
           !transactionResult.success ||
           !alertResult.success ||
           !reportResult.success ||
+          !forecastRiskResult.success ||
           !replenishmentResult.success
         ) {
           throw new Error(
@@ -543,6 +621,7 @@ function App() {
                 transactionResult.error ??
                 alertResult.error ??
                 reportResult.error ??
+                forecastRiskResult.error ??
                 replenishmentResult.error,
               "Unable to load inventory.",
             ),
@@ -557,6 +636,7 @@ function App() {
         setTransactions(transactionResult.data ?? []);
         setAlerts(alertResult.data ?? []);
         setReport(reportResult.data ?? null);
+        setForecastRisk(forecastRiskResult.data ?? []);
         setReplenishment(replenishmentResult.data ?? []);
         if (
           session.user.role === "Admin" ||
@@ -655,6 +735,48 @@ function App() {
       setAuditLogs(result.data);
     }
   };
+
+  const loadForecastBaseline = useCallback(
+    async (medicineId: number | null) => {
+      if (!session || !medicineId) {
+        setForecastBaseline(null);
+        return;
+      }
+
+      try {
+        const response = await apiFetch(
+          `/api/v1/reports/forecast-baseline?medicineId=${medicineId}&window=7&horizon=7`,
+          {
+            headers: { Authorization: `Bearer ${session.token}` },
+          },
+        );
+        if (!response.ok) {
+          setForecastBaseline(null);
+          return;
+        }
+        const result = (await response.json()) as {
+          success?: boolean;
+          data?: ForecastBaseline;
+          error?: string | ApiErrorPayload;
+        };
+        const baseline = result.data;
+        if (
+          !result.success ||
+          !baseline ||
+          typeof baseline !== "object" ||
+          !baseline.evaluation ||
+          !Array.isArray(baseline.forecast)
+        ) {
+          setForecastBaseline(null);
+          return;
+        }
+        setForecastBaseline(baseline);
+      } catch {
+        setForecastBaseline(null);
+      }
+    },
+    [session],
+  );
 
   const exportAuditLogs = () => {
     const escapeCsv = (value: string) => `"${value.replaceAll('"', '""')}"`;
@@ -1448,6 +1570,33 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    sessionStorage.setItem(
+      "pharmasense-replenishment-decisions",
+      JSON.stringify(replenishmentDecisions),
+    );
+  }, [replenishmentDecisions]);
+
+  useEffect(() => {
+    if (!session || medicines.length === 0) {
+      setForecastBaseline(null);
+      return;
+    }
+
+    const preferredMedicineId = medicines.some(
+      (medicine) => medicine.id === selectedForecastMedicineId,
+    )
+      ? selectedForecastMedicineId
+      : medicines[0].id;
+
+    if (preferredMedicineId !== selectedForecastMedicineId) {
+      setSelectedForecastMedicineId(preferredMedicineId);
+      return;
+    }
+
+    void loadForecastBaseline(preferredMedicineId);
+  }, [session, medicines, selectedForecastMedicineId, loadForecastBaseline]);
+
   if (!session) {
     return (
       <main className="auth-shell min-h-screen">
@@ -1543,8 +1692,18 @@ function App() {
     );
     return quantity <= medicine.reorderLevel;
   }).length;
-  const expiringSoonCount = alerts.filter(
-    (alert) => alert.type === "EXPIRING_SOON" || alert.type === "EXPIRED",
+  const queuedRiskCount = forecastRisk.filter(
+    (item) => item.riskLevel === "HIGH" || item.riskLevel === "MEDIUM",
+  ).length;
+  const replenishmentQueue = replenishment.filter(
+    (item) => item.status === "REPLENISH",
+  );
+  const pendingReviewCount = replenishmentQueue.filter(
+    (item) =>
+      (replenishmentDecisions[item.medicineId] ?? "PENDING") === "PENDING",
+  ).length;
+  const approvedReviewCount = Object.values(replenishmentDecisions).filter(
+    (decision) => decision === "APPROVED",
   ).length;
   const canWriteMedicines = [
     "Admin",
@@ -1579,6 +1738,57 @@ function App() {
   const filteredSuppliers = suppliers.filter((supplier) =>
     supplier.name.toLowerCase().includes(supplierSearch.trim().toLowerCase()),
   );
+
+  const handleReplenishmentDecision = async (
+    medicineId: number,
+    decision: Exclude<ReplenishmentDecision, "PENDING">,
+  ) => {
+    const previousDecision = replenishmentDecisions[medicineId] ?? "PENDING";
+    setReplenishmentDecisions((current) => ({
+      ...current,
+      [medicineId]: decision,
+    }));
+
+    try {
+      const response = await apiFetch(
+        "/api/v1/reports/replenishment/decision",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.token}`,
+          },
+          body: JSON.stringify({
+            medicineId,
+            decision,
+            notes: `${decision === "APPROVED" ? "Approved" : "Dismissed"} by ${session.user.name}`,
+          }),
+        },
+      );
+      const result = (await response.json()) as {
+        success?: boolean;
+        error?: string | ApiErrorPayload;
+      };
+      if (!response.ok || !result.success) {
+        throw new Error(
+          extractErrorMessage(
+            result.error,
+            "Unable to save the replenishment decision.",
+          ),
+        );
+      }
+    } catch (requestError) {
+      setReplenishmentDecisions((current) => ({
+        ...current,
+        [medicineId]: previousDecision,
+      }));
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to save the replenishment decision.",
+      );
+    }
+  };
 
   return (
     <div className="dashboard-shell min-h-screen bg-slate-100 p-3 sm:p-5 lg:p-8">
@@ -2898,7 +3108,7 @@ function App() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 font-medium mb-2">
             Total Medicines (SKUs)
@@ -2915,13 +3125,101 @@ function App() {
           </p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-gray-500 font-medium mb-2">Expiring Soon</h3>
-          <p className="text-3xl font-bold text-orange-500">
-            {expiringSoonCount}
+          <h3 className="text-gray-500 font-medium mb-2">Forecast watchlist</h3>
+          <p className="text-3xl font-bold text-violet-600">
+            {queuedRiskCount}
           </p>
-          <p className="text-gray-500 text-sm mt-1">Expiry alerts</p>
+          <p className="text-gray-500 text-sm mt-1">Medium + high risk</p>
+        </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-gray-500 font-medium mb-2">Review queue</h3>
+          <p className="text-3xl font-bold text-cyan-600">
+            {pendingReviewCount}
+          </p>
+          <p className="text-gray-500 text-sm mt-1">
+            Pending · {approvedReviewCount} approved
+          </p>
         </div>
       </div>
+
+      <section className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900">Forecast risk</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Read-only demand-risk overview based on recent stock OUT history and
+            stock cover.
+          </p>
+        </div>
+        {forecastRisk.length === 0 ? (
+          <p className="p-6 text-gray-500">
+            No forecast risk data is available yet.
+          </p>
+        ) : (
+          <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+            {forecastRisk.map((item) => {
+              const riskTone = {
+                LOW: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                MEDIUM: "bg-amber-50 text-amber-700 border-amber-200",
+                HIGH: "bg-red-50 text-red-700 border-red-200",
+                INSUFFICIENT_DATA:
+                  "bg-slate-100 text-slate-700 border-slate-200",
+              }[item.riskLevel];
+              const monitoringTone = {
+                OK: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                WATCH: "bg-amber-50 text-amber-700 border-amber-200",
+                INSUFFICIENT_DATA:
+                  "bg-slate-100 text-slate-700 border-slate-200",
+              }[item.monitoringStatus ?? "OK"];
+              return (
+                <div
+                  key={item.medicineId}
+                  className="rounded-xl border border-gray-200 bg-gray-50 p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {item.medicineName}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Current stock: {item.currentStock}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${riskTone}`}
+                      >
+                        {item.riskLevel}
+                      </span>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${monitoringTone}`}
+                      >
+                        {item.monitoringStatus ?? "OK"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-2 text-sm text-gray-600">
+                    <p>
+                      Projected daily demand:{" "}
+                      {item.predictedDailyDemand.toFixed(2)}
+                    </p>
+                    <p>
+                      Cover days:{" "}
+                      {item.coverDays === null
+                        ? "n/a"
+                        : item.coverDays.toFixed(2)}
+                    </p>
+                    <p>
+                      7-day projected stock:{" "}
+                      {item.projectedStockAfter7Days.toFixed(2)}
+                    </p>
+                  </div>
+                  <p className="mt-3 text-xs text-gray-600">{item.message}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       <section className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
@@ -2979,22 +3277,28 @@ function App() {
           </h2>
           <p className="text-sm text-gray-500 mt-1">
             Read-only estimates based on recent stock OUT activity and reorder
-            levels.
+            levels. Each item can be approved or dismissed by the human
+            reviewer.
           </p>
         </div>
-        {replenishment.filter((item) => item.status === "REPLENISH").length ===
-        0 ? (
+        {replenishmentQueue.length === 0 ? (
           <p className="p-6 text-gray-500">
             No replenishment review is suggested right now.
           </p>
         ) : (
           <div className="divide-y divide-gray-100">
-            {replenishment
-              .filter((item) => item.status === "REPLENISH")
-              .map((item) => (
+            {replenishmentQueue.map((item) => {
+              const decision =
+                replenishmentDecisions[item.medicineId] ?? "PENDING";
+              const decisionTone = {
+                PENDING: "text-slate-600 bg-slate-100 border-slate-200",
+                APPROVED: "text-emerald-700 bg-emerald-50 border-emerald-200",
+                DISMISSED: "text-amber-700 bg-amber-50 border-amber-200",
+              }[decision];
+              return (
                 <div
                   key={item.medicineId}
-                  className="p-4 flex items-center justify-between gap-4"
+                  className="p-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
                 >
                   <div>
                     <p className="font-medium text-gray-900">
@@ -3008,14 +3312,54 @@ function App() {
                       {item.explanation}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-blue-700">
-                      {item.recommendedUnits}
-                    </p>
-                    <p className="text-xs text-gray-500">units to review</p>
+                  <div className="flex flex-col items-start gap-3 lg:items-end">
+                    <div className="text-left lg:text-right">
+                      <p className="text-lg font-bold text-blue-700">
+                        {item.recommendedUnits}
+                      </p>
+                      <p className="text-xs text-gray-500">units to review</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleReplenishmentDecision(
+                            item.medicineId,
+                            "APPROVED",
+                          )
+                        }
+                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={decision === "APPROVED"}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleReplenishmentDecision(
+                            item.medicineId,
+                            "DISMISSED",
+                          )
+                        }
+                        className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={decision === "DISMISSED"}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${decisionTone}`}
+                    >
+                      {decision === "PENDING"
+                        ? "Awaiting review"
+                        : decision === "APPROVED"
+                          ? "Approved"
+                          : "Dismissed"}
+                    </span>
                   </div>
                 </div>
-              ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -3090,6 +3434,96 @@ function App() {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+
+            <div className="mt-6 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h3 className="font-bold text-gray-900">Forecast baseline</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Model evaluation and next-period demand outlook.
+                  </p>
+                </div>
+                <label className="text-sm text-gray-600">
+                  <span className="sr-only">Select forecast medicine</span>
+                  <select
+                    value={selectedForecastMedicineId ?? ""}
+                    onChange={(event) =>
+                      setSelectedForecastMedicineId(Number(event.target.value))
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 md:w-64"
+                    disabled={medicines.length === 0}
+                  >
+                    {medicines.map((medicine) => (
+                      <option key={medicine.id} value={medicine.id}>
+                        {medicine.genericName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {!forecastBaseline ? (
+                <p className="mt-4 text-gray-500">
+                  Forecast baseline is unavailable for the selected medicine.
+                </p>
+              ) : (
+                <>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-gray-500">
+                        MAE
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-gray-900">
+                        {forecastBaseline.evaluation?.mae == null
+                          ? "n/a"
+                          : Number(forecastBaseline.evaluation.mae).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-gray-500">
+                        Observations
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-gray-900">
+                        {forecastBaseline.evaluation?.observations ?? 0}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-gray-500">
+                        Status
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-gray-900">
+                        {forecastBaseline.evaluation?.readiness?.status ===
+                        "READY_FOR_BASELINE"
+                          ? "Ready"
+                          : "Insufficient history"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <h4 className="font-semibold text-gray-900 mb-3">
+                      Next {forecastBaseline.forecast.length} day forecast
+                    </h4>
+                    <div className="space-y-2">
+                      {forecastBaseline.forecast.map((point) => (
+                        <div
+                          key={`${forecastBaseline.medicineId}-${point.date}`}
+                          className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+                        >
+                          <span className="font-medium text-gray-700">
+                            {new Date(point.date).toLocaleDateString()}
+                          </span>
+                          <span className="text-gray-900">
+                            {Number(point.predictedQuantity ?? 0).toFixed(2)}{" "}
+                            units
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </section>

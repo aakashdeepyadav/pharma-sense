@@ -111,13 +111,17 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
   await page.getByLabel("Supplier name").fill(supplierName);
   await page.getByRole("button", { name: "Save supplier" }).click();
   await openManagementHistory(page);
-  await expect(page.getByText(supplierName, { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: supplierName, exact: true }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "+ Add Medicine" }).click();
   await page.getByLabel("Generic name").fill(medicineName);
   await page.getByLabel("Brand name").fill(brandName);
   await page.getByRole("button", { name: "Save medicine" }).click();
-  await expect(page.getByText(medicineName, { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: medicineName, exact: true }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Receive stock" }).click();
   await page

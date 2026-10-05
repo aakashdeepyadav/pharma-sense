@@ -8,6 +8,9 @@ if (!databaseUrl) {
   );
 }
 
+const seedPassword =
+  process.env.SEED_ADMIN_PASSWORD ?? process.env.E2E_ADMIN_PASSWORD ?? "";
+
 export default defineConfig({
   testDir: "./e2e-live",
   fullyParallel: false,
@@ -24,15 +27,21 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "npm --prefix ../backend run dev",
+      command:
+        "cd ../backend && npx prisma migrate deploy && " +
+        "npx tsx src/scripts/seed.ts && " +
+        "npx tsx src/server.ts",
       url: "http://127.0.0.1:5101/health",
       reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
+      timeout: 90_000,
       env: {
         DATABASE_URL: databaseUrl,
         JWT_SECRET: "local-e2e-only-secret-not-for-deployment",
+        SEED_ADMIN_PASSWORD: seedPassword || "LocalSeedPasswordForPlaywright123",
         PORT: "5101",
         FRONTEND_URL: "http://127.0.0.1:4174",
+        FRONTEND_URLS: "http://127.0.0.1:4174",
+        TRUST_PROXY: "false",
       },
     },
     {

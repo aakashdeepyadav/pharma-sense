@@ -12,6 +12,9 @@
     "db:quality": "tsx src/scripts/validateDatabaseQuality.ts",
     "research:demand": "tsx src/scripts/generateSyntheticDemand.ts",
     "research:evaluate": "tsx src/scripts/evaluateSyntheticForecast.ts",
+    "research:export": "python ../research/export_operational_demand.py",
+    "research:readiness": "python ../research/check_data_readiness.py",
+    "research:ml": "python ../research/train_lightgbm_forecast.py",
     "research:validate": "tsx src/scripts/validateDemandDataset.ts",
     "test": "tsx --test src/domain/stockRules.test.ts src/domain/reconciliation.test.ts src/domain/dataQuality.test.ts src/validation/schemas.test.ts src/domain/forecasting.test.ts src/domain/replenishment.test.ts src/server.test.ts"
   },
