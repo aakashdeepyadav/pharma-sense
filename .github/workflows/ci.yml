@@ -34,7 +34,7 @@ jobs:
       FRONTEND_URL: http://localhost:5173
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Generate an ephemeral JWT signing key
         run: |
           echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
@@ -74,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -113,7 +113,7 @@ jobs:
       pull-requests: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Reject tracked local environment and database dump files
@@ -173,7 +173,7 @@ jobs:
       E2E_DATABASE_URL: postgresql://postgres:ci-e2e-${{ github.run_id }}-${{ github.run_attempt }}@localhost:5432/pharmasense_e2e?schema=public
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Generate ephemeral E2E credentials
         run: |
           seed_password="$(openssl rand -hex 24)"
