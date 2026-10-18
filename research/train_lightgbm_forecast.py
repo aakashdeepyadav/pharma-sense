@@ -32,9 +32,16 @@ RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 def choose_data_source() -> tuple[Path, str]:
     if OPERATIONAL_DATA_PATH.exists():
-        operational_df = pd.read_csv(OPERATIONAL_DATA_PATH)
-        if {'date'}.issubset(operational_df.columns) and len(operational_df['date'].dropna()) >= 30:
-            return OPERATIONAL_DATA_PATH, 'operational'
+        try:
+            operational_df = pd.read_csv(OPERATIONAL_DATA_PATH)
+            if (
+                {'date', 'medicine_id', 'quantity_issued'}.issubset(operational_df.columns)
+                and operational_df['date'].nunique() >= 35
+                and operational_df.groupby('medicine_id')['date'].count().min() >= 35
+            ):
+                return OPERATIONAL_DATA_PATH, 'operational'
+        except Exception:
+            pass
     return SYNTHETIC_DATA_PATH, 'synthetic'
 
 

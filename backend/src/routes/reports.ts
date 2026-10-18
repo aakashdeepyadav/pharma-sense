@@ -333,6 +333,50 @@ router.get('/forecast-baseline', async (req: AuthenticatedRequest, res: Response
   }
 });
 
+router.get('/forecast-ml', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const candidateDirs = [
+      path.resolve(process.cwd(), '../research/results'),
+      path.resolve(process.cwd(), 'research/results'),
+      path.resolve(__dirname, '../../../research/results'),
+    ];
+
+    let metrics: unknown = null;
+    let replenishmentExample: unknown = null;
+
+    for (const dir of candidateDirs) {
+      const metricsFile = path.join(dir, 'lightgbm_forecast_metrics.json');
+      const exampleFile = path.join(dir, 'lightgbm_replenishment_example.json');
+      try {
+        const raw = await fs.readFile(metricsFile, 'utf8');
+        metrics = JSON.parse(raw);
+        try {
+          const rawExample = await fs.readFile(exampleFile, 'utf8');
+          replenishmentExample = JSON.parse(rawExample);
+        } catch {
+          replenishmentExample = null;
+        }
+        break;
+      } catch {
+        // try next candidate directory
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        available: metrics !== null,
+        metrics,
+        replenishmentExample,
+      },
+    });
+  } catch {
+    sendApiError(res, 500, 'GET_FORECAST_ML_FAILED', 'Failed to retrieve ML forecast insights');
+  }
+});
+
 router.get('/replenishment', async (req: AuthenticatedRequest, res: Response) => {
   const result = replenishmentQuerySchema.safeParse(req.query);
   if (!result.success) {

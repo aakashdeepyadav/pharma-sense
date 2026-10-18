@@ -1,6 +1,5 @@
 import {
   type FormEvent,
-  useCallback,
   useEffect,
   useRef,
   useState,
@@ -151,6 +150,32 @@ type ForecastBaseline = {
       status: "READY_FOR_BASELINE" | "INSUFFICIENT_HISTORY";
     };
   };
+};
+
+type ForecastMlData = {
+  available: boolean;
+  metrics?: {
+    model: string;
+    dataset: string;
+    data_source: string;
+    metrics: {
+      mae: number;
+      rmse: number;
+      baseline_naive_mae: number;
+      train_rows: number;
+      test_rows: number;
+      top_feature_importance: { feature: string; importance: number }[];
+    };
+    feature_names: string[];
+    notes: string[];
+  } | null;
+  replenishmentExample?: {
+    status: string;
+    recommended_units: number;
+    projected_need: number;
+    target_cover: number;
+    current_stock: number;
+  } | null;
 };
 
 type AuditLog = {
@@ -379,6 +404,7 @@ function App() {
   const [selectedForecastMedicineId, setSelectedForecastMedicineId] = useState<
     number | null
   >(null);
+  const [forecastMl, setForecastMl] = useState<ForecastMlData | null>(null);
   const [replenishment, setReplenishment] = useState<
     ReplenishmentRecommendation[]
   >([]);
@@ -627,6 +653,16 @@ function App() {
         setReport(reportResult.data ?? null);
         setForecastRisk(forecastRiskResult.data ?? []);
         setReplenishment(replenishmentResult.data ?? []);
+        void apiFetch("/api/v1/reports/forecast-ml", { headers })
+          .then(async (res) => {
+            if (res.ok) {
+              const mlResult = (await res.json()) as { success?: boolean; data?: ForecastMlData };
+              if (mlResult.success && mlResult.data) {
+                setForecastMl(mlResult.data);
+              }
+            }
+          })
+          .catch(() => {});
         if (
           session.user.role === "Admin" ||
           session.user.role === "Inventory Manager"
@@ -725,47 +761,6 @@ function App() {
     }
   };
 
-  const loadForecastBaseline = useCallback(
-    async (medicineId: number | null) => {
-      if (!session || !medicineId) {
-        setForecastBaseline(null);
-        return;
-      }
-
-      try {
-        const response = await apiFetch(
-          `/api/v1/reports/forecast-baseline?medicineId=${medicineId}&window=7&horizon=7`,
-          {
-            headers: { Authorization: `Bearer ${session.token}` },
-          },
-        );
-        if (!response.ok) {
-          setForecastBaseline(null);
-          return;
-        }
-        const result = (await response.json()) as {
-          success?: boolean;
-          data?: ForecastBaseline;
-          error?: string | ApiErrorPayload;
-        };
-        const baseline = result.data;
-        if (
-          !result.success ||
-          !baseline ||
-          typeof baseline !== "object" ||
-          !baseline.evaluation ||
-          !Array.isArray(baseline.forecast)
-        ) {
-          setForecastBaseline(null);
-          return;
-        }
-        setForecastBaseline(baseline);
-      } catch {
-        setForecastBaseline(null);
-      }
-    },
-    [session],
-  );
 
   const exportAuditLogs = () => {
     const escapeCsv = (value: string) => `"${value.replaceAll('"', '""')}"`;
@@ -1153,6 +1148,38 @@ function App() {
     setPurchaseFormOpen(true);
   };
 
+  const openPurchaseFormForReplenishment = (
+    item: ReplenishmentRecommendation,
+  ) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const nextYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const existingBatch = batches.find((b) => b.medicineId === item.medicineId);
+
+    setPurchaseForm({
+      medicineId: String(item.medicineId),
+      supplierId: existingBatch
+        ? String(existingBatch.supplierId)
+        : suppliers[0]
+          ? String(suppliers[0].id)
+          : "",
+      batchNumber: `PO-${item.medicineId}-${Date.now().toString().slice(-6)}`,
+      mfgDate: today,
+      expiryDate: nextYear,
+      quantity: String(Math.max(1, item.recommendedUnits)),
+      purchasePrice: existingBatch
+        ? String(existingBatch.purchasePrice)
+        : "10.00",
+      sellingPrice: existingBatch
+        ? String(existingBatch.sellingPrice)
+        : "15.00",
+      notes: `Replenishment order for ${item.medicineName} (${item.recommendedUnits} units approved by ${item.review?.reviewer?.name ?? "reviewer"})`,
+    });
+    setFormError("");
+    setPurchaseFormOpen(true);
+  };
+
   const handlePurchaseSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!session) return;
@@ -1452,6 +1479,8 @@ function App() {
     } finally {
       sessionStorage.removeItem("pharmasense-session");
       setSession(null);
+      setForecastBaseline(null);
+      setForecastMl(null);
     }
   };
 
@@ -1559,25 +1588,57 @@ function App() {
     }
   };
 
+  const effectiveForecastMedicineId =
+    medicines.length > 0
+      ? (medicines.some((medicine) => medicine.id === selectedForecastMedicineId)
+          ? selectedForecastMedicineId
+          : medicines[0].id)
+      : null;
+
   useEffect(() => {
-    if (!session || medicines.length === 0) {
-      setForecastBaseline(null);
+    if (!session || effectiveForecastMedicineId === null) {
       return;
     }
 
-    const preferredMedicineId = medicines.some(
-      (medicine) => medicine.id === selectedForecastMedicineId,
-    )
-      ? selectedForecastMedicineId
-      : medicines[0].id;
+    let isMounted = true;
+    const fetchBaseline = async () => {
+      try {
+        const response = await apiFetch(
+          `/api/v1/reports/forecast-baseline?medicineId=${effectiveForecastMedicineId}&window=7&horizon=7`,
+          {
+            headers: { Authorization: `Bearer ${session.token}` },
+          },
+        );
+        if (!response.ok) {
+          if (isMounted) setForecastBaseline(null);
+          return;
+        }
+        const result = (await response.json()) as {
+          success?: boolean;
+          data?: ForecastBaseline;
+        };
+        const baseline = result.data;
+        if (
+          !result.success ||
+          !baseline ||
+          typeof baseline !== "object" ||
+          !baseline.evaluation ||
+          !Array.isArray(baseline.forecast)
+        ) {
+          if (isMounted) setForecastBaseline(null);
+          return;
+        }
+        if (isMounted) setForecastBaseline(baseline);
+      } catch {
+        if (isMounted) setForecastBaseline(null);
+      }
+    };
 
-    if (preferredMedicineId !== selectedForecastMedicineId) {
-      setSelectedForecastMedicineId(preferredMedicineId);
-      return;
-    }
-
-    void loadForecastBaseline(preferredMedicineId);
-  }, [session, medicines, selectedForecastMedicineId, loadForecastBaseline]);
+    void fetchBaseline();
+    return () => {
+      isMounted = false;
+    };
+  }, [session, effectiveForecastMedicineId]);
 
   if (!session) {
     return (
@@ -3441,7 +3502,7 @@ function App() {
                 <label className="text-sm text-gray-600">
                   <span className="sr-only">Select forecast medicine</span>
                   <select
-                    value={selectedForecastMedicineId ?? ""}
+                    value={effectiveForecastMedicineId ?? ""}
                     onChange={(event) =>
                       setSelectedForecastMedicineId(Number(event.target.value))
                     }

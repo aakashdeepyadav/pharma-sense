@@ -323,10 +323,10 @@ describe('PharmaSense API', () => {
     });
 
     assert.equal(response.status, 200);
-    const body = (await response.json()) as { success: boolean; data: { medicineId: number; decision: string } };
+    const body = (await response.json()) as { success: boolean; data: { medicineId: number; review: { decision: string } } };
     assert.equal(body.success, true);
     assert.equal(body.data.medicineId, medicine.id);
-    assert.equal(body.data.decision, 'APPROVED');
+    assert.equal(body.data.review.decision, 'APPROVED');
 
     const audit = await prisma.auditLog.findFirst({
       where: {
@@ -359,6 +359,28 @@ describe('PharmaSense API', () => {
     assert.ok(body.data.some((item) => typeof item.medicineId === 'number'));
     assert.ok(body.data.every((item) => ['LOW', 'MEDIUM', 'HIGH', 'INSUFFICIENT_DATA'].includes(item.riskLevel)));
     assert.ok(body.data.every((item) => !item.monitoringStatus || ['OK', 'WATCH', 'INSUFFICIENT_DATA'].includes(item.monitoringStatus)));
+  });
+
+  it('returns ML forecast insights and metrics', async () => {
+    const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@pharmasense.local', password: seededAdminPassword }),
+    });
+    const login = (await loginResponse.json()) as { data: { token: string } };
+    const response = await fetch(`${baseUrl}/api/v1/reports/forecast-ml`, {
+      headers: { Authorization: `Bearer ${login.data.token}` },
+    });
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as {
+      success: boolean;
+      data: { available: boolean; metrics: { model: string } | null };
+    };
+    assert.equal(body.success, true);
+    assert.equal(typeof body.data.available, 'boolean');
+    if (body.data.available) {
+      assert.ok(body.data.metrics?.model);
+    }
   });
 
   it('rejects invalid forecast parameters', async () => {
