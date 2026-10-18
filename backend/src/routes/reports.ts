@@ -368,14 +368,35 @@ router.get('/replenishment', async (req: AuthenticatedRequest, res: Response) =>
       );
     }
 
+    const reviews = await prisma.replenishmentReview.findMany({
+      where: { medicineId: { in: medicines.map((medicine) => medicine.id) } },
+      select: {
+        medicineId: true,
+        decision: true,
+        notes: true,
+        reviewedAt: true,
+        reviewer: { select: { id: true, name: true } },
+      },
+    });
+    const reviewsByMedicine = new Map(reviews.map((review) => [review.medicineId, review]));
+
     const recommendations = medicines.map((medicine) => {
       const currentUnits = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
       const averageDailyDemand = (issuedByMedicine.get(medicine.id) ?? 0) / result.data.window;
+      const review = reviewsByMedicine.get(medicine.id);
       return {
         medicineId: medicine.id,
         medicineName: medicine.genericName,
         ...calculateReplenishment(currentUnits, medicine.reorderLevel, averageDailyDemand, result.data.targetDays),
         explanation: 'Read-only estimate using completed OUT transactions and the medicine reorder level.',
+        review: review
+          ? {
+              decision: review.decision,
+              notes: review.notes,
+              reviewedAt: review.reviewedAt,
+              reviewer: review.reviewer,
+            }
+          : null,
       };
     });
 
@@ -408,14 +429,37 @@ router.post('/replenishment/decision', requireRoles('Admin', 'Pharmacist', 'Inve
     }
 
     const summary = `${result.data.decision === 'APPROVED' ? 'Approved' : 'Dismissed'} replenishment review for ${medicine.genericName}`;
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.id,
-        action: 'REPLENISHMENT_DECISION',
-        entity: 'Medicine',
-        entityId: medicine.id,
-        details: `${summary}${result.data.notes ? `: ${result.data.notes}` : ''}`,
-      },
+    const review = await prisma.$transaction(async (transaction) => {
+      const savedReview = await transaction.replenishmentReview.upsert({
+        where: { medicineId: medicine.id },
+        create: {
+          medicineId: medicine.id,
+          reviewerId: req.user!.id,
+          decision: result.data.decision,
+          notes: result.data.notes,
+        },
+        update: {
+          reviewerId: req.user!.id,
+          decision: result.data.decision,
+          notes: result.data.notes,
+        },
+        select: {
+          decision: true,
+          notes: true,
+          reviewedAt: true,
+          reviewer: { select: { id: true, name: true } },
+        },
+      });
+      await transaction.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: 'REPLENISHMENT_DECISION',
+          entity: 'Medicine',
+          entityId: medicine.id,
+          details: `${summary}${result.data.notes ? `: ${result.data.notes}` : ''}`,
+        },
+      });
+      return savedReview;
     });
 
     res.json({
@@ -423,8 +467,7 @@ router.post('/replenishment/decision', requireRoles('Admin', 'Pharmacist', 'Inve
       data: {
         medicineId: medicine.id,
         medicineName: medicine.genericName,
-        decision: result.data.decision,
-        notes: result.data.notes ?? null,
+        review,
       },
     });
   } catch {

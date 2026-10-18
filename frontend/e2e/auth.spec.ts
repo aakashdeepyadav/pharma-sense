@@ -1,11 +1,58 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function mockDashboardApi(page: Page, role: string) {
+async function mockDashboardApi(
+  page: Page,
+  role: string,
+  includeReplenishment = false,
+) {
+  let review: {
+    decision: "APPROVED" | "DISMISSED";
+    notes: null;
+    reviewedAt: string;
+    reviewer: { id: number; name: string };
+  } | null = null;
+
   await page.route("**/api/v1/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     let response: unknown = { success: true, data: [] };
 
-    if (pathname.endsWith("/auth/login")) {
+    if (pathname.endsWith("/reports/replenishment/decision")) {
+      const request = route.request().postDataJSON() as {
+        medicineId: number;
+        decision: "APPROVED" | "DISMISSED";
+      };
+      review = {
+        decision: request.decision,
+        notes: null,
+        reviewedAt: "2026-10-18T10:00:00.000Z",
+        reviewer: { id: 1, name: "QA User" },
+      };
+      response = {
+        success: true,
+        data: { medicineId: request.medicineId, review },
+      };
+    } else if (pathname.endsWith("/reports/replenishment")) {
+      response = {
+        success: true,
+        data: includeReplenishment
+          ? [
+              {
+                medicineId: 1,
+                medicineName: "QA medicine",
+                currentUnits: 0,
+                reorderLevel: 5,
+                averageDailyDemand: 0,
+                targetDays: 14,
+                targetStock: 5,
+                recommendedUnits: 5,
+                status: "REPLENISH",
+                explanation: "Test recommendation",
+                review,
+              },
+            ]
+          : [],
+      };
+    } else if (pathname.endsWith("/auth/login")) {
       response = {
         success: true,
         data: {
@@ -160,6 +207,23 @@ test("shows a useful error for rejected credentials", async ({ page }) => {
   await signIn(page);
 
   await expect(page.getByRole("alert")).toHaveText("Invalid email or password.");
+});
+
+test("loads replenishment review decisions from the shared API", async ({
+  page,
+}) => {
+  await mockDashboardApi(page, "Admin", true);
+  await signIn(page);
+
+  await expect(page.getByText("QA medicine").first()).toBeVisible();
+  await page.getByRole("button", { name: "Approve" }).click();
+  await expect(page.getByText(/Reviewed by QA User/)).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText(/Reviewed by QA User/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Approve" }),
+  ).toBeDisabled();
 });
 
 test("keeps the sign-in form keyboard usable without mobile overflow", async ({

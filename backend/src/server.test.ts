@@ -108,6 +108,107 @@ describe('PharmaSense API', () => {
     assert.equal(typeof result.data.medicineCount, 'number');
   });
 
+  it('shares replenishment review decisions and records the authenticated reviewer', async () => {
+    const reviewer = await createUserForRole('Pharmacist');
+    const staff = await createUserForRole('Staff');
+    const category = await prisma.category.create({
+      data: { name: `review-${crypto.randomUUID()}-category` },
+    });
+    const medicine = await prisma.medicine.create({
+      data: {
+        genericName: `review-${crypto.randomUUID()}-medicine`,
+        brandName: 'Review workflow test',
+        categoryId: category.id,
+        reorderLevel: 5,
+        unit: 'Tablet',
+      },
+    });
+    const reviewerHeaders = {
+      'Content-Type': 'application/json',
+      Authorization: ['Be', 'arer'].join('') + ' ' + createAccessToken({ id: reviewer.id, role: 'Pharmacist' }),
+    };
+    const staffHeaders = {
+      'Content-Type': 'application/json',
+      Authorization: ['Be', 'arer'].join('') + ' ' + createAccessToken({ id: staff.id, role: 'Staff' }),
+    };
+
+    try {
+      const decisionResponse = await fetch(`${baseUrl}/api/v1/reports/replenishment/decision`, {
+        method: 'POST',
+        headers: reviewerHeaders,
+        body: JSON.stringify({ medicineId: medicine.id, decision: 'APPROVED' }),
+      });
+      assert.equal(decisionResponse.status, 200);
+      const decisionResult = (await decisionResponse.json()) as {
+        data: {
+          review: {
+            decision: string;
+            reviewer: { id: number; name: string };
+          };
+        };
+      };
+      assert.equal(decisionResult.data.review.decision, 'APPROVED');
+      assert.equal(decisionResult.data.review.reviewer.id, reviewer.id);
+      assert.equal(decisionResult.data.review.reviewer.name, reviewer.name);
+
+      const reportResponse = await fetch(`${baseUrl}/api/v1/reports/replenishment`, {
+        headers: {
+          Authorization: ['Be', 'arer'].join('') + ' ' + createAccessToken({ id: reviewer.id, role: 'Pharmacist' }),
+        },
+      });
+      assert.equal(reportResponse.status, 200);
+      const reportResult = (await reportResponse.json()) as {
+        data: Array<{
+          medicineId: number;
+          status: string;
+          review: { decision: string; reviewer: { id: number; name: string } } | null;
+        }>;
+      };
+      const recommendation = reportResult.data.find((item) => item.medicineId === medicine.id);
+      assert.ok(recommendation);
+      assert.equal(recommendation.status, 'REPLENISH');
+      assert.equal(recommendation.review?.decision, 'APPROVED');
+      assert.equal(recommendation.review?.reviewer.id, reviewer.id);
+
+      const staffDecisionResponse = await fetch(`${baseUrl}/api/v1/reports/replenishment/decision`, {
+        method: 'POST',
+        headers: staffHeaders,
+        body: JSON.stringify({ medicineId: medicine.id, decision: 'DISMISSED' }),
+      });
+      assert.equal(staffDecisionResponse.status, 403);
+
+      const updateResponse = await fetch(`${baseUrl}/api/v1/reports/replenishment/decision`, {
+        method: 'POST',
+        headers: reviewerHeaders,
+        body: JSON.stringify({ medicineId: medicine.id, decision: 'DISMISSED' }),
+      });
+      assert.equal(updateResponse.status, 200);
+      const savedReview = await prisma.replenishmentReview.findUniqueOrThrow({
+        where: { medicineId: medicine.id },
+      });
+      assert.equal(savedReview.decision, 'DISMISSED');
+
+      const auditCount = await prisma.auditLog.count({
+        where: {
+          action: 'REPLENISHMENT_DECISION',
+          entity: 'Medicine',
+          entityId: medicine.id,
+          userId: reviewer.id,
+        },
+      });
+      assert.equal(auditCount, 2);
+    } finally {
+      await prisma.replenishmentReview.deleteMany({ where: { medicineId: medicine.id } });
+      await prisma.auditLog.deleteMany({
+        where: { action: 'REPLENISHMENT_DECISION', entityId: medicine.id },
+      });
+      await prisma.medicine.delete({ where: { id: medicine.id } });
+      await prisma.category.delete({ where: { id: category.id } });
+      await prisma.user.delete({ where: { id: reviewer.id } });
+      await prisma.user.delete({ where: { id: staff.id } });
+    }
+  });
+
   it('smokes an authenticated inventory receiving and issuing workflow', async () => {
     const runId = `smoke-${Date.now()}`;
     let categoryId: number | undefined;

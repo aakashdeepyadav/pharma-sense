@@ -12,6 +12,8 @@ inventory operations workstream. All protected endpoints require a bearer JWT.
 | `POST /api/v1/batches` | Admin, Pharmacist, Inventory Manager | `201` | `400 VALIDATION_ERROR`, `409 DUPLICATE_BATCH` | Batch, stock-IN ledger, and audit are atomic |
 | `POST /api/v1/inventory/transactions` | Admin, Pharmacist, Inventory Manager, Staff | `201` | `400 VALIDATION_ERROR`, `404 BATCH_NOT_FOUND`, `409 INSUFFICIENT_STOCK`, `409 EXPIRED_BATCH` | Quantity update, ledger row, and audit are atomic |
 | `PATCH /api/v1/alerts/:id/acknowledge` | Any authenticated role | `200` | `400 INVALID_ALERT_ID`, `404 ALERT_NOT_FOUND` | Alert acknowledgement and audit are atomic |
+| `GET /api/v1/reports/replenishment` | Any authenticated role | `200`, recommendations with the latest persisted review and reviewer | `400 VALIDATION_ERROR` | Read-only; never creates purchases or stock movements |
+| `POST /api/v1/reports/replenishment/decision` | Admin, Pharmacist, Inventory Manager | `200`, saved decision and reviewer | `400 VALIDATION_ERROR`, `404 MEDICINE_NOT_FOUND` | Latest review and audit event are written atomically; previous review history remains in the audit log |
 
 Errors use the following shape:
 
@@ -29,6 +31,11 @@ Errors use the following shape:
 Unauthenticated requests return `401`; authenticated users without the
 endpoint role return `403`. Invalid request data is rejected before a
 transaction starts.
+
+Replenishment review state is shared across users and stored per medicine.
+Submitting another decision updates the current review state while retaining
+each decision as an attributed audit event. Review decisions are advisory only
+and do not initiate a purchase or stock change.
 
 ## Session invalidation
 

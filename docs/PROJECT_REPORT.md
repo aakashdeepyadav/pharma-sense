@@ -103,7 +103,8 @@ This is important because model output is treated as advisory evidence, not as a
 1. Estimate average demand from historical OUT transactions.
 2. Calculate reorder pressure using reorder level and current stock.
 3. Recommend replenishment only as a draft decision.
-4. Leave final purchase action to a human approver.
+4. Store the latest approval/dismissal decision per medicine so reviewers share the same status.
+5. Record each decision with its authenticated reviewer in the audit trail; decisions never create purchases or change stock.
 
 ## 6. Current Implementation Status
 
@@ -114,21 +115,20 @@ This is important because model output is treated as advisory evidence, not as a
 - stock transaction logic
 - alerts for stock and expiry risk
 - report APIs for forecast baseline and replenishment guidance
+- shared replenishment review state with reviewer attribution and transactional audit records
+- dashboard review status showing who made the latest decision
 - fleet of background validation and readiness checks
 - ML research pipeline and evaluation metrics
-- generated training dataset for full model training
 
 ### In progress or not yet full production
 
-- real operational demand dataset from live business data
-- model-to-alert integration at the product level
-- forecast-driven alert rules
-- approval workflow for purchase actions
-- monitoring, drift checks, retraining, and governance workflow
+- business approval of production data use and forecasting claims
+- production hosting, backup ownership, and deployment/rollback rehearsal
+- ongoing ownership for forecast quality review and model retraining
 
 ## 7. Verified Results
 
-The following checks were run and passed in the current workspace:
+The following checks were run and passed during the current implementation:
 
 ### Backend validation
 
@@ -136,57 +136,40 @@ Command:
 
 ```bash
 cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\backend"
-npm test
+npm run build
+npx prisma validate
+npx tsx --test src/domain/stockRules.test.ts src/domain/reconciliation.test.ts src/domain/dataQuality.test.ts src/validation/schemas.test.ts src/domain/forecasting.test.ts src/domain/replenishment.test.ts
 ```
 
 Result:
 
-- 28 tests passed
+- TypeScript build passed and Prisma schema validation passed
+- all 10 database-independent backend tests passed
 - 0 failed
 
-### Frontend build validation
+### Frontend validation
 
 Command:
 
 ```bash
 cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\frontend"
+npm run lint
 npm run build
+npm run test:e2e
 ```
 
 Result:
 
-- successful production build
-- Vite compile completed successfully
+- lint completed with one existing React state-in-effect warning in the forecast selector
+- production build succeeded
+- all 10 browser tests passed, including review-state persistence across reloads
 
-### Forecast readiness validation
-
-Command:
-
-```bash
-cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\backend"
-npm run research:readiness
-```
-
-Result:
-
-- production_ready: true
-- dataset passed minimum data-quality and coverage gates
-
-### Forecast model validation
-
-Command:
-
-```bash
-cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\backend"
-npm run research:ml
-```
-
-Result:
-
-- MAE: 1.3775
-- RMSE: 2.0038
-- model trained successfully on the full generated demand dataset
-- forecast output generated
+The full backend `npm test` run and `npx prisma migrate deploy` could not be
+completed because the configured PostgreSQL endpoint at `localhost:5433` was
+unavailable; the Docker daemon was also unavailable. The API integration test
+for database-backed decision persistence therefore has not run against a live
+database. Live PostgreSQL browser tests, database quality/reconciliation, and
+research/model retraining were not run as part of this implementation.
 
 ## 8. Result Interpretation
 
@@ -197,35 +180,32 @@ The project is in a strong engineering state for:
 - forecasting research
 - alert and replenishment support
 
-The project is not yet a fully autonomous, live, pharma-grade prediction system because the remaining gap is the operational decision loop:
+The system is deliberately not an autonomous prediction system. Its operational
+review loop is implemented, while production use still depends on:
 
-- approved live data feed
-- model-supported alerting
-- approval workflow
-- human-in-the-loop purchase decisions
-- formal monitoring and governance
+- explicit business approval of the data and forecasting claims
+- production hosting, backup, ownership, and rollback readiness
+- continued human review of all replenishment recommendations
 
 ## 9. Critical Risks and Gaps
 
 1. Forecast output is still advisory and cannot be treated as an automatic operational action.
 2. Real operational data must be approved before production claims are made.
-3. Forecast-based alerts need a governance layer before being used in critical decisions.
-4. The model needs monitoring for drift, lead-time changes, and new medicine behavior.
-5. Product-level workflow integration still needs to be completed for end-user forecasting dashboards.
+3. Forecast metrics require ongoing review against approved operational data.
+4. Model drift, lead-time changes, and new medicine behavior need assigned operational owners.
+5. Production rollout remains gated on the release checklist and business sign-off.
 
 ## 10. Recommended Next Phase
 
-The next working phase should focus on the operational decision loop:
+The next working phase is deployment and handoff:
 
-1. connect forecast output to the operational API
-2. create forecast risk alert types
-3. add human-approved replenishment recommendations
-4. expose them in the UI
-5. add monitoring, versioning, and drift checks
-6. validate with production-style review before purchase automation is considered
+1. run the migration and full release checks in a disposable environment
+2. assign database, backup, secret, access-review, and rollback owners
+3. obtain explicit business approval for data usage and pilot claims
+4. keep forecast recommendations advisory and human-reviewed
 
 ## 11. Final Assessment
 
-PharmaSense is already a credible operational inventory platform with a strong early-stage forecasting and replenishment research layer. The project is no longer just a prototype; it is a functioning inventory system with a valid ML research pipeline. The remaining work is not about basic features anymore — it is about connecting the forecasting intelligence to a reviewable, safe, and production-ready operational workflow.
+PharmaSense has a functioning inventory system, forecasting and replenishment guidance, and a shared, auditable human review workflow. The remaining release work is organizational and operational: production data approval, hosting and recovery ownership, and a rehearsed deployment with explicit sign-off.
 
 This is the correct path for a responsible full system rollout: product first, forecasting second, governed action last.

@@ -6,14 +6,14 @@ Goal: make the forecast output fully operational from a governance perspective.
 
 Tasks:
 
-- confirm the dashboard exposes forecast risk and replenishment recommendations clearly
-- ensure every review decision is attached to audit logs and staff identity
-- make the approval/dismiss flow visible in the operational report views
-- keep the model advisory-only with no automatic stock changes
+- [x] expose forecast risk and replenishment recommendations in the dashboard
+- [x] persist each review decision across users and sessions, with reviewer attribution and an audit event
+- [x] show approval/dismissal state and reviewer on the replenishment review card
+- [x] keep the model advisory-only with no automatic stock changes
 
 Priority: High
 
-Status: Active
+Status: Complete
 
 ## Phase 2: Monitoring and drift checks
 
@@ -41,6 +41,8 @@ Tasks:
 - confirm approved data retention and governance practices
 - obtain business sign-off before production claim language is used
 
+Status: Pending external data-governance and business approval
+
 Priority: High
 
 ## Phase 4: Deployment and handoff
@@ -64,7 +66,8 @@ Continue with Phase 4: deployment and handoff.
 
 This will include:
 
-- confirming the final release rehearsal evidence from the local environment
+- applying the new replenishment-review migration through the release process
+- confirming the final release rehearsal evidence in a disposable environment
 - recording operational ownership and live deployment boundaries
 - checking environment secret handling and rollback plans
 - finalising sign-off materials for team handoff and production release approval

@@ -2,11 +2,18 @@
 
 ## Status
 
-The project is ready for operational handoff from a validation standpoint. The backend release path was exercised successfully, the forecasting pipeline ran on approved operational demand data, and the frontend production build completed.
+The replenishment review workflow now persists the latest decision per
+medicine, shows the reviewer in the dashboard, and writes each decision with
+its audit event atomically. The release is **not ready for operational
+handoff**: the new migration has not been applied, and database-backed
+integration checks must pass before release.
 
 ## Verified evidence
 
-### Backend release rehearsal
+### Previously recorded backend release rehearsal
+
+The following results are historical project evidence and were not rerun for
+the current change.
 
 Command run:
 
@@ -62,27 +69,56 @@ Result:
 - one non-blocking React warning remained in the forecast selector effect during linting
 - production bundle was generated successfully
 
+### Current local validation
+
+Commands run:
+
+```powershell
+cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\backend"
+npm run build
+npx prisma validate
+npx tsx --test src/domain/stockRules.test.ts src/domain/reconciliation.test.ts src/domain/dataQuality.test.ts src/validation/schemas.test.ts src/domain/forecasting.test.ts src/domain/replenishment.test.ts
+
+cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\frontend"
+npm run lint
+npm run build
+npm run test:e2e
+```
+
+Results:
+
+- backend TypeScript build and Prisma schema validation passed
+- all 10 database-independent backend tests passed
+- frontend build passed and all 10 browser tests passed
+- lint completed with one existing forecast-selector React warning
+
+The full backend `npm test` command and `npx prisma migrate deploy` were
+attempted but could not reach the configured database at `localhost:5433`.
+Docker Desktop was unavailable. Database quality/reconciliation, the
+database-backed review API test, and the live PostgreSQL browser workflow
+remain unverified for this change.
+
 ## Operational interpretation
 
 This project remains in an advisory, human-reviewed operating model:
 
 - forecasting is evidence for planning and monitoring
-- replenishment recommendations are reviewable and auditable
+- replenishment decisions are shared, persistent, reviewable, and auditable
 - no recommendation directly creates orders or stock movements without approval
-- deployment is supported by migration, seed, reconciliation, and audit flows
+- the new persistence migration must be applied and verified before release
 
 ## Release checklist status
 
-The following handoff gates are satisfied in this local rehearsal:
+The following release gates remain open for this change:
 
-- [x] migration deployment works
-- [x] database quality is acceptable
-- [x] stock reconciliation has no discrepancies
-- [x] API regression tests pass
-- [x] forecasting pipeline works on operational data
-- [x] frontend production build succeeds
-- [x] release runbook is documented
-- [x] security and governance controls are recorded
+- [ ] apply the new migration to a disposable PostgreSQL database
+- [ ] pass the full backend integration test suite
+- [ ] pass database quality and stock reconciliation checks
+- [ ] run the live PostgreSQL browser workflow
+- [ ] complete final release rehearsal and rollback review
+
+Frontend build and browser tests, Prisma schema validation, and
+database-independent backend tests passed locally.
 
 ## Remaining operational owner actions
 

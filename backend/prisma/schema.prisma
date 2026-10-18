@@ -8,17 +8,18 @@ datasource db {
 }
 
 model User {
-  id           Int                @id @default(autoincrement())
-  name         String
-  email        String             @unique
-  passwordHash String
-  active       Boolean            @default(true)
-  sessionVersion Int              @default(0)
-  roleId       Int
-  role         Role               @relation(fields: [roleId], references: [id])
-  transactions StockTransaction[]
-  auditLogs    AuditLog[]
-  purchases    Purchase[]         @relation("PurchasesCreated")
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  email                String                @unique
+  passwordHash         String
+  active               Boolean               @default(true)
+  sessionVersion       Int                   @default(0)
+  roleId               Int
+  role                 Role                  @relation(fields: [roleId], references: [id])
+  transactions         StockTransaction[]
+  auditLogs            AuditLog[]
+  purchases            Purchase[]            @relation("PurchasesCreated")
+  replenishmentReviews ReplenishmentReview[]
 }
 
 model Role {
@@ -36,20 +37,21 @@ model Category {
 }
 
 model Medicine {
-  id            Int            @id @default(autoincrement())
-  genericName   String
-  brandName     String
-  categoryId    Int
-  category      Category       @relation(fields: [categoryId], references: [id])
-  manufacturer  String?
-  dosageForm    String?
-  barcode       String?        @unique
-  active        Boolean        @default(true)
-  reorderLevel  Int            @default(0)
-  unit          String
-  batches       Batch[]
-  alerts        Alert[]
-  purchaseItems PurchaseItem[]
+  id                  Int                  @id @default(autoincrement())
+  genericName         String
+  brandName           String
+  categoryId          Int
+  category            Category             @relation(fields: [categoryId], references: [id])
+  manufacturer        String?
+  dosageForm          String?
+  barcode             String?              @unique
+  active              Boolean              @default(true)
+  reorderLevel        Int                  @default(0)
+  unit                String
+  batches             Batch[]
+  alerts              Alert[]
+  purchaseItems       PurchaseItem[]
+  replenishmentReview ReplenishmentReview?
 }
 
 model Supplier {
@@ -155,4 +157,16 @@ model RevokedAccessToken {
   createdAt DateTime @default(now())
 
   @@index([expiresAt])
+}
+
+model ReplenishmentReview {
+  medicineId Int      @id
+  medicine   Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  reviewerId Int
+  reviewer   User     @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+  decision   String
+  notes      String?
+  reviewedAt DateTime @updatedAt
+
+  @@index([reviewerId])
 }

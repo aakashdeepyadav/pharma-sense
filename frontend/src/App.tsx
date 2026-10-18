@@ -107,6 +107,12 @@ type ReplenishmentRecommendation = {
   recommendedUnits: number;
   status: "REPLENISH" | "NO_ACTION";
   explanation: string;
+  review?: {
+    decision: Exclude<ReplenishmentDecision, "PENDING">;
+    notes: string | null;
+    reviewedAt: string;
+    reviewer: { id: number; name: string };
+  } | null;
 };
 
 type ReplenishmentDecision = "PENDING" | "APPROVED" | "DISMISSED";
@@ -376,25 +382,8 @@ function App() {
   const [replenishment, setReplenishment] = useState<
     ReplenishmentRecommendation[]
   >([]);
-  const [replenishmentDecisions, setReplenishmentDecisions] = useState<
-    Record<number, ReplenishmentDecision>
-  >(() => {
-    try {
-      const storedValue = sessionStorage.getItem(
-        "pharmasense-replenishment-decisions",
-      );
-      if (!storedValue) return {};
-      const parsed = JSON.parse(storedValue) as Record<
-        string,
-        ReplenishmentDecision
-      >;
-      return Object.fromEntries(
-        Object.entries(parsed).map(([key, value]) => [Number(key), value]),
-      );
-    } catch {
-      return {};
-    }
-  });
+  const [savingReplenishmentDecision, setSavingReplenishmentDecision] =
+    useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [auditSearch, setAuditSearch] = useState("");
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
@@ -1571,13 +1560,6 @@ function App() {
   };
 
   useEffect(() => {
-    sessionStorage.setItem(
-      "pharmasense-replenishment-decisions",
-      JSON.stringify(replenishmentDecisions),
-    );
-  }, [replenishmentDecisions]);
-
-  useEffect(() => {
     if (!session || medicines.length === 0) {
       setForecastBaseline(null);
       return;
@@ -1699,11 +1681,10 @@ function App() {
     (item) => item.status === "REPLENISH",
   );
   const pendingReviewCount = replenishmentQueue.filter(
-    (item) =>
-      (replenishmentDecisions[item.medicineId] ?? "PENDING") === "PENDING",
+    (item) => !item.review,
   ).length;
-  const approvedReviewCount = Object.values(replenishmentDecisions).filter(
-    (decision) => decision === "APPROVED",
+  const approvedReviewCount = replenishmentQueue.filter(
+    (item) => item.review?.decision === "APPROVED",
   ).length;
   const canWriteMedicines = [
     "Admin",
@@ -1743,12 +1724,7 @@ function App() {
     medicineId: number,
     decision: Exclude<ReplenishmentDecision, "PENDING">,
   ) => {
-    const previousDecision = replenishmentDecisions[medicineId] ?? "PENDING";
-    setReplenishmentDecisions((current) => ({
-      ...current,
-      [medicineId]: decision,
-    }));
-
+    setSavingReplenishmentDecision(true);
     try {
       const response = await apiFetch(
         "/api/v1/reports/replenishment/decision",
@@ -1758,18 +1734,19 @@ function App() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.token}`,
           },
-          body: JSON.stringify({
-            medicineId,
-            decision,
-            notes: `${decision === "APPROVED" ? "Approved" : "Dismissed"} by ${session.user.name}`,
-          }),
+          body: JSON.stringify({ medicineId, decision }),
         },
       );
       const result = (await response.json()) as {
         success?: boolean;
+        data?: {
+          medicineId: number;
+          review: NonNullable<ReplenishmentRecommendation["review"]>;
+        };
         error?: string | ApiErrorPayload;
       };
-      if (!response.ok || !result.success) {
+      const savedReview = result.data?.review;
+      if (!response.ok || !result.success || !savedReview) {
         throw new Error(
           extractErrorMessage(
             result.error,
@@ -1777,16 +1754,21 @@ function App() {
           ),
         );
       }
+      setReplenishment((current) =>
+        current.map((item) =>
+          item.medicineId === medicineId
+            ? { ...item, review: savedReview }
+            : item,
+        ),
+      );
     } catch (requestError) {
-      setReplenishmentDecisions((current) => ({
-        ...current,
-        [medicineId]: previousDecision,
-      }));
       setError(
         requestError instanceof Error
           ? requestError.message
           : "Unable to save the replenishment decision.",
       );
+    } finally {
+      setSavingReplenishmentDecision(false);
     }
   };
 
@@ -3288,8 +3270,7 @@ function App() {
         ) : (
           <div className="divide-y divide-gray-100">
             {replenishmentQueue.map((item) => {
-              const decision =
-                replenishmentDecisions[item.medicineId] ?? "PENDING";
+              const decision = item.review?.decision ?? "PENDING";
               const decisionTone = {
                 PENDING: "text-slate-600 bg-slate-100 border-slate-200",
                 APPROVED: "text-emerald-700 bg-emerald-50 border-emerald-200",
@@ -3329,7 +3310,10 @@ function App() {
                           )
                         }
                         className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={decision === "APPROVED"}
+                        disabled={
+                          savingReplenishmentDecision ||
+                          decision === "APPROVED"
+                        }
                       >
                         Approve
                       </button>
@@ -3342,7 +3326,10 @@ function App() {
                           )
                         }
                         className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={decision === "DISMISSED"}
+                        disabled={
+                          savingReplenishmentDecision ||
+                          decision === "DISMISSED"
+                        }
                       >
                         Dismiss
                       </button>
@@ -3356,6 +3343,12 @@ function App() {
                           ? "Approved"
                           : "Dismissed"}
                     </span>
+                    {item.review && (
+                          <p className="text-xs text-gray-500">
+                            Reviewed by {item.review.reviewer.name} on{" "}
+                            {new Date(item.review.reviewedAt).toLocaleString()}
+                          </p>
+                    )}
                   </div>
                 </div>
               );

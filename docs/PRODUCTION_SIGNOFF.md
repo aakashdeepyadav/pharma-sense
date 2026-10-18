@@ -2,19 +2,26 @@
 
 ## Verified status
 
-The project has passed the current release-quality gate based on fresh validation in the workspace.
+The shared replenishment review workflow is implemented, including persistent
+review status, reviewer attribution, and atomic audit logging. Release
+verification is incomplete: the new migration was not applied because the
+configured PostgreSQL service at `localhost:5433` was unavailable.
 
-- Backend validation: 30 tests passed, 0 failed
-- Dataset readiness: `production_ready = true`
-- Operational dataset size: 20,080 rows
-- Medicines covered: 20
-- Unique days covered: 1,004
-- Date range: 2024-01-01 to 2026-09-30
-- Forecast quality: MAE 0.6574, RMSE 1.1551
+- Backend TypeScript build: passed
+- Prisma schema validation: passed
+- Database-independent backend tests: 10 passed
+- Frontend production build: passed
+- Frontend browser tests: 10 passed
+- Frontend lint: completed with one existing forecast-selector warning
+- Full database-backed API tests, migration deployment, database quality,
+  reconciliation, and live browser workflow: not verified in this run
 
 ## Conclusion
 
-The system is ready for the next operational phase as a production-style pilot with human review controls in place. The current forecast is evidence for decision support, not autonomous inventory action.
+The system is **not signed off for production deployment** until the migration
+and database-backed release checks pass in a disposable PostgreSQL environment.
+Forecast and replenishment outputs remain advisory and must not trigger
+autonomous inventory action.
 
 ## Release rules
 
@@ -27,9 +34,11 @@ The system is ready for the next operational phase as a production-style pilot w
 ## Required next actions
 
 - Freeze the approved operational dataset and model baseline.
+- Apply the replenishment review migration and pass the full database-backed test suite.
 - Review the forecast risk and replenishment recommendation workflow.
 - Verify audit logging for every recommendation decision.
-- Confirm that no stock movement is triggered without a signed review.
+- Confirm that no stock movement is triggered automatically from a review decision.
+- Assign production hosting, backup, secret, and rollback owners.
 - Use the project checklists in this repository for deployment and release sign-off.
 
 ## Commands for final verification
