@@ -4,7 +4,7 @@
 
 PharmaSense is a medicine inventory and decision-support system designed for pharmacies and healthcare inventory teams. The project combines operational stock management, alerting, auditability, and a forecasting pipeline that can support replenishment planning without allowing model output to trigger purchases automatically.
 
-The project has reached a solid MVP stage with validated inventory management workflows, an alerting layer, and a working ML forecasting baseline. The current implementation is strongest in product operations and data governance. The remaining work is the operational bridge from forecast output to business-approved actions, which should remain human-reviewed and auditable.
+The project has a complete, locally verified inventory workflow spanning authentication, role-based access, medicine and supplier management, receiving and issuing, purchases, alerts, reporting, audit history, and human-reviewed replenishment decisions. A Render deployment Blueprint is prepared. Production hosting, privileged MFA, backup/restore rehearsal, and forecasting validation with representative operational data remain open.
 
 ## 2. Project Objective
 
@@ -120,7 +120,7 @@ This is important because model output is treated as advisory evidence, not as a
 - fleet of background validation and readiness checks
 - ML research pipeline and evaluation metrics
 
-### In progress or not yet full production
+### Remaining before production use
 
 - business approval of production data use and forecasting claims
 - production hosting, backup ownership, and deployment/rollback rehearsal
@@ -128,52 +128,18 @@ This is important because model output is treated as advisory evidence, not as a
 
 ## 7. Verified Results
 
-The following checks were run and passed during the current implementation:
+The latest local verification was recorded on 2026-10-20:
 
-### Backend validation
-
-Command:
-
-```bash
-cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\backend"
-npm run build
-npx prisma validate
-npx tsx --test src/domain/stockRules.test.ts src/domain/reconciliation.test.ts src/domain/dataQuality.test.ts src/validation/schemas.test.ts src/domain/forecasting.test.ts src/domain/replenishment.test.ts
-```
-
-Result:
-
-- TypeScript build passed and Prisma schema validation passed
-- all 10 database-independent backend tests passed
-- 0 failed
-
-### Frontend validation
-
-Command:
-
-```bash
-cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\frontend"
-npm run lint
-npm run build
-npm run test:e2e
-```
-
-Result:
-
-- lint completed with one existing React state-in-effect warning in the forecast selector
-- production build succeeded
-- all 10 browser tests passed, including review-state persistence across reloads
-
-The full backend `npm test` run and `npx prisma migrate deploy` could not be
-completed because the configured PostgreSQL endpoint at `localhost:5433` was
-unavailable; the Docker daemon was also unavailable. The API integration test
-for database-backed decision persistence therefore has not run against a live
-database. Live PostgreSQL browser tests, database quality/reconciliation, and
-research/model retraining were not run as part of this implementation.
+- Backend TypeScript build and all 35 tests passed.
+- Frontend lint and production build passed; all 13 mocked Playwright tests passed.
+- One live Playwright workflow passed against an isolated disposable PostgreSQL database; the temporary database was removed.
+- Database quality reported 0 errors and warnings; stock reconciliation reported 0 discrepancies. Both checks were read-only.
+- Backend and frontend production dependency audits reported 0 vulnerabilities.
+- The Render Blueprint YAML syntax parses; Render CLI validation and hosted deployment remain unverified.
 
 ## 8. Result Interpretation
 
-The project is in a strong engineering state for:
+The local application and automated verification are complete for the tested scope. The project is prepared for a controlled Render pilot, while production use still depends on:
 
 - product operations
 - business inventory control
@@ -184,7 +150,8 @@ The system is deliberately not an autonomous prediction system. Its operational
 review loop is implemented, while production use still depends on:
 
 - explicit business approval of the data and forecasting claims
-- production hosting, backup, ownership, and rollback readiness
+- actual deployment, backup/restore, ownership, and rollback readiness
+- privileged MFA before operational inventory use
 - continued human review of all replenishment recommendations
 
 ## 9. Critical Risks and Gaps
@@ -197,7 +164,7 @@ review loop is implemented, while production use still depends on:
 
 ## 10. Recommended Next Phase
 
-The next working phase is deployment and handoff:
+The remaining release work is deployment and handoff:
 
 1. run the migration and full release checks in a disposable environment
 2. assign database, backup, secret, access-review, and rollback owners
