@@ -301,6 +301,142 @@ describe('PharmaSense API', () => {
     }
   });
 
+  it('keeps active alerts visible and reopens them when the same condition returns', async () => {
+    const runId = `alert-lifecycle-${crypto.randomUUID()}`;
+    const category = await prisma.category.create({ data: { name: `${runId}-category` } });
+    const supplier = await prisma.supplier.create({ data: { name: `${runId}-supplier` } });
+    const medicine = await prisma.medicine.create({
+      data: {
+        genericName: `${runId}-medicine`,
+        brandName: 'Alert lifecycle test',
+        categoryId: category.id,
+        unit: 'Tablet',
+        reorderLevel: 0,
+      },
+    });
+    const batch = await prisma.batch.create({
+      data: {
+        medicineId: medicine.id,
+        supplierId: supplier.id,
+        batchNumber: `${runId}-batch`,
+        mfgDate: new Date('2025-01-01T00:00:00Z'),
+        expiryDate: new Date('2035-01-01T00:00:00Z'),
+        quantity: 0,
+        purchasePrice: 1,
+        sellingPrice: 2,
+      },
+    });
+    const expiredBatch = await prisma.batch.create({
+      data: {
+        medicineId: medicine.id,
+        supplierId: supplier.id,
+        batchNumber: `${runId}-expired-batch`,
+        mfgDate: new Date('2019-01-01T00:00:00Z'),
+        expiryDate: new Date('2020-01-01T00:00:00Z'),
+        quantity: 6,
+        purchasePrice: 1,
+        sellingPrice: 2,
+      },
+    });
+    const fingerprint = `OUT_OF_STOCK:${medicine.id}`;
+
+    try {
+      const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'admin@pharmasense.local', password: seededAdminPassword }),
+      });
+      assert.equal(loginResponse.status, 200);
+      const login = (await loginResponse.json()) as { data: { token: string } };
+      const headers = { Authorization: `Bearer ${login.data.token}` };
+
+      const fetchCurrentAlert = async () => {
+        const response = await fetch(`${baseUrl}/api/v1/alerts`, { headers });
+        assert.equal(response.status, 200);
+        const result = (await response.json()) as {
+          data: Array<{ id: number; fingerprint: string; status: string }>;
+        };
+        return result.data.find((alert) => alert.fingerprint === fingerprint);
+      };
+
+      const firstAlert = await fetchCurrentAlert();
+      assert.ok(firstAlert);
+      assert.equal(firstAlert.status, 'OPEN');
+      assert.equal((await fetchCurrentAlert())?.status, 'OPEN');
+
+      const acknowledgeResponse = await fetch(
+        `${baseUrl}/api/v1/alerts/${firstAlert.id}/acknowledge`,
+        { method: 'PATCH', headers },
+      );
+      assert.equal(acknowledgeResponse.status, 200);
+      assert.equal((await fetchCurrentAlert())?.status, 'ACKNOWLEDGED');
+
+      await prisma.batch.update({ where: { id: batch.id }, data: { quantity: 2 } });
+      assert.equal(await fetchCurrentAlert(), undefined);
+      assert.equal((await prisma.alert.findUniqueOrThrow({ where: { fingerprint } })).status, 'RESOLVED');
+
+      await prisma.batch.update({ where: { id: batch.id }, data: { quantity: 0 } });
+      const reopenedAlert = await fetchCurrentAlert();
+      assert.ok(reopenedAlert);
+      assert.equal(reopenedAlert.status, 'OPEN');
+    } finally {
+      const medicineAlerts = await prisma.alert.findMany({ where: { medicineId: medicine.id }, select: { id: true } });
+      if (medicineAlerts.length > 0) {
+        await prisma.auditLog.deleteMany({
+          where: { entity: 'Alert', entityId: { in: medicineAlerts.map((alert) => alert.id) } },
+        });
+        await prisma.alert.deleteMany({ where: { medicineId: medicine.id } });
+      }
+      await prisma.batch.delete({ where: { id: batch.id } });
+      await prisma.batch.delete({ where: { id: expiredBatch.id } });
+      await prisma.medicine.delete({ where: { id: medicine.id } });
+      await prisma.category.delete({ where: { id: category.id } });
+      await prisma.supplier.delete({ where: { id: supplier.id } });
+    }
+  });
+
+  it('paginates purchase history and validates its page parameters', async () => {
+    const runId = `purchase-pages-${crypto.randomUUID()}`;
+    const admin = await prisma.user.findUniqueOrThrow({ where: { email: 'admin@pharmasense.local' } });
+    const supplier = await prisma.supplier.create({ data: { name: `${runId}-supplier` } });
+    const purchases = await Promise.all([1, 2].map(() => prisma.purchase.create({
+      data: { supplierId: supplier.id, createdById: admin.id },
+    })));
+
+    try {
+      const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'admin@pharmasense.local', password: seededAdminPassword }),
+      });
+      assert.equal(loginResponse.status, 200);
+      const login = (await loginResponse.json()) as { data: { token: string } };
+      const headers = { Authorization: `Bearer ${login.data.token}` };
+
+      const readPage = async (page: number) => {
+        const response = await fetch(`${baseUrl}/api/v1/purchases?page=${page}&pageSize=1`, { headers });
+        assert.equal(response.status, 200);
+        return (await response.json()) as {
+          data: Array<{ id: number }>;
+          meta: { page: number; pageSize: number; total: number; totalPages: number };
+        };
+      };
+      const firstPage = await readPage(1);
+      const secondPage = await readPage(2);
+      assert.equal(firstPage.data.length, 1);
+      assert.equal(secondPage.data.length, 1);
+      assert.equal(firstPage.meta.pageSize, 1);
+      assert.ok(firstPage.meta.total >= 2);
+      assert.notEqual(firstPage.data[0].id, secondPage.data[0].id);
+
+      const invalidResponse = await fetch(`${baseUrl}/api/v1/purchases?page=0`, { headers });
+      assert.equal(invalidResponse.status, 400);
+    } finally {
+      await prisma.purchase.deleteMany({ where: { id: { in: purchases.map((purchase) => purchase.id) } } });
+      await prisma.supplier.delete({ where: { id: supplier.id } });
+    }
+  });
+
   it('records a replenishment review decision for a medicine', async () => {
     const medicine = await prisma.medicine.findFirst();
     assert.ok(medicine, 'Expected a seeded medicine for replenishment review testing');

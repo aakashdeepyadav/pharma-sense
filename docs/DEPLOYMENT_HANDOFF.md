@@ -69,7 +69,7 @@ Result:
 - one non-blocking React warning remained in the forecast selector effect during linting
 - production bundle was generated successfully
 
-### Current local validation
+### Historical local validation (superseded)
 
 Commands run:
 
@@ -92,11 +92,19 @@ Results:
 - frontend build passed and all 10 browser tests passed
 - lint completed with one existing forecast-selector React warning
 
-The full backend `npm test` command and `npx prisma migrate deploy` were
-attempted but could not reach the configured database at `localhost:5433`.
-Docker Desktop was unavailable. Database quality/reconciliation, the
-database-backed review API test, and the live PostgreSQL browser workflow
-remain unverified for this change.
+These results predate the verification below. The old PostgreSQL connection
+failure is no longer the current database status.
+
+### Current project verification (2026-10-20)
+
+- Backend build passed; all 34 backend tests passed.
+- Frontend lint and production build passed; all 13 mocked Playwright tests
+  passed.
+- Database quality passed with 0 errors and 0 warnings; stock reconciliation
+  reported 0 discrepancies and 0 unsupported movements. Both checks were
+  read-only (`modifiedData: false`).
+- The live browser workflow was not run because `E2E_DATABASE_URL` is not
+  configured. It needs a disposable PostgreSQL database.
 
 ## Operational interpretation
 
@@ -111,10 +119,9 @@ This project remains in an advisory, human-reviewed operating model:
 
 The following release gates remain open for this change:
 
-- [ ] apply the new migration to a disposable PostgreSQL database
-- [ ] pass the full backend integration test suite
-- [ ] pass database quality and stock reconciliation checks
-- [ ] run the live PostgreSQL browser workflow
+- [x] pass the full backend integration test suite against the configured local database
+- [x] pass database quality and stock reconciliation checks
+- [ ] apply migrations and run the live browser workflow against a disposable PostgreSQL database
 - [ ] complete final release rehearsal and rollback review
 
 Frontend build and browser tests, Prisma schema validation, and

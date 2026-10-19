@@ -4,7 +4,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { apiFetch } from "./api";
+import { apiFetch, fetchAllPages, readAllPages } from "./api";
 import "./App.css";
 
 type Medicine = {
@@ -18,7 +18,7 @@ type Medicine = {
   active: boolean;
   unit: string;
   reorderLevel: number;
-  batches: { quantity: number }[];
+  batches: { quantity: number; expiryDate: string }[];
 };
 
 type Category = { id: number; name: string; description: string | null };
@@ -250,20 +250,31 @@ type BatchForm = {
   sellingPrice: string;
 };
 
-type PurchaseForm = BatchForm & {
+type PurchaseLineForm = Omit<BatchForm, "supplierId">;
+
+type PurchaseForm = {
+  supplierId: string;
+  items: PurchaseLineForm[];
   notes: string;
 };
+
+function emptyPurchaseLine(medicineId = ""): PurchaseLineForm {
+  return {
+    medicineId,
+    batchNumber: "",
+    mfgDate: "",
+    expiryDate: "",
+    quantity: "1",
+    purchasePrice: "0",
+    sellingPrice: "0",
+  };
+}
 
 type StockForm = {
   batchId: string;
   type: "OUT" | "ADJ";
   quantity: string;
   notes: string;
-};
-
-type ApiResponse = {
-  success: boolean;
-  data: Medicine[];
 };
 
 type Session = {
@@ -276,6 +287,17 @@ type ApiErrorPayload = {
   message?: string;
   details?: unknown[];
 };
+
+function isExpiryDatePast(expiryDate: string, now = new Date()) {
+  return expiryDate.slice(0, 10) < now.toISOString().slice(0, 10);
+}
+
+function availableMedicineUnits(medicine: Medicine, now = new Date()) {
+  return medicine.batches.reduce(
+    (total, batch) => total + (isExpiryDatePast(batch.expiryDate, now) ? 0 : batch.quantity),
+    0,
+  );
+}
 
 function extractErrorMessage(payload: unknown, fallback: string): string {
   if (!payload || typeof payload !== "object") {
@@ -471,14 +493,8 @@ function App() {
   });
   const [purchaseFormOpen, setPurchaseFormOpen] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState<PurchaseForm>({
-    medicineId: "",
     supplierId: "",
-    batchNumber: "",
-    mfgDate: "",
-    expiryDate: "",
-    quantity: "0",
-    purchasePrice: "0",
-    sellingPrice: "0",
+    items: [emptyPurchaseLine()],
     notes: "",
   });
   const [stockFormOpen, setStockFormOpen] = useState(false);
@@ -536,11 +552,11 @@ function App() {
           replenishmentResponse,
         ] = await Promise.all([
           apiFetch("/api/v1/medicines?pageSize=100", { headers }),
-          apiFetch("/api/v1/categories", { headers }),
-          apiFetch("/api/v1/suppliers", { headers }),
+          apiFetch("/api/v1/categories?pageSize=100", { headers }),
+          apiFetch("/api/v1/suppliers?pageSize=100", { headers }),
           apiFetch("/api/v1/batches?pageSize=100", { headers }),
-          apiFetch("/api/v1/purchases", { headers }),
-          apiFetch("/api/v1/inventory/transactions", {
+          apiFetch("/api/v1/purchases?pageSize=100", { headers }),
+          apiFetch("/api/v1/inventory/transactions?pageSize=100", {
             headers,
           }),
           apiFetch("/api/v1/alerts", { headers }),
@@ -563,36 +579,14 @@ function App() {
           throw new Error("The inventory service returned an error.");
         }
 
-        const medicineResult = (await medicineResponse.json()) as {
-          success?: boolean;
-          data?: Medicine[];
-          error?: string | ApiErrorPayload;
-        };
-        const categoryResult = (await categoryResponse.json()) as {
-          success?: boolean;
-          data?: Category[];
-          error?: string | ApiErrorPayload;
-        };
-        const supplierResult = (await supplierResponse.json()) as {
-          success?: boolean;
-          data?: Supplier[];
-          error?: string | ApiErrorPayload;
-        };
-        const batchResult = (await batchResponse.json()) as {
-          success?: boolean;
-          data?: Batch[];
-          error?: string | ApiErrorPayload;
-        };
-        const purchaseResult = (await purchaseResponse.json()) as {
-          success?: boolean;
-          data?: Purchase[];
-          error?: string | ApiErrorPayload;
-        };
-        const transactionResult = (await transactionResponse.json()) as {
-          success?: boolean;
-          data?: StockTransaction[];
-          error?: string | ApiErrorPayload;
-        };
+        const [allMedicines, allCategories, allSuppliers, allBatches, allPurchases, allTransactions] = await Promise.all([
+          readAllPages<Medicine>(medicineResponse, "/api/v1/medicines", { headers }),
+          readAllPages<Category>(categoryResponse, "/api/v1/categories", { headers }),
+          readAllPages<Supplier>(supplierResponse, "/api/v1/suppliers", { headers }),
+          readAllPages<Batch>(batchResponse, "/api/v1/batches", { headers }),
+          readAllPages<Purchase>(purchaseResponse, "/api/v1/purchases", { headers }),
+          readAllPages<StockTransaction>(transactionResponse, "/api/v1/inventory/transactions", { headers }),
+        ]);
         const alertResult = (await alertResponse.json()) as {
           success?: boolean;
           data?: InventoryAlert[];
@@ -615,12 +609,6 @@ function App() {
         };
 
         if (
-          !medicineResult.success ||
-          !categoryResult.success ||
-          !supplierResult.success ||
-          !batchResult.success ||
-          !purchaseResult.success ||
-          !transactionResult.success ||
           !alertResult.success ||
           !reportResult.success ||
           !forecastRiskResult.success ||
@@ -628,12 +616,6 @@ function App() {
         ) {
           throw new Error(
             extractErrorMessage(
-              medicineResult.error ??
-                categoryResult.error ??
-                supplierResult.error ??
-                batchResult.error ??
-                purchaseResult.error ??
-                transactionResult.error ??
                 alertResult.error ??
                 reportResult.error ??
                 forecastRiskResult.error ??
@@ -643,12 +625,12 @@ function App() {
           );
         }
 
-        setMedicines(medicineResult.data ?? []);
-        setCategories(categoryResult.data ?? []);
-        setSuppliers(supplierResult.data ?? []);
-        setBatches(batchResult.data ?? []);
-        setPurchases(purchaseResult.data ?? []);
-        setTransactions(transactionResult.data ?? []);
+        setMedicines(allMedicines);
+        setCategories(allCategories);
+        setSuppliers(allSuppliers);
+        setBatches(allBatches);
+        setPurchases(allPurchases);
+        setTransactions(allTransactions);
         setAlerts(alertResult.data ?? []);
         setReport(reportResult.data ?? null);
         setForecastRisk(forecastRiskResult.data ?? []);
@@ -667,18 +649,7 @@ function App() {
           session.user.role === "Admin" ||
           session.user.role === "Inventory Manager"
         ) {
-          const auditResponse = await apiFetch(
-            "/api/v1/audit-logs?page=1&pageSize=100",
-            {
-              headers,
-            },
-          );
-          if (auditResponse.ok) {
-            const auditResult = (await auditResponse.json()) as {
-              data: AuditLog[];
-            };
-            setAuditLogs(auditResult.data);
-          }
+          setAuditLogs(await fetchAllPages<AuditLog>("/api/v1/audit-logs", { headers }));
         } else {
           setAuditLogs([]);
         }
@@ -752,12 +723,12 @@ function App() {
 
     const query = new URLSearchParams({ page: "1", pageSize: "100" });
     if (search.trim()) query.set("search", search.trim());
-    const response = await apiFetch(`/api/v1/audit-logs?${query.toString()}`, {
-      headers: { Authorization: `Bearer ${session.token}` },
-    });
-    if (response.ok) {
-      const result = (await response.json()) as { data: AuditLog[] };
-      setAuditLogs(result.data);
+    try {
+      setAuditLogs(await fetchAllPages<AuditLog>(`/api/v1/audit-logs?${query.toString()}`, {
+        headers: { Authorization: `Bearer ${session.token}` },
+      }));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to load audit history.");
     }
   };
 
@@ -794,13 +765,25 @@ function App() {
 
   const refreshPurchases = async () => {
     if (!session) return;
-    const response = await apiFetch("/api/v1/purchases", {
-      headers: { Authorization: `Bearer ${session.token}` },
-    });
-    if (response.ok) {
-      const result = (await response.json()) as { data: Purchase[] };
-      setPurchases(result.data);
+    try {
+      setPurchases(await fetchAllPages<Purchase>("/api/v1/purchases", {
+        headers: { Authorization: `Bearer ${session.token}` },
+      }));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to load purchases.");
     }
+  };
+
+  const refreshInventoryCollections = async (token: string) => {
+    const headers = { Authorization: `Bearer ${token}` };
+    const [nextMedicines, nextBatches, nextTransactions] = await Promise.all([
+      fetchAllPages<Medicine>("/api/v1/medicines", { headers }),
+      fetchAllPages<Batch>("/api/v1/batches", { headers }),
+      fetchAllPages<StockTransaction>("/api/v1/inventory/transactions", { headers }),
+    ]);
+    setMedicines(nextMedicines);
+    setBatches(nextBatches);
+    setTransactions(nextTransactions);
   };
 
   const openCreateForm = () => {
@@ -879,11 +862,7 @@ function App() {
 
       setFormOpen(false);
       setEditingMedicine(null);
-      const refreshed = await apiFetch("/api/v1/medicines?pageSize=100", {
-        headers: { Authorization: `Bearer ${session.token}` },
-      });
-      const refreshedResult = (await refreshed.json()) as ApiResponse;
-      setMedicines(refreshedResult.data);
+      await refreshInventoryCollections(session.token);
       await refreshAuditLogs();
     } catch (requestError) {
       setFormError(
@@ -1132,16 +1111,23 @@ function App() {
     setBatchFormOpen(true);
   };
 
+  const updatePurchaseItem = (
+    index: number,
+    field: keyof PurchaseLineForm,
+    value: string,
+  ) => {
+    setPurchaseForm((current) => ({
+      ...current,
+      items: current.items.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    }));
+  };
+
   const openCreatePurchaseForm = () => {
     setPurchaseForm({
-      medicineId: medicines[0] ? String(medicines[0].id) : "",
       supplierId: suppliers[0] ? String(suppliers[0].id) : "",
-      batchNumber: "",
-      mfgDate: "",
-      expiryDate: "",
-      quantity: "1",
-      purchasePrice: "0",
-      sellingPrice: "0",
+      items: [emptyPurchaseLine(medicines[0] ? String(medicines[0].id) : "")],
       notes: "",
     });
     setFormError("");
@@ -1158,22 +1144,20 @@ function App() {
     const existingBatch = batches.find((b) => b.medicineId === item.medicineId);
 
     setPurchaseForm({
-      medicineId: String(item.medicineId),
       supplierId: existingBatch
         ? String(existingBatch.supplierId)
         : suppliers[0]
           ? String(suppliers[0].id)
           : "",
-      batchNumber: `PO-${item.medicineId}-${Date.now().toString().slice(-6)}`,
-      mfgDate: today,
-      expiryDate: nextYear,
-      quantity: String(Math.max(1, item.recommendedUnits)),
-      purchasePrice: existingBatch
-        ? String(existingBatch.purchasePrice)
-        : "10.00",
-      sellingPrice: existingBatch
-        ? String(existingBatch.sellingPrice)
-        : "15.00",
+      items: [{
+        ...emptyPurchaseLine(String(item.medicineId)),
+        batchNumber: `PO-${item.medicineId}-${Date.now().toString().slice(-6)}`,
+        mfgDate: today,
+        expiryDate: nextYear,
+        quantity: String(Math.max(1, item.recommendedUnits)),
+        purchasePrice: existingBatch ? String(existingBatch.purchasePrice) : "10.00",
+        sellingPrice: existingBatch ? String(existingBatch.sellingPrice) : "15.00",
+      }],
       notes: `Replenishment order for ${item.medicineName} (${item.recommendedUnits} units approved by ${item.review?.reviewer?.name ?? "reviewer"})`,
     });
     setFormError("");
@@ -1183,6 +1167,10 @@ function App() {
   const handlePurchaseSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!session) return;
+    const submitter = (event.nativeEvent as SubmitEvent)
+      .submitter as HTMLButtonElement | null;
+    const receiveImmediately = submitter?.value === "receive";
+    let createdPurchaseId: number | null = null;
 
     setSaving(true);
     setFormError("");
@@ -1197,17 +1185,15 @@ function App() {
         body: JSON.stringify({
           supplierId: Number(purchaseForm.supplierId),
           notes: purchaseForm.notes,
-          items: [
-            {
-              medicineId: Number(purchaseForm.medicineId),
-              batchNumber: purchaseForm.batchNumber,
-              mfgDate: purchaseForm.mfgDate,
-              expiryDate: purchaseForm.expiryDate,
-              quantity: Number(purchaseForm.quantity),
-              purchasePrice: Number(purchaseForm.purchasePrice),
-              sellingPrice: Number(purchaseForm.sellingPrice),
-            },
-          ],
+          items: purchaseForm.items.map((item) => ({
+              medicineId: Number(item.medicineId),
+              batchNumber: item.batchNumber,
+              mfgDate: item.mfgDate,
+              expiryDate: item.expiryDate,
+              quantity: Number(item.quantity),
+              purchasePrice: Number(item.purchasePrice),
+              sellingPrice: Number(item.sellingPrice),
+          })),
         }),
       });
       const purchaseResult = (await purchaseResponse.json()) as {
@@ -1223,6 +1209,14 @@ function App() {
         throw new Error(
           extractErrorMessage(purchaseResult, "Unable to create purchase."),
         );
+      }
+      createdPurchaseId = purchaseResult.data.id;
+
+      if (!receiveImmediately) {
+        await refreshPurchases();
+        setPurchaseFormOpen(false);
+        await refreshAuditLogs();
+        return;
       }
 
       const receiveResponse = await apiFetch(
@@ -1240,27 +1234,8 @@ function App() {
       }
 
       const authHeaders = { Authorization: `Bearer ${session.token}` };
-      const [
-        batchResponse,
-        medicineResponse,
-        transactionResponse,
-        alertResponse,
-      ] = await Promise.all([
-        apiFetch("/api/v1/batches?pageSize=100", { headers: authHeaders }),
-        apiFetch("/api/v1/medicines?pageSize=100", {
-          headers: authHeaders,
-        }),
-        apiFetch("/api/v1/inventory/transactions", {
-          headers: authHeaders,
-        }),
-        apiFetch("/api/v1/alerts", { headers: authHeaders }),
-      ]);
-      setBatches(((await batchResponse.json()) as { data: Batch[] }).data);
-      setMedicines(((await medicineResponse.json()) as ApiResponse).data);
-      setTransactions(
-        ((await transactionResponse.json()) as { data: StockTransaction[] })
-          .data,
-      );
+      const alertResponse = await apiFetch("/api/v1/alerts", { headers: authHeaders });
+      await refreshInventoryCollections(session.token);
       setAlerts(
         ((await alertResponse.json()) as { data: InventoryAlert[] }).data,
       );
@@ -1268,11 +1243,17 @@ function App() {
       setPurchaseFormOpen(false);
       await refreshAuditLogs();
     } catch (requestError) {
-      setFormError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to receive purchase.",
-      );
+      const message = requestError instanceof Error
+        ? requestError.message
+        : "Unable to receive purchase.";
+      if (receiveImmediately && createdPurchaseId !== null) {
+        setPurchaseFormOpen(false);
+        await refreshPurchases();
+        await refreshAuditLogs();
+        setError(`${message} Purchase #${createdPurchaseId} remains a draft; receive it from purchase history.`);
+      } else {
+        setFormError(message);
+      }
     } finally {
       setSaving(false);
     }
@@ -1310,15 +1291,7 @@ function App() {
         );
       }
 
-      const headers = { Authorization: `Bearer ${session.token}` };
-      const [batchResponse, medicineResponse] = await Promise.all([
-        apiFetch("/api/v1/batches?pageSize=100", { headers }),
-        apiFetch("/api/v1/medicines?pageSize=100", { headers }),
-      ]);
-      const batchResult = (await batchResponse.json()) as { data: Batch[] };
-      const medicineResult = (await medicineResponse.json()) as ApiResponse;
-      setBatches(batchResult.data);
-      setMedicines(medicineResult.data);
+      await refreshInventoryCollections(session.token);
       setBatchFormOpen(false);
       await refreshAuditLogs();
     } catch (requestError) {
@@ -1372,23 +1345,7 @@ function App() {
         );
       }
 
-      const headers = { Authorization: `Bearer ${session.token}` };
-      const [batchResponse, medicineResponse, transactionResponse] =
-        await Promise.all([
-          apiFetch("/api/v1/batches?pageSize=100", { headers }),
-          apiFetch("/api/v1/medicines?pageSize=100", { headers }),
-          apiFetch("/api/v1/inventory/transactions", {
-            headers,
-          }),
-        ]);
-      const batchResult = (await batchResponse.json()) as { data: Batch[] };
-      const medicineResult = (await medicineResponse.json()) as ApiResponse;
-      const transactionResult = (await transactionResponse.json()) as {
-        data: StockTransaction[];
-      };
-      setBatches(batchResult.data);
-      setMedicines(medicineResult.data);
-      setTransactions(transactionResult.data);
+      await refreshInventoryCollections(session.token);
       setStockFormOpen(false);
       await refreshAuditLogs();
     } catch (requestError) {
@@ -1418,22 +1375,8 @@ function App() {
       return;
     }
 
-    const [
-      batchResponse,
-      medicineResponse,
-      transactionResponse,
-      alertResponse,
-    ] = await Promise.all([
-      apiFetch("/api/v1/batches?pageSize=100", { headers }),
-      apiFetch("/api/v1/medicines?pageSize=100", { headers }),
-      apiFetch("/api/v1/inventory/transactions", { headers }),
-      apiFetch("/api/v1/alerts", { headers }),
-    ]);
-    setBatches(((await batchResponse.json()) as { data: Batch[] }).data);
-    setMedicines(((await medicineResponse.json()) as ApiResponse).data);
-    setTransactions(
-      ((await transactionResponse.json()) as { data: StockTransaction[] }).data,
-    );
+    const alertResponse = await apiFetch("/api/v1/alerts", { headers });
+    await refreshInventoryCollections(session.token);
     setAlerts(
       ((await alertResponse.json()) as { data: InventoryAlert[] }).data,
     );
@@ -1729,11 +1672,7 @@ function App() {
   }
 
   const lowStockCount = medicines.filter((medicine) => {
-    const quantity = medicine.batches.reduce(
-      (total, batch) => total + batch.quantity,
-      0,
-    );
-    return quantity <= medicine.reorderLevel;
+    return availableMedicineUnits(medicine) <= medicine.reorderLevel;
   }).length;
   const queuedRiskCount = forecastRisk.filter(
     (item) => item.riskLevel === "HIGH" || item.riskLevel === "MEDIUM",
@@ -2119,7 +2058,7 @@ function App() {
         <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
           <form
             onSubmit={handlePurchaseSave}
-            className="w-full max-w-2xl bg-white rounded-xl shadow-xl p-6"
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-xl bg-white p-6 shadow-xl"
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">
@@ -2138,141 +2077,97 @@ function App() {
                 {formError}
               </p>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="text-sm font-medium text-gray-700">
-                Medicine
-                <select
-                  value={purchaseForm.medicineId}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      medicineId: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                >
-                  {medicines.map((medicine) => (
-                    <option key={medicine.id} value={medicine.id}>
-                      {medicine.genericName} ({medicine.brandName})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Supplier
-                <select
-                  value={purchaseForm.supplierId}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      supplierId: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                >
-                  {suppliers.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Batch number
-                <input
-                  value={purchaseForm.batchNumber}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      batchNumber: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Quantity received
-                <input
-                  type="number"
-                  min="1"
-                  value={purchaseForm.quantity}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      quantity: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Manufacturing date
-                <input
-                  type="date"
-                  value={purchaseForm.mfgDate}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      mfgDate: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Expiry date
-                <input
-                  type="date"
-                  value={purchaseForm.expiryDate}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      expiryDate: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Purchase price per unit
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={purchaseForm.purchasePrice}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      purchasePrice: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Selling price per unit
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={purchaseForm.sellingPrice}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      sellingPrice: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-              </label>
+            <label className="block text-sm font-medium text-gray-700">
+              Supplier
+              <select
+                value={purchaseForm.supplierId}
+                onChange={(event) =>
+                  setPurchaseForm({ ...purchaseForm, supplierId: event.target.value })
+                }
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                required
+              >
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="mt-5 space-y-4">
+              {purchaseForm.items.map((item, index) => (
+                <fieldset key={index} className="rounded-xl border border-gray-200 p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <legend className="font-semibold text-gray-900">Line item {index + 1}</legend>
+                    {purchaseForm.items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setPurchaseForm((current) => ({
+                          ...current,
+                          items: current.items.filter((_, itemIndex) => itemIndex !== index),
+                        }))}
+                        className="text-sm font-medium text-red-700 hover:text-red-900"
+                      >
+                        Remove item
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Medicine
+                      <select
+                        value={item.medicineId}
+                        onChange={(event) => updatePurchaseItem(index, "medicineId", event.target.value)}
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                        required
+                      >
+                        <option value="" disabled>Select medicine</option>
+                        {medicines.map((medicine) => (
+                          <option key={medicine.id} value={medicine.id}>
+                            {medicine.genericName} ({medicine.brandName})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Batch number
+                      <input value={item.batchNumber} onChange={(event) => updatePurchaseItem(index, "batchNumber", event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Quantity received
+                      <input type="number" min="1" value={item.quantity} onChange={(event) => updatePurchaseItem(index, "quantity", event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Manufacturing date
+                      <input type="date" value={item.mfgDate} onChange={(event) => updatePurchaseItem(index, "mfgDate", event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Expiry date
+                      <input type="date" value={item.expiryDate} onChange={(event) => updatePurchaseItem(index, "expiryDate", event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Purchase price per unit
+                      <input type="number" min="0" step="0.01" value={item.purchasePrice} onChange={(event) => updatePurchaseItem(index, "purchasePrice", event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Selling price per unit
+                      <input type="number" min="0" step="0.01" value={item.sellingPrice} onChange={(event) => updatePurchaseItem(index, "sellingPrice", event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+                    </label>
+                  </div>
+                </fieldset>
+              ))}
+              <button
+                type="button"
+                onClick={() => setPurchaseForm((current) => ({
+                  ...current,
+                  items: [...current.items, emptyPurchaseLine(medicines[0] ? String(medicines[0].id) : "")],
+                }))}
+                disabled={purchaseForm.items.length >= 100}
+                className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+              >
+                Add line item
+              </button>
             </div>
             <label className="block text-sm font-medium text-gray-700 mt-4">
               Purchase notes
@@ -2298,6 +2193,15 @@ function App() {
               </button>
               <button
                 type="submit"
+                value="draft"
+                disabled={saving}
+                className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save as draft"}
+              </button>
+              <button
+                type="submit"
+                value="receive"
                 disabled={saving}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
               >
@@ -3395,6 +3299,15 @@ function App() {
                         Dismiss
                       </button>
                     </div>
+                    {decision === "APPROVED" && canReceiveStock && (
+                      <button
+                        type="button"
+                        onClick={() => openPurchaseFormForReplenishment(item)}
+                        className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
+                      >
+                        Prepare purchase
+                      </button>
+                    )}
                     <span
                       className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${decisionTone}`}
                     >
@@ -3487,6 +3400,39 @@ function App() {
                       </span>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-gray-900">Research model evaluation</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Synthetic research data only. These metrics are not production forecasts.
+              </p>
+              {!forecastMl?.available || !forecastMl.metrics ? (
+                <p className="mt-3 text-sm text-gray-500">
+                  No evaluated research model is currently available.
+                </p>
+              ) : (
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-xs text-gray-500">Model / dataset</p>
+                    <p className="mt-1 font-semibold text-gray-900">
+                      {forecastMl.metrics.model} / {forecastMl.metrics.dataset}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-xs text-gray-500">MAE (units)</p>
+                    <p className="mt-1 font-semibold text-gray-900">
+                      {forecastMl.metrics.metrics.mae.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-xs text-gray-500">Naive baseline MAE</p>
+                    <p className="mt-1 font-semibold text-gray-900">
+                      {forecastMl.metrics.metrics.baseline_naive_mae.toFixed(2)}
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -3650,10 +3596,7 @@ function App() {
                       {med.active ? "Active" : "Inactive"}
                     </td>
                     <td className="px-6 py-4 text-gray-600">
-                      {med.batches.reduce(
-                        (total, batch) => total + batch.quantity,
-                        0,
-                      )}{" "}
+                      {availableMedicineUnits(med)}{" "}
                       / {med.reorderLevel}
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -3975,7 +3918,10 @@ function App() {
                           {batch.supplier.name}
                         </td>
                         <td className="px-6 py-4 text-gray-600">
-                          {new Date(batch.expiryDate).toLocaleDateString()}
+                          <span className={isExpiryDatePast(batch.expiryDate) ? "text-red-700" : ""}>
+                            {new Date(batch.expiryDate).toLocaleDateString()}
+                            {isExpiryDatePast(batch.expiryDate) && " (expired)"}
+                          </span>
                         </td>
                         <td className="px-6 py-4 text-gray-600 text-right">
                           {batch.quantity}
@@ -3985,7 +3931,8 @@ function App() {
                             <>
                               <button
                                 onClick={() => openStockForm(batch, "OUT")}
-                                className="text-blue-600 hover:text-blue-800 font-medium mr-3"
+                                disabled={isExpiryDatePast(batch.expiryDate)}
+                                className="mr-3 font-medium text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 Issue
                               </button>

@@ -4,6 +4,8 @@ async function mockDashboardApi(
   page: Page,
   role: string,
   includeReplenishment = false,
+  includeSecondMedicinePage = false,
+  failPurchaseReceive = false,
 ) {
   let review: {
     decision: "APPROVED" | "DISMISSED";
@@ -11,12 +13,53 @@ async function mockDashboardApi(
     reviewedAt: string;
     reviewer: { id: number; name: string };
   } | null = null;
+  let savedPurchase: {
+    id: number;
+    status: "DRAFT" | "RECEIVED";
+    createdAt: string;
+    receivedAt: string | null;
+    supplier: { name: string };
+    createdBy: { name: string };
+    items: { id: number; batchNumber: string; quantity: number; medicine: { genericName: string } }[];
+  } | null = null;
 
   await page.route("**/api/v1/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     let response: unknown = { success: true, data: [] };
+    let status = 200;
 
-    if (pathname.endsWith("/reports/replenishment/decision")) {
+    if (pathname.endsWith("/purchases/1/receive")) {
+      if (failPurchaseReceive) {
+        status = 409;
+        response = { success: false, error: { code: "DUPLICATE_BATCH", message: "A batch with this medicine and batch number already exists" } };
+      } else {
+        if (savedPurchase) savedPurchase.status = "RECEIVED";
+        response = { success: true, data: savedPurchase };
+      }
+    } else if (pathname.endsWith("/purchases")) {
+      if (route.request().method() === "POST") {
+        const request = route.request().postDataJSON() as {
+          items: { batchNumber: string; quantity: number }[];
+        };
+        savedPurchase = {
+          id: 1,
+          status: "DRAFT",
+          createdAt: "2026-10-19T10:00:00.000Z",
+          receivedAt: null,
+          supplier: { name: "QA supplier" },
+          createdBy: { name: "QA User" },
+          items: request.items.map((item, index) => ({
+            id: index + 1,
+            batchNumber: item.batchNumber,
+            quantity: item.quantity,
+            medicine: { genericName: "QA medicine" },
+          })),
+        };
+        response = { success: true, data: { id: savedPurchase.id } };
+      } else {
+        response = { success: true, data: savedPurchase ? [savedPurchase] : [] };
+      }
+    } else if (pathname.endsWith("/reports/replenishment/decision")) {
       const request = route.request().postDataJSON() as {
         medicineId: number;
         decision: "APPROVED" | "DISMISSED";
@@ -74,23 +117,26 @@ async function mockDashboardApi(
         },
       };
     } else if (pathname.endsWith("/medicines")) {
+      const pageNumber = Number(new URL(route.request().url()).searchParams.get("page") ?? "1");
+      const medicine = (id: number, genericName: string) => ({
+        id,
+        genericName,
+        brandName: `Brand ${id}`,
+        categoryId: 1,
+        manufacturer: null,
+        dosageForm: null,
+        barcode: null,
+        active: true,
+        unit: "Tablet",
+        reorderLevel: 2,
+        batches: [{ quantity: 10, expiryDate: "2035-01-01T00:00:00.000Z" }],
+      });
       response = {
         success: true,
-        data: [
-          {
-            id: 1,
-            genericName: "QA medicine",
-            brandName: "QA brand",
-            categoryId: 1,
-            manufacturer: null,
-            dosageForm: null,
-            barcode: null,
-            active: true,
-            unit: "Tablet",
-            reorderLevel: 2,
-            batches: [{ quantity: 10 }],
-          },
-        ],
+        data: pageNumber === 2 && includeSecondMedicinePage
+          ? [medicine(2, "Second page medicine")]
+          : [medicine(1, "QA medicine")],
+        ...(includeSecondMedicinePage ? { meta: { totalPages: 2 } } : {}),
       };
     } else if (pathname.endsWith("/suppliers")) {
       response = {
@@ -175,7 +221,7 @@ async function mockDashboardApi(
     }
 
     await route.fulfill({
-      status: 200,
+      status,
       contentType: "application/json",
       body: JSON.stringify(response),
     });
@@ -224,6 +270,73 @@ test("loads replenishment review decisions from the shared API", async ({
   await expect(
     page.getByRole("button", { name: "Approve" }),
   ).toBeDisabled();
+});
+
+test("loads medicines beyond the first API page", async ({ page }) => {
+  await mockDashboardApi(page, "Admin", false, true);
+  await signIn(page);
+
+  await expect(
+    page.getByRole("cell", { name: "Second page medicine", exact: true }),
+  ).toBeVisible();
+});
+
+test("saves a purchase draft and receives it from purchase history", async ({
+  page,
+}) => {
+  await mockDashboardApi(page, "Admin");
+  await signIn(page);
+
+  await page.getByRole("button", { name: "Receive purchase" }).click();
+  await page.getByRole("combobox", { name: "Medicine" }).selectOption("1");
+  await page.getByRole("combobox", { name: "Supplier" }).selectOption("1");
+  await page.getByLabel("Batch number", { exact: true }).fill("QA-DRAFT-BATCH");
+  await page.getByLabel("Quantity received").fill("3");
+  await page.getByLabel("Manufacturing date").fill("2025-01-01");
+  await page.getByLabel("Expiry date").fill("2035-01-01");
+  await page.getByRole("button", { name: "Add line item" }).click();
+  await page.getByLabel("Batch number").nth(1).fill("QA-DRAFT-BATCH-2");
+  await page.getByLabel("Quantity received").nth(1).fill("2");
+  await page.getByLabel("Manufacturing date").nth(1).fill("2025-01-01");
+  await page.getByLabel("Expiry date").nth(1).fill("2035-01-01");
+  await page.getByRole("button", { name: "Save as draft" }).click();
+
+  await page.getByText("Management and history", { exact: true }).click();
+  const purchaseHistory = page
+    .getByRole("heading", { name: "Purchase history" })
+    .locator("xpath=../..");
+  const purchaseRow = purchaseHistory.getByRole("row").filter({
+    hasText: "QA medicine (3), QA medicine (2)",
+  });
+  await expect(purchaseRow).toContainText("DRAFT");
+  await purchaseRow.getByRole("button", { name: "Receive" }).click();
+  await expect(purchaseRow).toContainText("RECEIVED");
+});
+
+test("keeps a failed immediate receipt as a recoverable draft", async ({
+  page,
+}) => {
+  await mockDashboardApi(page, "Admin", false, false, true);
+  await signIn(page);
+
+  await page.getByRole("button", { name: "Receive purchase" }).click();
+  await page.getByRole("combobox", { name: "Medicine" }).selectOption("1");
+  await page.getByRole("combobox", { name: "Supplier" }).selectOption("1");
+  await page.getByLabel("Batch number").fill("QA-FAILED-RECEIPT");
+  await page.getByLabel("Manufacturing date").fill("2025-01-01");
+  await page.getByLabel("Expiry date").fill("2035-01-01");
+  await page.getByRole("button", { name: "Create and receive" }).click();
+
+  await expect(page.getByText(/remains a draft; receive it from purchase history/)).toBeVisible();
+  await page.getByText("Management and history", { exact: true }).click();
+  const purchaseHistory = page
+    .getByRole("heading", { name: "Purchase history" })
+    .locator("xpath=../..");
+  const purchaseRow = purchaseHistory.getByRole("row").filter({
+    hasText: "QA medicine (1)",
+  });
+  await expect(purchaseRow).toContainText("DRAFT");
+  await expect(purchaseRow.getByRole("button", { name: "Receive" })).toBeVisible();
 });
 
 test("keeps the sign-in form keyboard usable without mobile overflow", async ({

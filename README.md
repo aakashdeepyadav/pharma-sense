@@ -7,7 +7,7 @@ Agent-Based Medicine Stock Management System.
 - Node.js 22 and npm
 - Docker (for database)
 
-## Current MVP
+## Current capabilities
 
 - JWT login with server-side role checks for Admin, Pharmacist, Inventory Manager, and Staff.
 - Medicine, category, supplier, and batch management through the live API and dashboard, including manufacturer, dosage/form, barcode, and active status fields.

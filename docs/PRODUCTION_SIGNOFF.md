@@ -2,26 +2,31 @@
 
 ## Verified status
 
-The shared replenishment review workflow is implemented, including persistent
-review status, reviewer attribution, and atomic audit logging. Release
-verification is incomplete: the new migration was not applied because the
-configured PostgreSQL service at `localhost:5433` was unavailable.
+The replenishment review workflow is implemented, including persistent review
+status, reviewer attribution, and atomic audit logging. Verification recorded
+on 2026-10-20 passed against the configured local PostgreSQL database:
 
 - Backend TypeScript build: passed
-- Prisma schema validation: passed
-- Database-independent backend tests: 10 passed
+- Backend test suite: 34 passed
 - Frontend production build: passed
-- Frontend browser tests: 10 passed
-- Frontend lint: completed with one existing forecast-selector warning
-- Full database-backed API tests, migration deployment, database quality,
-  reconciliation, and live browser workflow: not verified in this run
+- Frontend lint: passed
+- Mocked Playwright browser suite: 13 passed
+- Database quality: passed, 0 errors and 0 warnings
+- Stock reconciliation: 0 discrepancies and 0 unsupported movements
+- Both database checks reported `modifiedData: false`
+- Live browser workflow against a disposable database: not run because
+  `E2E_DATABASE_URL` is not configured
 
 ## Conclusion
 
-The system is **not signed off for production deployment** until the migration
-and database-backed release checks pass in a disposable PostgreSQL environment.
-Forecast and replenishment outputs remain advisory and must not trigger
-autonomous inventory action.
+The system is **not signed off for production deployment**. Local database and
+automated checks pass, but the live browser workflow has not been run against a
+disposable database, and hosting, backup/restore, secret management, and
+rollback ownership still require a deployment rehearsal. Forecast and
+replenishment outputs remain advisory and must not trigger autonomous inventory
+action. The forecasting model is synthetic-data research, not a production
+forecast; production forecasting requires representative operational history
+and separate validation.
 
 ## Release rules
 
@@ -34,7 +39,7 @@ autonomous inventory action.
 ## Required next actions
 
 - Freeze the approved operational dataset and model baseline.
-- Apply the replenishment review migration and pass the full database-backed test suite.
+- Run the live browser workflow against a disposable PostgreSQL database.
 - Review the forecast risk and replenishment recommendation workflow.
 - Verify audit logging for every recommendation decision.
 - Confirm that no stock movement is triggered automatically from a review decision.

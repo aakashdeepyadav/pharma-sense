@@ -6,6 +6,7 @@ import { forecastQuerySchema } from '../validation/schemas';
 import { replenishmentDecisionSchema, replenishmentQuerySchema } from '../validation/schemas';
 import { assessDemandDrift, assessDemandRisk, assessForecastQuality, assessForecastReadiness, movingAverageForecast, movingAverageMae } from '../domain/forecasting';
 import { calculateReplenishment } from '../domain/replenishment';
+import { availableStock } from '../domain/stockRules';
 import { sendApiError } from '../lib/api';
 
 const router = Router();
@@ -19,11 +20,11 @@ router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
           id: true,
           genericName: true,
           reorderLevel: true,
-          batches: { select: { quantity: true } },
+          batches: { select: { quantity: true, expiryDate: true } },
         },
       }),
       prisma.supplier.count(),
-      prisma.batch.findMany({ select: { quantity: true, purchasePrice: true } }),
+      prisma.batch.findMany({ select: { quantity: true, purchasePrice: true, expiryDate: true } }),
       prisma.stockTransaction.findMany({
         where: { type: 'OUT' },
         select: { quantity: true, timestamp: true, batch: { select: { medicineId: true } } },
@@ -59,7 +60,7 @@ router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
         currentDate = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth(), currentDate.getUTCDate() + 1));
       }
 
-      const currentStock = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
+      const currentStock = availableStock(medicine.batches, to);
       const risk = assessDemandRisk(values, currentStock, medicine.reorderLevel, 7);
       const quality = assessForecastQuality(
         values.slice(7),
@@ -102,7 +103,7 @@ router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
         medicineCount: medicines.length,
         supplierCount: suppliers,
         batchCount: batches.length,
-        totalUnits: batches.reduce((total, batch) => total + batch.quantity, 0),
+        totalUnits: availableStock(batches, to),
         inventoryCost: batches.reduce((total, batch) => total + batch.quantity * Number(batch.purchasePrice), 0),
         issuedUnits: transactions.reduce((total, transaction) => total + transaction.quantity, 0),
         forecastWatchCount: monitoringExposure.filter(
@@ -183,7 +184,7 @@ router.get('/forecast-risk', async (_req: AuthenticatedRequest, res: Response) =
           id: true,
           genericName: true,
           reorderLevel: true,
-          batches: { select: { quantity: true } },
+          batches: { select: { quantity: true, expiryDate: true } },
         },
         orderBy: { genericName: 'asc' },
       }),
@@ -221,7 +222,7 @@ router.get('/forecast-risk', async (_req: AuthenticatedRequest, res: Response) =
         workingDate.setUTCDate(workingDate.getUTCDate() + 1);
       }
 
-      const currentStock = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
+      const currentStock = availableStock(medicine.batches, to);
       const risk = assessDemandRisk(values, currentStock, medicine.reorderLevel, 7);
       const actualValues = values.slice(7);
       const predictions = actualValues.map((_, index) => {
@@ -394,7 +395,7 @@ router.get('/replenishment', async (req: AuthenticatedRequest, res: Response) =>
           id: true,
           genericName: true,
           reorderLevel: true,
-          batches: { select: { quantity: true } },
+          batches: { select: { quantity: true, expiryDate: true } },
         },
         orderBy: { genericName: 'asc' },
       }),
@@ -425,7 +426,7 @@ router.get('/replenishment', async (req: AuthenticatedRequest, res: Response) =>
     const reviewsByMedicine = new Map(reviews.map((review) => [review.medicineId, review]));
 
     const recommendations = medicines.map((medicine) => {
-      const currentUnits = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
+      const currentUnits = availableStock(medicine.batches, to);
       const averageDailyDemand = (issuedByMedicine.get(medicine.id) ?? 0) / result.data.window;
       const review = reviewsByMedicine.get(medicine.id);
       return {
