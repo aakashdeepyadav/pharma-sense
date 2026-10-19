@@ -273,7 +273,7 @@ Unknown, duplicate, expired, and ambiguous barcodes must produce recoverable err
 - Enforce authorization server-side on every protected route; the frontend role check is only presentation.
 - Validate and normalize all request bodies, query parameters, and path IDs with Zod.
 - Use parameterized ORM queries and avoid raw SQL unless reviewed.
-- Configure CORS with the comma-separated `FRONTEND_URLS` allow-list rather than unrestricted production CORS, and only trust forwarded client IPs when `TRUST_PROXY=true` is set behind a controlled reverse proxy.
+- Configure CORS with the comma-separated `FRONTEND_URLS` allow-list rather than unrestricted production CORS. Set `TRUST_PROXY_HOPS` to the exact count of controlled proxy hops; each proxy must overwrite forwarded client IP headers, and the API must not be reachable around that proxy.
 - Apply security headers, request size limits, configurable rate limits on login/API traffic, and generic login failure messages. Login and API limiter settings must be tuned independently for deployment traffic.
 - Keep secrets out of source control; provide `.env.example` with non-secret placeholders.
 - Use HTTPS in deployed environments and secure cookie/token handling appropriate to the chosen auth design.

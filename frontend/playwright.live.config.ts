@@ -41,7 +41,7 @@ export default defineConfig({
         PORT: "5101",
         FRONTEND_URL: "http://127.0.0.1:4174",
         FRONTEND_URLS: "http://127.0.0.1:4174",
-        TRUST_PROXY: "false",
+        TRUST_PROXY_HOPS: "0",
       },
     },
     {

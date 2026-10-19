@@ -26,9 +26,9 @@ on 2026-10-20 passed against the configured local PostgreSQL database:
 ## Conclusion
 
 The system is **not signed off for production deployment**. Local database,
-automated checks, and the disposable-database live workflow pass, but hosting,
-backup/restore, secret management, and rollback ownership still require a
-deployment rehearsal. Forecast and
+automated checks, and the disposable-database live workflow pass. A Render
+Blueprint is prepared, but no hosted deployment, privileged MFA, backup/restore
+rehearsal, or rollback evidence exists yet. Forecast and
 replenishment outputs remain advisory and must not trigger autonomous inventory
 action. The forecasting model is synthetic-data research, not a production
 forecast; production forecasting requires representative operational history
@@ -46,6 +46,7 @@ and separate validation.
 
 - Freeze the approved operational dataset and model baseline.
 - Complete a deployment rehearsal against the selected target environment.
+- Require and verify MFA for privileged accounts before operational use.
 - Review the forecast risk and replenishment recommendation workflow.
 - Verify audit logging for every recommendation decision.
 - Confirm that no stock movement is triggered automatically from a review decision.

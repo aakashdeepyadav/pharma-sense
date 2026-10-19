@@ -92,6 +92,10 @@ npm run test:e2e
 npm audit --omit=dev --audit-level=high
 ```
 
+## Deploy to Render
+
+The repository includes a Render Blueprint at [`render.yaml`](render.yaml) for a managed PostgreSQL database, API, and static frontend. Review its paid plans and the deployment steps in the [Render runbook](docs/DEPLOYMENT_RUNBOOK.md) before creating resources. The Blueprint is configured for the Render `pharmasense-api` and `pharmasense-web` hostnames; change the API CORS origin and frontend CSP if you use different names or a custom domain.
+
 The live inventory workflow requires a disposable PostgreSQL database and is run in CI with an ephemeral administrator password:
 
 ```bash
@@ -103,7 +107,7 @@ npm run test:e2e:live
 
 Verified on 2026-10-20: backend build and all 35 backend tests passed; frontend lint, production build, and all 13 mocked browser tests passed. The live browser workflow passed against an isolated disposable PostgreSQL database (1 workflow, 2.4 minutes); the database was removed afterward. Backend and frontend production dependency audits reported 0 vulnerabilities. Database quality passed with no errors or warnings, and stock reconciliation found no discrepancies. A read-only browser sign-in and dashboard smoke test against the local API succeeded with no failed API requests or browser console warnings.
 
-The production deployment rehearsal remains open because no target hosting, secrets, HTTPS edge, or backup/restore environment has been provided. See [project completion estimate](docs/PROJECT_COMPLETION_PLAN.md), [production signoff](docs/PRODUCTION_SIGNOFF.md), and [deployment handoff](docs/DEPLOYMENT_HANDOFF.md) for current status.
+The Render deployment configuration is prepared and its YAML syntax parses, but the Render CLI schema validator has not been run; no Render resources have been created and no production deployment or backup/restore rehearsal has been verified. Privileged MFA also remains a gate before operational inventory use. See [project completion estimate](docs/PROJECT_COMPLETION_PLAN.md), [production signoff](docs/PRODUCTION_SIGNOFF.md), and [deployment handoff](docs/DEPLOYMENT_HANDOFF.md) for current status.
 
 ## Security Notes
 

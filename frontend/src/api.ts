@@ -1,4 +1,7 @@
-const apiBaseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
+const configuredApiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
+const apiBaseUrl = configuredApiUrl.includes("://")
+  ? configuredApiUrl
+  : `https://${configuredApiUrl}`;
 
 export function apiFetch(path: string, init?: RequestInit) {
   return fetch(`${apiBaseUrl}${path}`, init);

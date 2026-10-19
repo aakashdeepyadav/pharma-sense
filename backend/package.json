@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "tsx src/scripts/seed.ts",
+    "bootstrap:admin": "node dist/scripts/bootstrapAdmin.js",
     "db:reconcile": "tsx src/scripts/reconcileStock.ts",
     "db:quality": "tsx src/scripts/validateDatabaseQuality.ts",
     "research:demand": "tsx src/scripts/generateSyntheticDemand.ts",

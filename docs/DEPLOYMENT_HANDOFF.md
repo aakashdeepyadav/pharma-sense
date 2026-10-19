@@ -6,7 +6,8 @@ The replenishment review workflow now persists the latest decision per
 medicine, shows the reviewer in the dashboard, and writes each decision with
 its audit event atomically. The release is **not ready for production
 handoff**: local database-backed checks and the live browser workflow pass,
-but target-environment migration, operations, backup/restore, and rollback
+and a Render Blueprint is prepared, but no Render resources have been created.
+Target migration, privileged MFA, backup/restore, monitoring, and rollback
 rehearsal remain open.
 
 ## Verified evidence
@@ -135,14 +136,17 @@ for weighted completion and remaining work.
 
 ## Remaining operational owner actions
 
-Before a production deployment, assign an owner for:
+The Render Blueprint now configures a private managed PostgreSQL database,
+HTTPS static hosting, security headers, pre-deploy migrations, generated JWT
+secret, and one-time administrator bootstrap. Before using operational data:
 
-- managed PostgreSQL hosting and backups
-- secret management and environment isolation
-- HTTPS termination and restricted networking
+- create the Blueprint resources and verify the live API and frontend origins
+- remove bootstrap secrets after the first administrator login
+- require MFA for privileged accounts
+- configure monitoring and verify a database restore from backup
 - team access review and role approval
-- release sign-off and rollback rehearsal
+- release sign-off and rollback/recovery rehearsal
 
 ## Recommended next release action
 
-Use the project runbooks in this repository to perform the controlled deployment rehearsal in a disposable environment and then obtain explicit business sign-off before production rollout.
+Use the Render steps in [DEPLOYMENT_RUNBOOK.md](DEPLOYMENT_RUNBOOK.md) to create a controlled pilot deployment. Do not enter operational inventory until the remaining security and recovery gates above are verified and signed off.
