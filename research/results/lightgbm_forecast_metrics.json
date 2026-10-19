@@ -17,72 +17,66 @@
   },
   "forecast_horizon_days": 1,
   "metrics": {
-    "mae": 1.3766731897878441,
-    "rmse": 1.70321645767825,
+    "mae": 1.3847498114617602,
+    "rmse": 1.739740899213147,
     "train_rows": 357,
     "test_rows": 90,
-    "baseline_naive_mae": 2.5290123456790123,
+    "baseline_naive_mae": 2.8444444444444446,
     "top_feature_importance": [
       {
-        "feature": "num__rolling_mean_30",
-        "importance": 1078.0
+        "feature": "rolling_mean_7",
+        "importance": 483.0
       },
       {
-        "feature": "num__rolling_mean_7",
-        "importance": 983.0
+        "feature": "rolling_mean_30",
+        "importance": 457.0
       },
       {
-        "feature": "num__rolling_mean_14",
-        "importance": 817.0
+        "feature": "rolling_mean_14",
+        "importance": 420.0
       },
       {
-        "feature": "num__lag_1",
-        "importance": 697.0
+        "feature": "week_of_year",
+        "importance": 410.0
       },
       {
-        "feature": "num__week_of_year",
-        "importance": 625.0
+        "feature": "day_of_week",
+        "importance": 356.0
       },
       {
-        "feature": "num__day_of_week",
-        "importance": 551.0
+        "feature": "lag_1",
+        "importance": 318.0
       },
       {
-        "feature": "num__lag_30",
-        "importance": 529.0
+        "feature": "lag_30",
+        "importance": 257.0
       },
       {
-        "feature": "num__lag_7",
-        "importance": 487.0
+        "feature": "lag_7",
+        "importance": 220.0
       },
       {
-        "feature": "num__lag_14",
-        "importance": 428.0
+        "feature": "lag_14",
+        "importance": 192.0
       },
       {
-        "feature": "num__month",
-        "importance": 94.0
+        "feature": "month",
+        "importance": 50.0
       }
     ]
   },
   "feature_names": [
-    "cat__medicine_id_1",
-    "cat__medicine_id_2",
-    "cat__medicine_id_3",
-    "cat__medicine_name_Synthetic Amoxicillin",
-    "cat__medicine_name_Synthetic Cetirizine",
-    "cat__medicine_name_Synthetic Paracetamol",
-    "num__day_of_week",
-    "num__month",
-    "num__week_of_year",
-    "num__is_weekend",
-    "num__lag_1",
-    "num__lag_7",
-    "num__lag_14",
-    "num__lag_30",
-    "num__rolling_mean_7",
-    "num__rolling_mean_14",
-    "num__rolling_mean_30"
+    "day_of_week",
+    "month",
+    "week_of_year",
+    "is_weekend",
+    "lag_1",
+    "lag_7",
+    "lag_14",
+    "lag_30",
+    "rolling_mean_7",
+    "rolling_mean_14",
+    "rolling_mean_30"
   ],
   "notes": [
     "Operational data is preferred for production evaluation; a synthetic fallback is used only when operational history is insufficient.",

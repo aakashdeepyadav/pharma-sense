@@ -1,10 +1,11 @@
 import { Router, Response } from 'express';
 import prisma from '../lib/prisma';
 import { AuthenticatedRequest, requireRoles } from '../auth';
-import { demandHistoryQuerySchema } from '../validation/schemas';
+import { demandHistoryQuerySchema, forecastMlPredictionQuerySchema } from '../validation/schemas';
 import { forecastQuerySchema } from '../validation/schemas';
 import { replenishmentDecisionSchema, replenishmentQuerySchema } from '../validation/schemas';
 import { assessDemandDrift, assessDemandRisk, assessForecastQuality, assessForecastReadiness, movingAverageForecast, movingAverageMae } from '../domain/forecasting';
+import { buildLightGbmFeatures, loadLightGbmArtifact, predictLightGbm } from '../domain/lightgbm';
 import { calculateReplenishment } from '../domain/replenishment';
 import { availableStock } from '../domain/stockRules';
 import { sendApiError } from '../lib/api';
@@ -339,6 +340,7 @@ router.get('/forecast-ml', async (_req: AuthenticatedRequest, res: Response) => 
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
     const candidateDirs = [
+      path.resolve(process.cwd(), 'ml-artifacts'),
       path.resolve(process.cwd(), '../research/results'),
       path.resolve(process.cwd(), 'research/results'),
       path.resolve(__dirname, '../../../research/results'),
@@ -375,6 +377,117 @@ router.get('/forecast-ml', async (_req: AuthenticatedRequest, res: Response) => 
     });
   } catch {
     sendApiError(res, 500, 'GET_FORECAST_ML_FAILED', 'Failed to retrieve ML forecast insights');
+  }
+});
+
+router.get('/forecast-ml/predictions', async (req: AuthenticatedRequest, res: Response) => {
+  const query = forecastMlPredictionQuerySchema.safeParse(req.query);
+  if (!query.success) {
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', query.error.issues);
+    return;
+  }
+
+  try {
+    let model: Awaited<ReturnType<typeof loadLightGbmArtifact>>;
+    try {
+      model = await loadLightGbmArtifact();
+    } catch {
+      sendApiError(res, 503, 'FORECAST_MODEL_UNAVAILABLE', 'The LightGBM inference artifact is not installed');
+      return;
+    }
+
+    const medicines = await prisma.medicine.findMany({
+      where: query.data.medicineId ? { id: query.data.medicineId, active: true } : { active: true },
+      select: { id: true, genericName: true },
+      orderBy: { genericName: 'asc' },
+    });
+    if (query.data.medicineId && medicines.length === 0) {
+      sendApiError(res, 404, 'MEDICINE_NOT_FOUND', 'Active medicine not found');
+      return;
+    }
+
+    const today = new Date();
+    const forecastDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const historyStart = new Date(forecastDate);
+    historyStart.setUTCDate(historyStart.getUTCDate() - 30);
+    const medicineIds = medicines.map((medicine) => medicine.id);
+    const transactions = medicineIds.length === 0
+      ? []
+      : await prisma.stockTransaction.findMany({
+          where: {
+            type: 'OUT',
+            timestamp: { gte: historyStart, lt: forecastDate },
+            batch: { medicineId: { in: medicineIds } },
+          },
+          select: {
+            quantity: true,
+            timestamp: true,
+            batch: { select: { medicineId: true } },
+          },
+          orderBy: { timestamp: 'asc' },
+        });
+
+    const demandByMedicine = new Map<number, number[]>(medicineIds.map((id) => [id, Array(30).fill(0)]));
+    const firstDemandDay = new Map<number, number>();
+    const activeDemandDays = new Map<number, Set<number>>();
+    for (const transaction of transactions) {
+      const dayIndex = Math.floor((Date.UTC(
+        transaction.timestamp.getUTCFullYear(),
+        transaction.timestamp.getUTCMonth(),
+        transaction.timestamp.getUTCDate(),
+      ) - historyStart.getTime()) / (24 * 60 * 60 * 1000));
+      if (dayIndex < 0 || dayIndex >= 30) continue;
+      const medicineId = transaction.batch.medicineId;
+      const dailyValues = demandByMedicine.get(medicineId);
+      if (!dailyValues) continue;
+      dailyValues[dayIndex] += transaction.quantity;
+      firstDemandDay.set(medicineId, Math.min(firstDemandDay.get(medicineId) ?? dayIndex, dayIndex));
+      const activeDays = activeDemandDays.get(medicineId) ?? new Set<number>();
+      activeDays.add(dayIndex);
+      activeDemandDays.set(medicineId, activeDays);
+    }
+
+    const forecasts = medicines.map((medicine) => {
+      const dailyDemand = demandByMedicine.get(medicine.id) ?? Array(30).fill(0);
+      const firstDay = firstDemandDay.get(medicine.id);
+      const historyDays = firstDay === undefined ? 0 : 30 - firstDay;
+      const demandDays = activeDemandDays.get(medicine.id)?.size ?? 0;
+      if (historyDays < 30 || demandDays === 0) {
+        return {
+          medicineId: medicine.id,
+          medicineName: medicine.genericName,
+          forecastDate: forecastDate.toISOString().slice(0, 10),
+          predictedQuantity: null,
+          status: 'INSUFFICIENT_HISTORY' as const,
+          historyDays,
+          demandDays,
+        };
+      }
+
+      const features = buildLightGbmFeatures(dailyDemand, forecastDate);
+      return {
+        medicineId: medicine.id,
+        medicineName: medicine.genericName,
+        forecastDate: forecastDate.toISOString().slice(0, 10),
+        predictedQuantity: Number(predictLightGbm(model, features).toFixed(2)),
+        status: 'READY' as const,
+        historyDays,
+        demandDays,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        model: model.model,
+        trainingDataSource: model.training_data_source,
+        trainedAt: model.trained_at,
+        inferenceDataSource: 'recent_stock_out_transactions',
+        forecasts,
+      },
+    });
+  } catch {
+    sendApiError(res, 500, 'CALCULATE_ML_FORECAST_FAILED', 'Failed to calculate LightGBM forecasts');
   }
 });
 

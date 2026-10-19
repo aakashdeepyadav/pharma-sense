@@ -178,6 +178,22 @@ type ForecastMlData = {
   } | null;
 };
 
+type LightGbmPrediction = {
+  model: string;
+  trainingDataSource: "synthetic" | "operational";
+  trainedAt: string;
+  inferenceDataSource: string;
+  forecasts: {
+    medicineId: number;
+    medicineName: string;
+    forecastDate: string;
+    predictedQuantity: number | null;
+    status: "READY" | "INSUFFICIENT_HISTORY";
+    historyDays: number;
+    demandDays: number;
+  }[];
+};
+
 type AuditLog = {
   id: number;
   action: string;
@@ -436,6 +452,8 @@ function App() {
     number | null
   >(null);
   const [forecastMl, setForecastMl] = useState<ForecastMlData | null>(null);
+  const [lightGbmPrediction, setLightGbmPrediction] =
+    useState<LightGbmPrediction | null>(null);
   const [replenishment, setReplenishment] = useState<
     ReplenishmentRecommendation[]
   >([]);
@@ -1640,6 +1658,9 @@ function App() {
           ? selectedForecastMedicineId
           : medicines[0].id)
       : null;
+  const selectedLightGbmForecast = lightGbmPrediction?.forecasts.find(
+    (forecast) => forecast.medicineId === effectiveForecastMedicineId,
+  );
 
   useEffect(() => {
     if (!session || effectiveForecastMedicineId === null) {
@@ -1681,6 +1702,41 @@ function App() {
     };
 
     void fetchBaseline();
+    return () => {
+      isMounted = false;
+    };
+  }, [session, effectiveForecastMedicineId]);
+
+  useEffect(() => {
+    if (!session || effectiveForecastMedicineId === null) {
+      setLightGbmPrediction(null);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchLightGbmPrediction = async () => {
+      try {
+        const response = await apiFetch(
+          `/api/v1/reports/forecast-ml/predictions?medicineId=${effectiveForecastMedicineId}`,
+          { headers: { Authorization: `Bearer ${session.token}` } },
+        );
+        if (!response.ok) {
+          if (isMounted) setLightGbmPrediction(null);
+          return;
+        }
+        const result = (await response.json()) as {
+          success?: boolean;
+          data?: LightGbmPrediction;
+        };
+        if (isMounted) {
+          setLightGbmPrediction(result.success ? result.data ?? null : null);
+        }
+      } catch {
+        if (isMounted) setLightGbmPrediction(null);
+      }
+    };
+
+    void fetchLightGbmPrediction();
     return () => {
       isMounted = false;
     };
@@ -3615,6 +3671,43 @@ function App() {
                           : "Insufficient history"}
                       </p>
                     </div>
+                  </div>
+
+                  <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="font-semibold text-indigo-950">
+                        LightGBM next-day prediction
+                      </h4>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-indigo-800">
+                        {!lightGbmPrediction
+                          ? "Model unavailable"
+                          : lightGbmPrediction.trainingDataSource === "synthetic"
+                            ? "Synthetic training data"
+                            : "Operational training data"}
+                      </span>
+                    </div>
+                    {!selectedLightGbmForecast ? (
+                      <p className="mt-2 text-sm text-indigo-900">
+                        The model prediction is unavailable. Check the API model artifact and try again.
+                      </p>
+                    ) : selectedLightGbmForecast.status === "READY" ? (
+                      <p className="mt-2 text-sm text-indigo-950">
+                        Predicted demand for {selectedLightGbmForecast.forecastDate}: {" "}
+                        <strong>{selectedLightGbmForecast.predictedQuantity?.toFixed(2)} units</strong>
+                        <span className="ml-2 text-indigo-800">
+                          ({selectedLightGbmForecast.historyDays} history days)
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-sm text-indigo-900">
+                        Not enough recorded demand for this medicine. The model needs 30 days of history.
+                      </p>
+                    )}
+                    {lightGbmPrediction?.trainingDataSource === "synthetic" && (
+                      <p className="mt-2 text-xs text-indigo-800">
+                        Demo inference uses this medicine's recent stock issues, but the model was trained on synthetic data and is not production-calibrated.
+                      </p>
+                    )}
                   </div>
 
                   <div className="mt-6">

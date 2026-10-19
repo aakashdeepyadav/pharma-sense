@@ -708,6 +708,83 @@ describe('PharmaSense API', () => {
     }
   });
 
+  it('returns a live LightGBM prediction from recent stock issue history', async () => {
+    const admin = await prisma.user.findUnique({ where: { email: 'admin@pharmasense.local' } });
+    assert.ok(admin);
+    const runId = `lightgbm-inference-${crypto.randomUUID()}`;
+    const category = await prisma.category.create({ data: { name: `${runId}-category` } });
+    const supplier = await prisma.supplier.create({ data: { name: `${runId}-supplier` } });
+    const medicine = await prisma.medicine.create({
+      data: {
+        genericName: `${runId}-medicine`,
+        brandName: 'LightGBM inference test',
+        categoryId: category.id,
+        unit: 'Tablet',
+        reorderLevel: 10,
+      },
+    });
+    const batch = await prisma.batch.create({
+      data: {
+        medicineId: medicine.id,
+        supplierId: supplier.id,
+        batchNumber: `${runId}-batch`,
+        mfgDate: new Date('2025-01-01T00:00:00Z'),
+        expiryDate: new Date('2035-01-01T00:00:00Z'),
+        quantity: 1000,
+        purchasePrice: 1,
+        sellingPrice: 2,
+      },
+    });
+    const today = new Date();
+    const forecastDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const firstHistoryDay = new Date(forecastDate);
+    firstHistoryDay.setUTCDate(firstHistoryDay.getUTCDate() - 30);
+
+    try {
+      await prisma.stockTransaction.createMany({
+        data: Array.from({ length: 30 }, (_, index) => ({
+          batchId: batch.id,
+          userId: admin.id,
+          type: 'OUT',
+          quantity: 4 + (index % 6),
+          timestamp: new Date(firstHistoryDay.getTime() + index * 24 * 60 * 60 * 1000),
+        })),
+      });
+      const response = await fetch(`${baseUrl}/api/v1/reports/forecast-ml/predictions?medicineId=${medicine.id}`, {
+        headers: { Authorization: `Bearer ${createAccessToken({ id: admin.id, role: 'Admin' })}` },
+      });
+      assert.equal(response.status, 200);
+      const body = (await response.json()) as {
+        success: boolean;
+        data: {
+          model: string;
+          trainingDataSource: string;
+          forecasts: Array<{ medicineId: number; status: string; predictedQuantity: number | null; historyDays: number }>;
+        };
+      };
+      assert.equal(body.success, true);
+      assert.equal(body.data.model, 'LightGBM baseline');
+      assert.equal(body.data.trainingDataSource, 'synthetic');
+      assert.deepEqual(body.data.forecasts[0], {
+        medicineId: medicine.id,
+        medicineName: medicine.genericName,
+        forecastDate: forecastDate.toISOString().slice(0, 10),
+        predictedQuantity: body.data.forecasts[0].predictedQuantity,
+        status: 'READY',
+        historyDays: 30,
+        demandDays: 30,
+      });
+      assert.ok(Number.isFinite(body.data.forecasts[0].predictedQuantity));
+      assert.ok((body.data.forecasts[0].predictedQuantity ?? -1) >= 0);
+    } finally {
+      await prisma.stockTransaction.deleteMany({ where: { batchId: batch.id } });
+      await prisma.batch.delete({ where: { id: batch.id } });
+      await prisma.medicine.delete({ where: { id: medicine.id } });
+      await prisma.supplier.delete({ where: { id: supplier.id } });
+      await prisma.category.delete({ where: { id: category.id } });
+    }
+  });
+
   it('rejects invalid forecast parameters', async () => {
     const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
       method: 'POST',

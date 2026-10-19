@@ -155,10 +155,11 @@ Do not point the live browser workflow or database quality tools at a database c
 
 ## Forecasting and model status
 
-The project has two different forecasting paths:
+The project has three forecasting paths:
 
 1. **Live advisory calculations:** the TypeScript API computes moving-average forecasts, demand risk, and replenishment suggestions from stock-out transactions and current inventory in PostgreSQL. These results are advisory and require human review.
-2. **LightGBM research benchmark:** Python scripts validate a dataset, build features, train and evaluate a LightGBM baseline, and write metrics and predictions under `research/results/`. The checked-in benchmark uses synthetic demand. The `/forecast-ml` API response exposes benchmark metrics; it does not run LightGBM inference for each live request.
+2. **Live LightGBM inference:** the API loads the portable tree artifact at `backend/ml-artifacts/lightgbm_model.json` and runs the exported LightGBM trees in TypeScript. `GET /api/v1/reports/forecast-ml/predictions?medicineId={id}` predicts next-day demand from the medicine's last 30 full UTC days of stock OUT activity. It returns `INSUFFICIENT_HISTORY` when it cannot establish that history.
+3. **LightGBM research benchmark:** Python scripts validate a dataset, build features, train and evaluate a LightGBM baseline, and write metrics and predictions under `research/results/`. The checked-in model was trained on synthetic demand. The live inference endpoint uses recent database transactions as inputs, but synthetic training means the result is a demonstration only and is not production-calibrated.
 
 Run the research pipeline from the repository root:
 
@@ -171,7 +172,7 @@ npm run research:evaluate
 npm run research:ml
 ```
 
-Model results must not be described as production accuracy unless they have been evaluated against approved, representative operational history. The documented roadmap calls for deeper real demand history, stockout and availability context, baseline comparisons, monitoring, and a governed human-reviewed pilot before making that claim. Read the [data contract](research/data/DATA_CONTRACT.md), [forecasting roadmap](docs/PRODUCTION_FORECASTING_ROADMAP.md), and [ML governance workflow](docs/ML_GOVERNANCE_WORKFLOW.md) before using real or de-identified data.
+When the synthetic dataset is selected, training also refreshes the portable API artifact and its metric files under `backend/ml-artifacts/`. Redeploy the API after regenerating them. Operational model artifacts are deliberately not exported by the research script; releasing a model trained on operational data requires approval, representative evaluation, and a private governed release process. Model results must not be described as production accuracy without approved, representative operational history. Read the [data contract](research/data/DATA_CONTRACT.md), [forecasting roadmap](docs/PRODUCTION_FORECASTING_ROADMAP.md), and [ML governance workflow](docs/ML_GOVERNANCE_WORKFLOW.md) before using real or de-identified data.
 
 ## Deployment
 

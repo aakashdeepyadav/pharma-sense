@@ -152,6 +152,10 @@ export const forecastQuerySchema = z.object({
   path: ['from'],
 });
 
+export const forecastMlPredictionQuerySchema = z.object({
+  medicineId: z.coerce.number().int().positive().optional(),
+});
+
 const purchaseItemSchema = z.object({
   medicineId: z.coerce.number().int().positive(),
   batchNumber: z.string().trim().min(1).max(100),

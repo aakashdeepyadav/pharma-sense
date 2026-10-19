@@ -36,6 +36,6 @@ Run the research-grade LightGBM demand model from the backend directory:
 npm run research:ml
 ```
 
-This script trains a LightGBM regressor on the synthetic demand dataset using lag and rolling-window features for medicine demand. It writes metrics to `research/results/lightgbm_forecast_metrics.json` and prediction output to `research/results/lightgbm_predictions.csv`.
+This script trains a LightGBM regressor using calendar, lag, and rolling-window features. When the synthetic dataset is selected, it writes evaluation metrics and prediction output under `research/results/` and exports a portable tree model plus dashboard metric artifacts under `backend/ml-artifacts/`. The API evaluates those exported trees directly in TypeScript; a separate Python inference server is not required.
 
-This is still a synthetic-only benchmarking pipeline. It must not be treated as proof of production performance for a real pharmacy deployment.
+The live endpoint `GET /api/v1/reports/forecast-ml/predictions?medicineId={id}` applies the packaged model to 30 full UTC days of that medicine's stock OUT transactions. The current packaged model was trained on synthetic data and is only a working demonstration; its prediction is not production-calibrated. If operational data is selected, the script intentionally does not export a deployable model. Operational model release requires approved data, representative evaluation, and private governance.

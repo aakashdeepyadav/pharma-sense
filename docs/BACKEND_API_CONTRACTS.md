@@ -14,6 +14,7 @@ inventory operations workstream. All protected endpoints require a bearer JWT.
 | `POST /api/v1/inventory/transactions` | Admin, Pharmacist, Inventory Manager, Staff | `201` | `400 VALIDATION_ERROR`, `404 BATCH_NOT_FOUND`, `409 INSUFFICIENT_STOCK`, `409 EXPIRED_BATCH` | Quantity update, ledger row, and audit are atomic |
 | `PATCH /api/v1/alerts/:id/acknowledge` | Any authenticated role | `200` | `400 INVALID_ALERT_ID`, `404 ALERT_NOT_FOUND` | Alert acknowledgement and audit are atomic |
 | `GET /api/v1/reports/replenishment` | Any authenticated role | `200`, recommendations with the latest persisted review and reviewer | `400 VALIDATION_ERROR` | Read-only; never creates purchases or stock movements |
+| `GET /api/v1/reports/forecast-ml/predictions?medicineId={id}` | Any authenticated role | `200`, one-day LightGBM estimate or `INSUFFICIENT_HISTORY` | `400 VALIDATION_ERROR`, `404 MEDICINE_NOT_FOUND`, `503 FORECAST_MODEL_UNAVAILABLE` | Read-only inference over recent stock OUT history; no inventory changes |
 | `POST /api/v1/reports/replenishment/decision` | Admin, Pharmacist, Inventory Manager | `200`, saved decision and reviewer | `400 VALIDATION_ERROR`, `404 MEDICINE_NOT_FOUND` | Latest review and audit event are written atomically; previous review history remains in the audit log |
 
 Errors use the following shape:
@@ -37,6 +38,12 @@ Replenishment review state is shared across users and stored per medicine.
 Submitting another decision updates the current review state while retaining
 each decision as an attributed audit event. Review decisions are advisory only
 and do not initiate a purchase or stock change.
+
+The LightGBM prediction endpoint uses the packaged `backend/ml-artifacts`
+artifact and the latest 30 full UTC calendar days of stock OUT transactions.
+It returns insufficient history unless demand exists throughout a complete
+30-day history window. The current artifact is trained on synthetic data, so
+live inference is a technical demonstration and is not production-calibrated.
 
 ## Session invalidation
 

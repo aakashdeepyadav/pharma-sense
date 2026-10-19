@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from lightgbm import LGBMRegressor
-from sklearn.compose import ColumnTransformer
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
 
 REQUIRED_COLUMNS = {'date', 'medicine_id', 'quantity_issued'}
 OPTIONAL_FEATURE_COLUMNS = {
@@ -27,6 +25,7 @@ FEATURE_TABLE_PATH = ROOT / 'research' / 'results' / 'forecast_feature_table.csv
 OPERATIONAL_DATA_PATH = ROOT / 'research' / 'data' / 'operational_demand.csv'
 SYNTHETIC_DATA_PATH = ROOT / 'research' / 'data' / 'synthetic_demand.csv'
 RESULTS_DIR = ROOT / 'research' / 'results'
+MODEL_ARTIFACT_PATH = ROOT / 'backend' / 'ml-artifacts' / 'lightgbm_model.json'
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -114,15 +113,7 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def train_model(train_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[Pipeline, pd.DataFrame, dict, list[str]]:
-    categorical = ['medicine_id']
-    if 'medicine_category' in train_df.columns:
-        categorical.append('medicine_category')
-    if 'organization_group' in train_df.columns:
-        categorical.append('organization_group')
-    if 'medicine_name' in train_df.columns:
-        categorical.append('medicine_name')
-
+def train_model(train_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[LGBMRegressor, pd.DataFrame, dict, list[str]]:
     numeric = [
         'day_of_week',
         'month',
@@ -136,44 +127,28 @@ def train_model(train_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[Pipeline
         'rolling_mean_14',
         'rolling_mean_30',
     ]
-    for column in ['is_stockout_censored', 'available_units_at_start', 'expiry_units_at_start', 'supplier_lead_days']:
-        if column in train_df.columns:
-            numeric.append(column)
-
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('cat', OneHotEncoder(handle_unknown='ignore'), categorical),
-            ('num', 'passthrough', numeric),
-        ]
+    feature_names = numeric
+    model = LGBMRegressor(
+        objective='regression',
+        n_estimators=250,
+        learning_rate=0.05,
+        num_leaves=15,
+        subsample=0.9,
+        colsample_bytree=0.9,
+        random_state=42,
+        verbose=-1,
     )
 
-    model = Pipeline(
-        steps=[
-            ('preprocessor', preprocessor),
-            ('model', LGBMRegressor(
-                objective='regression',
-                n_estimators=500,
-                learning_rate=0.05,
-                num_leaves=31,
-                subsample=0.9,
-                colsample_bytree=0.9,
-                random_state=42,
-                verbose=-1,
-            )),
-        ]
-    )
-
-    X_train = train_df[categorical + numeric]
+    X_train = train_df[feature_names]
     y_train = train_df['target']
-    X_test = test_df[categorical + numeric]
+    X_test = test_df[feature_names]
     y_test = test_df['target']
 
     model.fit(X_train, y_train)
     preds = model.predict(X_test)
     preds = np.clip(preds, 0, None)
 
-    feature_names = list(model.named_steps['preprocessor'].get_feature_names_out())
-    importances = model.named_steps['model'].feature_importances_
+    importances = model.feature_importances_
     ranked_features = sorted(
         zip(feature_names, importances.tolist()),
         key=lambda item: item[1],
@@ -185,7 +160,7 @@ def train_model(train_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[Pipeline
         'rmse': float(np.sqrt(mean_squared_error(y_test, preds))),
         'train_rows': int(len(train_df)),
         'test_rows': int(len(test_df)),
-        'baseline_naive_mae': float(np.mean(np.abs(y_test - y_test.shift(1).fillna(y_test.mean())))),
+        'baseline_naive_mae': float(np.mean(np.abs(y_test.to_numpy() - test_df['lag_1'].to_numpy()))),
         'top_feature_importance': [
             {'feature': feature, 'importance': float(score)}
             for feature, score in ranked_features
@@ -195,7 +170,7 @@ def train_model(train_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[Pipeline
     result_df = pd.DataFrame({
         'actual': y_test.reset_index(drop=True),
         'predicted': preds,
-        'medicine_id': X_test['medicine_id'].reset_index(drop=True),
+        'medicine_id': test_df['medicine_id'].reset_index(drop=True),
         'date': test_df['date'].reset_index(drop=True),
     })
 
@@ -260,7 +235,8 @@ def main() -> None:
         'model': 'LightGBM baseline',
         'dataset': str(data_path.relative_to(ROOT)),
         'data_source': data_source,
-        'production_ready': data_source == 'operational',
+        'production_ready': False,
+        'production_readiness_reason': 'A research baseline requires approved data, representative evaluation, and human sign-off before production use.',
         'production_ready_structure': {
             'time_based_split': True,
             'feature_validation': True,
@@ -277,6 +253,22 @@ def main() -> None:
             'Operational production deployment requires an approved real or de-identified dataset and human sign-off.',
         ],
     }
+
+    export_model_artifact = data_source == 'synthetic'
+    if export_model_artifact:
+        MODEL_ARTIFACT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        artifact = {
+            'format': 'lightgbm-booster-json-v1',
+            'model': 'LightGBM baseline',
+            'training_data_source': data_source,
+            'trained_at': datetime.now(timezone.utc).isoformat(),
+            'feature_names': feature_names,
+            'booster': model.booster_.dump_model(),
+        }
+        MODEL_ARTIFACT_PATH.write_text(json.dumps(artifact, separators=(',', ':')), encoding='utf-8')
+        print(f'Portable inference artifact written to {MODEL_ARTIFACT_PATH.relative_to(ROOT)}')
+    else:
+        print('Operational model artifact was not exported. A governed, private model-release process is required for operational data.')
 
     RESULTS_DIR.joinpath('lightgbm_forecast_metrics.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
     RESULTS_DIR.joinpath('lightgbm_predictions.csv').write_text(
@@ -296,6 +288,13 @@ def main() -> None:
         json.dumps(recommend_replenishment(pd.Series(example)), indent=2),
         encoding='utf-8',
     )
+    if export_model_artifact:
+        MODEL_ARTIFACT_PATH.parent.joinpath('lightgbm_forecast_metrics.json').write_text(
+            json.dumps(summary, indent=2), encoding='utf-8',
+        )
+        MODEL_ARTIFACT_PATH.parent.joinpath('lightgbm_replenishment_example.json').write_text(
+            json.dumps(recommend_replenishment(pd.Series(example)), indent=2), encoding='utf-8',
+        )
 
     print(json.dumps(summary, indent=2))
 
