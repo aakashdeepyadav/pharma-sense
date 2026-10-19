@@ -7,10 +7,11 @@ status, reviewer attribution, and atomic audit logging. Verification recorded
 on 2026-10-20 passed against the configured local PostgreSQL database:
 
 - Backend TypeScript build: passed
-- Backend test suite: 35 passed
+- Backend test suite: 41 passed, including MFA unit, enrollment, recovery, and admin reset integration coverage
 - Frontend production build: passed
 - Frontend lint: passed
-- Mocked Playwright browser suite: 13 passed
+- Mocked Playwright browser suite: 15 passed, including MFA enrollment and verification
+- MFA migration and API flow passed against a disposable PostgreSQL schema; the schema was removed after the run
 - Database quality: passed, 0 errors and 0 warnings
 - Stock reconciliation: 0 discrepancies and 0 unsupported movements
 - Both database checks reported `modifiedData: false`
@@ -27,8 +28,10 @@ on 2026-10-20 passed against the configured local PostgreSQL database:
 
 The system is **not signed off for production deployment**. Local database,
 automated checks, and the disposable-database live workflow pass. A Render
-Blueprint is prepared, but no hosted deployment, privileged MFA, backup/restore
-rehearsal, or rollback evidence exists yet. Forecast and
+Blueprint requires MFA for all operational roles, with encrypted authenticator
+secrets and one-time recovery codes implemented in the application. No hosted
+deployment, deployed MFA recovery rehearsal, backup/restore rehearsal, or
+rollback evidence exists yet. Forecast and
 replenishment outputs remain advisory and must not trigger autonomous inventory
 action. The forecasting model is synthetic-data research, not a production
 forecast; production forecasting requires representative operational history
@@ -46,7 +49,7 @@ and separate validation.
 
 - Freeze the approved operational dataset and model baseline.
 - Complete a deployment rehearsal against the selected target environment.
-- Require and verify MFA for privileged accounts before operational use.
+- Verify MFA enrollment, recovery codes, and administrator recovery for operational accounts before use.
 - Review the forecast risk and replenishment recommendation workflow.
 - Verify audit logging for every recommendation decision.
 - Confirm that no stock movement is triggered automatically from a review decision.

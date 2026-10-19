@@ -2,7 +2,7 @@
 
 ## Status as of 2026-10-20
 
-**Estimated completion: 83% for the full production-ready project.** The
+**Estimated completion: 84% for the full production-ready project.** The
 inventory application and its local verification are complete for the tested
 scope. The remaining work is mainly production operations and evidence-based
 forecasting; neither can be closed by local code changes alone.
@@ -13,12 +13,12 @@ has shipped. The weights make the scope explicit:
 | Workstream | Weight | Completion | Weighted points | Evidence / open work |
 |---|---:|---:|---:|---|
 | Core inventory application | 50% | 100% | 50 | Authentication and roles, inventory, receiving/issuing, purchase history, alerts, reporting, and replenishment review are implemented. |
-| Local verification | 25% | 100% | 25 | Backend build and 35 tests, frontend lint/build and 13 mocked browser tests, one live browser workflow on disposable PostgreSQL, database quality/reconciliation, local dashboard smoke, and production dependency audits passed. |
-| Production operations | 15% | 50% | 7.5 | A Render Blueprint now defines the managed database, API/static services, TLS/security headers, database migrations, generated JWT secret, and one-time admin bootstrap. Actual Render deploy, privileged MFA, backup/restore rehearsal, monitoring, and rollback are still open. |
+| Local verification | 25% | 100% | 25 | Backend build, Prisma validation and 41 tests, frontend lint/build and 15 mocked browser tests, plus a separate live inventory workflow on disposable PostgreSQL passed. Earlier database quality/reconciliation, local dashboard smoke, and production dependency audits also passed. |
+| Production operations | 15% | 60% | 9 | Render config now requires MFA for all roles; the app supports encrypted TOTP enrollment, replay protection, one-time recovery codes, and audited admin reset. Actual Render deploy, hosted MFA recovery rehearsal, backup/restore, monitoring, and rollback remain open. |
 | Production forecasting | 10% | 0% | 0 | Current forecasting remains advisory/research. The roadmap requires representative operational history (at least 12 months of daily demand) before model validation and a governed pilot. |
 
-Calculation: `50 + 25 + (15 * 0.50) + (10 * 0) = 82.5%`, rounded to **83%**.
-The local inventory application alone is effectively complete; the 17.5
+Calculation: `50 + 25 + (15 * 0.60) + (10 * 0) = 84%`.
+The local inventory application alone is effectively complete; the 16
 percentage points left in the full-project estimate are not all coding tasks.
 
 ## What remains
@@ -33,8 +33,8 @@ Complete these gates in the Render account:
    the paid plans and keep the API and database in the same region.
 2. Provide the one-time administrator setup values, confirm migrations and
    health checks, then remove the bootstrap variables after the first login.
-3. Require privileged-user MFA before operational inventory data is entered;
-   keep the API at one instance while request/login limiting is process-local.
+3. Verify authenticator enrollment, recovery codes, and administrator recovery
+   for every operational account; keep the API at one instance while request/login limiting is process-local.
 4. Configure monitoring and log review; verify a backup by rehearsing restore
    and documenting the recovery point and operator.
 5. Review migration compatibility, rehearse rollback/recovery, assign owners,
@@ -56,8 +56,9 @@ production forecast readiness. See
 
 ## Verification record
 
-- Backend TypeScript build: passed; 35 tests passed.
-- Frontend lint and production build: passed; 13 mocked Playwright tests passed.
+- Backend TypeScript build and Prisma schema validation: passed; all 41 backend tests passed.
+- The MFA migration, enrollment, replay rejection, and single-use recovery flow passed against a temporary PostgreSQL schema; that schema was dropped afterward.
+- Frontend lint, production build, and all 15 mocked Playwright tests passed.
 - Live browser workflow: 1 passed against a disposable isolated PostgreSQL
   database in 2.4 minutes; the temporary database was removed.
 - Database quality: 0 errors and 0 warnings; reconciliation: 0 discrepancies

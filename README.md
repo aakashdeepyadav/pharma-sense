@@ -21,6 +21,7 @@ Agent-Based Medicine Stock Management System.
 - Low-stock, out-of-stock, expired, and expiring-soon alerts with acknowledgement.
 - Operational reports, management-only audit logs, and transactional audit events for writes.
 - Admin user and role management, account activation/deactivation, password reset, and self-service password change with immediate session invalidation.
+- Authenticator-based MFA for every operational role, with encrypted TOTP secrets, one-time recovery codes, replay protection, and audited administrator reset for another user's lost authenticator.
 - Role-aware dashboard controls for Admin, Inventory Manager, Pharmacist, and Staff; frontend permissions are presentation-only and the API remains authoritative.
 - Responsive, keyboard-accessible sign-in and dashboard workflows, including focus-managed medicine dialogs and usable audit search/export controls on narrow screens.
 - Read-only replenishment recommendations based on recent OUT demand and reorder levels; recommendations never place purchases automatically.
@@ -105,13 +106,14 @@ npm run test:e2e:live
 
 ## Latest Local Verification
 
-Verified on 2026-10-20: backend build and all 35 backend tests passed; frontend lint, production build, and all 13 mocked browser tests passed. The live browser workflow passed against an isolated disposable PostgreSQL database (1 workflow, 2.4 minutes); the database was removed afterward. Backend and frontend production dependency audits reported 0 vulnerabilities. Database quality passed with no errors or warnings, and stock reconciliation found no discrepancies. A read-only browser sign-in and dashboard smoke test against the local API succeeded with no failed API requests or browser console warnings.
+Verified on 2026-10-20: backend build, Prisma schema validation, and all 41 backend tests passed. The new MFA migration and API flows passed against a temporary PostgreSQL schema that was dropped after the run. Frontend lint/build and all 15 mocked Playwright tests passed. The separate live browser workflow passed against disposable PostgreSQL; earlier database quality/reconciliation and production dependency audits also passed. These results are local and do not verify a Render deployment.
 
-The Render deployment configuration is prepared and its YAML syntax parses, but the Render CLI schema validator has not been run; no Render resources have been created and no production deployment or backup/restore rehearsal has been verified. Privileged MFA also remains a gate before operational inventory use. See [project completion estimate](docs/PROJECT_COMPLETION_PLAN.md), [production signoff](docs/PRODUCTION_SIGNOFF.md), and [deployment handoff](docs/DEPLOYMENT_HANDOFF.md) for current status.
+The Render Blueprint requires MFA for all roles and generates a dedicated key to encrypt authenticator secrets. No Render resources have been created, and the production MFA flow, backup/restore, monitoring, and rollback have not been verified on a deployed environment. See [project completion estimate](docs/PROJECT_COMPLETION_PLAN.md), [production signoff](docs/PRODUCTION_SIGNOFF.md), and [deployment handoff](docs/DEPLOYMENT_HANDOFF.md) for current status.
 
 ## Security Notes
 
 - Passwords are stored as bcrypt hashes and login failures use a generic response.
+- Production requires authenticator MFA for Admin, Pharmacist, Inventory Manager, and Staff accounts. Each user saves one-time recovery codes during enrollment; lost MFA can be reset by another administrator and every reset is audited. The `MFA_ENCRYPTION_KEY` must remain stable because it encrypts TOTP secrets at rest.
 - Protected API routes enforce JWT authentication and check the user's current database role on every request; frontend controls are presentation only.
 - JWTs are restricted to HS256 with an issuer and audience, and the application refuses to start without a signing key of at least 32 bytes. Use a separately generated high-entropy value.
 - Dashboard logout stores a SHA-256 token fingerprint in PostgreSQL; logout remains effective across API restarts and replicas. Existing tokens without the new issuer/audience must sign in again after this migration.

@@ -4,7 +4,7 @@
 
 PharmaSense is a medicine inventory and decision-support system designed for pharmacies and healthcare inventory teams. The project combines operational stock management, alerting, auditability, and a forecasting pipeline that can support replenishment planning without allowing model output to trigger purchases automatically.
 
-The project has a complete, locally verified inventory workflow spanning authentication, role-based access, medicine and supplier management, receiving and issuing, purchases, alerts, reporting, audit history, and human-reviewed replenishment decisions. A Render deployment Blueprint is prepared. Production hosting, privileged MFA, backup/restore rehearsal, and forecasting validation with representative operational data remain open.
+The project has a complete, locally verified inventory workflow spanning authentication, role-based access, medicine and supplier management, receiving and issuing, purchases, alerts, reporting, audit history, and human-reviewed replenishment decisions. Authenticator MFA is implemented and required by the Render Blueprint. Production hosting, deployed MFA recovery rehearsal, backup/restore, and forecasting validation with representative operational data remain open.
 
 ## 2. Project Objective
 
@@ -130,8 +130,9 @@ This is important because model output is treated as advisory evidence, not as a
 
 The latest local verification was recorded on 2026-10-20:
 
-- Backend TypeScript build and all 35 tests passed.
-- Frontend lint and production build passed; all 13 mocked Playwright tests passed.
+- Backend TypeScript build, Prisma schema validation, and all 41 tests passed.
+- Frontend lint and production build passed; all 15 mocked Playwright tests passed.
+- MFA migration, enrollment, replay rejection, and single-use recovery passed on a temporary PostgreSQL schema, which was removed afterward.
 - One live Playwright workflow passed against an isolated disposable PostgreSQL database; the temporary database was removed.
 - Database quality reported 0 errors and warnings; stock reconciliation reported 0 discrepancies. Both checks were read-only.
 - Backend and frontend production dependency audits reported 0 vulnerabilities.
@@ -151,7 +152,7 @@ review loop is implemented, while production use still depends on:
 
 - explicit business approval of the data and forecasting claims
 - actual deployment, backup/restore, ownership, and rollback readiness
-- privileged MFA before operational inventory use
+- deployed MFA enrollment/recovery verification before operational inventory use
 - continued human review of all replenishment recommendations
 
 ## 9. Critical Risks and Gaps

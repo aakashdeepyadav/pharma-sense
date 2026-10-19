@@ -14,7 +14,7 @@ Review these controls for every release and whenever deployment topology changes
 - [x] Passwords use bcrypt, login errors are generic, and protected routes enforce authentication and roles server-side.
 - [x] Development seeding requires an environment-provided password, rejects production mode, and does not log the secret.
 - [x] Health, authentication, anonymous protected-route rejection, and role-denial behavior have API tests.
-- [ ] Require MFA for privileged accounts before using operational inventory data.
+- [x] Production requires authenticator MFA for every role that can access or change operational inventory; enrollment creates single-use recovery codes and TOTP secrets are encrypted at rest.
 - [ ] Review CSP and HSTS at the actual frontend/HTTPS termination layer before deployment.
 - [ ] Define trusted proxy behavior and shared login throttling before placing multiple API instances behind a reverse proxy.
 - [ ] Rotate the signing key through a documented key-rotation procedure; changing it invalidates all existing access tokens.

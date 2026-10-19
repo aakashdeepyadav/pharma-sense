@@ -193,6 +193,7 @@ type ManagedUser = {
   name: string;
   email: string;
   active: boolean;
+  mfaEnabled: boolean;
   role: { id: number; name: string };
 };
 
@@ -281,6 +282,11 @@ type Session = {
   token: string;
   user: { id?: number; name: string; email?: string; role: string };
 };
+
+type MfaFlow =
+  | { stage: "verify"; challengeToken: string }
+  | { stage: "setup"; challengeToken: string; secret: string; otpauthUrl: string }
+  | { stage: "recovery"; session: Session; recoveryCodes: string[] };
 
 type ApiErrorPayload = {
   code?: string;
@@ -412,6 +418,9 @@ function App() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
+  const [mfaFlow, setMfaFlow] = useState<MfaFlow | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [recoveryCodesSaved, setRecoveryCodesSaved] = useState(false);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -689,25 +698,93 @@ function App() {
       });
       const result = (await response.json()) as {
         success?: boolean;
-        data?: Session;
+        data?: Session & {
+          mfaRequired?: boolean;
+          mfaSetupRequired?: boolean;
+          challengeToken?: string;
+        };
         error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success || !result.data) {
         throw new Error(extractErrorMessage(result, "Unable to sign in."));
       }
 
-      sessionStorage.setItem(
-        "pharmasense-session",
-        JSON.stringify(result.data),
-      );
-      setLoading(true);
-      setSession(result.data);
+      if (result.data.token) {
+        startAuthenticatedSession(result.data);
+        return;
+      }
+      if (!result.data.challengeToken) {
+        throw new Error("The server returned an incomplete sign-in response.");
+      }
+      if (result.data.mfaSetupRequired) {
+        const setupResponse = await apiFetch("/api/v1/auth/mfa/setup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enrollmentToken: result.data.challengeToken }),
+        });
+        const setup = (await setupResponse.json()) as {
+          success?: boolean;
+          data?: { secret: string; otpauthUrl: string };
+          error?: string | ApiErrorPayload;
+        };
+        if (!setupResponse.ok || !setup.success || !setup.data) {
+          throw new Error(extractErrorMessage(setup, "Unable to start MFA setup."));
+        }
+        setMfaFlow({ stage: "setup", challengeToken: result.data.challengeToken, ...setup.data });
+      } else {
+        setMfaFlow({ stage: "verify", challengeToken: result.data.challengeToken });
+      }
+      setMfaCode("");
+      setLoginError("");
     } catch (requestError) {
       setLoginError(
         requestError instanceof Error
           ? requestError.message
           : "Unable to sign in.",
       );
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const startAuthenticatedSession = (nextSession: Session) => {
+    sessionStorage.setItem("pharmasense-session", JSON.stringify(nextSession));
+    setLoading(true);
+    setMfaFlow(null);
+    setSession(nextSession);
+  };
+
+  const handleMfaSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!mfaFlow || mfaFlow.stage === "recovery") return;
+    setLoggingIn(true);
+    setLoginError("");
+    try {
+      const isSetup = mfaFlow.stage === "setup";
+      const response = await apiFetch(isSetup ? "/api/v1/auth/mfa/confirm" : "/api/v1/auth/mfa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(isSetup
+          ? { enrollmentToken: mfaFlow.challengeToken, code: mfaCode }
+          : { challengeToken: mfaFlow.challengeToken, code: mfaCode }),
+      });
+      const result = (await response.json()) as {
+        success?: boolean;
+        data?: Session & { recoveryCodes?: string[] };
+        error?: string | ApiErrorPayload;
+      };
+      if (!response.ok || !result.success || !result.data?.token) {
+        throw new Error(extractErrorMessage(result, "Unable to verify the authenticator code."));
+      }
+      if (isSetup) {
+        if (!result.data.recoveryCodes?.length) throw new Error("MFA was enabled, but recovery codes were not returned. Sign in again to continue.");
+        setMfaFlow({ stage: "recovery", session: result.data, recoveryCodes: result.data.recoveryCodes });
+      } else {
+        startAuthenticatedSession(result.data);
+      }
+      setMfaCode("");
+    } catch (requestError) {
+      setLoginError(requestError instanceof Error ? requestError.message : "Unable to verify MFA.");
     } finally {
       setLoggingIn(false);
     }
@@ -983,6 +1060,32 @@ function App() {
           ? requestError.message
           : "Unable to save user.",
       );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUserMfaReset = async () => {
+    if (!session || !editingUser || editingUser.id === session.user.id) return;
+    if (!window.confirm(`Reset MFA for ${editingUser.name}? They will need to enroll an authenticator again, and their current sessions will end.`)) return;
+    const currentPassword = window.prompt("Enter your password to confirm the MFA reset.");
+    if (!currentPassword) return;
+    setSaving(true);
+    setFormError("");
+    try {
+      const response = await apiFetch(`/api/v1/users/${editingUser.id}/reset-mfa`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.token}` },
+        body: JSON.stringify({ currentPassword }),
+      });
+      const result = (await response.json()) as { success?: boolean; error?: string | ApiErrorPayload };
+      if (!response.ok || !result.success) throw new Error(extractErrorMessage(result, "Unable to reset user MFA."));
+      await refreshUserAdministration();
+      await refreshAuditLogs();
+      setUserFormOpen(false);
+      setEditingUser(null);
+    } catch (requestError) {
+      setFormError(requestError instanceof Error ? requestError.message : "Unable to reset user MFA.");
     } finally {
       setSaving(false);
     }
@@ -1615,56 +1718,60 @@ function App() {
               </p>
             </div>
 
-            <form onSubmit={handleLogin}>
-              {loginError && (
-                <p
-                  role="alert"
-                  className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                >
-                  {loginError}
-                </p>
-              )}
+            {loginError && (
+              <p role="alert" className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {loginError}
+              </p>
+            )}
 
-              <label
-                className="block text-sm font-medium text-slate-700"
-                htmlFor="email"
-              >
-                Email address
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="username"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100"
-                  required
-                />
-              </label>
-
-              <label
-                className="block text-sm font-medium text-slate-700"
-                htmlFor="password"
-              >
-                Password
-                <input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100"
-                  required
-                />
-              </label>
-
-              <button
-                type="submit"
-                disabled={loggingIn}
-                className="w-full rounded-xl bg-cyan-700 px-4 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {loggingIn ? "Signing in..." : "Sign in to dashboard"}
-              </button>
-            </form>
+            {mfaFlow?.stage === "recovery" ? (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-slate-900">Save your recovery codes</h3>
+                <p className="text-sm text-slate-600">Each code works once if you lose access to your authenticator. Store these somewhere private; they will not be shown again.</p>
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-4 font-mono text-sm" aria-label="One-time MFA recovery codes">
+                  {mfaFlow.recoveryCodes.map((code) => <span key={code}>{code}</span>)}
+                </div>
+                <label className="flex items-start gap-2 text-sm text-slate-700">
+                  <input type="checkbox" checked={recoveryCodesSaved} onChange={(event) => setRecoveryCodesSaved(event.target.checked)} className="mt-1" />
+                  I saved these recovery codes in a secure place.
+                </label>
+                <button type="button" disabled={!recoveryCodesSaved} onClick={() => startAuthenticatedSession(mfaFlow.session)} className="w-full rounded-xl bg-cyan-700 px-4 py-3 font-semibold text-white disabled:opacity-50">Continue to PharmaSense</button>
+              </div>
+            ) : mfaFlow ? (
+              <form onSubmit={handleMfaSubmit} className="space-y-4">
+                {mfaFlow.stage === "setup" ? (
+                  <>
+                    <h3 className="text-lg font-semibold text-slate-900">Set up an authenticator</h3>
+                    <p className="text-sm text-slate-600">Add this account in an authenticator app using the setup key below, then enter its current six-digit code.</p>
+                    <div className="break-all rounded-xl bg-slate-100 p-3 font-mono text-sm" aria-label="Authenticator setup key">{mfaFlow.secret}</div>
+                    <details className="text-xs text-slate-500"><summary className="cursor-pointer">Manual setup URI</summary><p className="mt-2 break-all">{mfaFlow.otpauthUrl}</p></details>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-semibold text-slate-900">Two-step verification</h3>
+                    <p className="text-sm text-slate-600">Enter the current code from your authenticator app or one of your unused recovery codes.</p>
+                  </>
+                )}
+                <label className="block text-sm font-medium text-slate-700" htmlFor="mfa-code">
+                  {mfaFlow.stage === "setup" ? "Authenticator code" : "Authenticator or recovery code"}
+                  <input id="mfa-code" inputMode={mfaFlow.stage === "setup" ? "numeric" : "text"} autoCapitalize="characters" autoCorrect="off" autoComplete="one-time-code" value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-mono text-slate-900 outline-none focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100" required />
+                </label>
+                <button type="submit" disabled={loggingIn} className="w-full rounded-xl bg-cyan-700 px-4 py-3 font-semibold text-white disabled:opacity-50">{loggingIn ? "Verifying..." : mfaFlow.stage === "setup" ? "Enable MFA" : "Verify and sign in"}</button>
+                <button type="button" onClick={() => { setMfaFlow(null); setMfaCode(""); setLoginError(""); }} className="w-full rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700">Back to sign in</button>
+              </form>
+            ) : (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <label className="block text-sm font-medium text-slate-700" htmlFor="email">
+                  Email address
+                  <input id="email" type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100" required />
+                </label>
+                <label className="block text-sm font-medium text-slate-700" htmlFor="password">
+                  Password
+                  <input id="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100" required />
+                </label>
+                <button type="submit" disabled={loggingIn} className="w-full rounded-xl bg-cyan-700 px-4 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 disabled:cursor-not-allowed disabled:opacity-70">{loggingIn ? "Signing in..." : "Sign in to dashboard"}</button>
+              </form>
+            )}
           </section>
         </div>
       </main>
@@ -2498,6 +2605,14 @@ function App() {
                     </span>
                   </span>
                 </label>
+              )}
+              {editingUser && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 text-sm">
+                  <span className="text-slate-700">Authenticator MFA: {editingUser.mfaEnabled ? "enabled" : "not enrolled"}</span>
+                  {editingUser.mfaEnabled && editingUser.id !== session.user.id && (
+                    <button type="button" onClick={() => void handleUserMfaReset()} disabled={saving} className="rounded-lg border border-amber-300 px-3 py-2 font-semibold text-amber-800 disabled:opacity-50">Reset MFA</button>
+                  )}
+                </div>
               )}
               <label className="block text-sm font-medium text-slate-700">
                 {editingUser

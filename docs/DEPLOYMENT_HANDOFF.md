@@ -7,7 +7,7 @@ medicine, shows the reviewer in the dashboard, and writes each decision with
 its audit event atomically. The release is **not ready for production
 handoff**: local database-backed checks and the live browser workflow pass,
 and a Render Blueprint is prepared, but no Render resources have been created.
-Target migration, privileged MFA, backup/restore, monitoring, and rollback
+Target migration, deployed MFA recovery, backup/restore, monitoring, and rollback
 rehearsal remain open.
 
 ## Verified evidence
@@ -99,8 +99,8 @@ failure is no longer the current database status.
 
 ### Current project verification (2026-10-20)
 
-- Backend build passed; all 35 backend tests passed.
-- Frontend lint and production build passed; all 13 mocked Playwright tests
+- Backend build and schema validation passed; all 41 backend tests passed.
+- Frontend lint and production build passed; all 15 mocked Playwright tests
   passed.
 - Backend and frontend production dependency audits reported 0 vulnerabilities.
 - Database quality passed with 0 errors and 0 warnings; stock reconciliation
@@ -142,7 +142,7 @@ secret, and one-time administrator bootstrap. Before using operational data:
 
 - create the Blueprint resources and verify the live API and frontend origins
 - remove bootstrap secrets after the first administrator login
-- require MFA for privileged accounts
+- verify MFA enrollment, recovery codes, and administrator recovery for every operational account
 - configure monitoring and verify a database restore from backup
 - team access review and role approval
 - release sign-off and rollback/recovery rehearsal

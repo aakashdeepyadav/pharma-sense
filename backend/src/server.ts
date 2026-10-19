@@ -15,6 +15,7 @@ import purchaseRoutes from './routes/purchases';
 import userRoutes from './routes/users';
 import prisma from './lib/prisma';
 import { requireAuth, validateJwtSecret } from './auth';
+import { validateMfaEncryptionKey } from './mfa';
 
 dotenv.config();
 validateJwtSecret();
@@ -32,6 +33,10 @@ function validateRuntimeConfiguration() {
   if (!process.env.FRONTEND_URLS && !process.env.FRONTEND_URL) {
     throw new Error('Production FRONTEND_URLS or FRONTEND_URL is required');
   }
+  if (process.env.REQUIRE_PRIVILEGED_MFA !== 'true') {
+    throw new Error('Production REQUIRE_PRIVILEGED_MFA must be true');
+  }
+  validateMfaEncryptionKey();
 }
 
 validateRuntimeConfiguration();

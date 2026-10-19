@@ -44,8 +44,9 @@ The system is designed around controlled usage and clear accountability:
 
 Local verification recorded on 2026-10-20 passed:
 
-- backend build and all 35 backend tests
-- frontend lint, production build, and all 13 mocked browser tests
+- backend build, Prisma schema validation, and all 41 backend tests
+- frontend lint, production build, and all 15 mocked browser tests
+- MFA enrollment, TOTP replay protection, one-time recovery, and migration integration against a disposable PostgreSQL schema
 - one live browser workflow against an isolated disposable PostgreSQL database
 - database quality with 0 errors or warnings and stock reconciliation with 0 discrepancies
 - local browser dashboard smoke and zero high-severity production dependency audit findings
@@ -61,7 +62,7 @@ The current implementation is prepared for a controlled Render pilot. Before
 operational inventory use, the following gates remain:
 
 - deploy the Blueprint and verify service health and database privacy
-- require privileged-user MFA
+- verify MFA enrollment and recovery for every operational account on the deployed target
 - configure monitoring and rehearse backup restoration
 - assign role approval and release ownership
 - complete release and rollback rehearsal
@@ -81,6 +82,6 @@ gates, with the following design policy:
 ## Decision statement
 
 The codebase and Render deployment configuration are ready for a controlled
-pilot. Production operational use is not approved until MFA, backup/restore,
+pilot. Production operational use is not approved until deployed MFA recovery, backup/restore,
 monitoring, and release sign-off are verified. Forecasting remains advisory;
 the system does not automate procurement.

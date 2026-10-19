@@ -31,6 +31,10 @@ services:
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
+      - key: MFA_ENCRYPTION_KEY
+        generateValue: true
+      - key: REQUIRE_PRIVILEGED_MFA
+        value: "true"
       - key: FRONTEND_URLS
         value: https://pharmasense-web.onrender.com
       - key: TRUST_PROXY_HOPS

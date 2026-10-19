@@ -255,6 +255,63 @@ test("shows a useful error for rejected credentials", async ({ page }) => {
   await expect(page.getByRole("alert")).toHaveText("Invalid email or password.");
 });
 
+test("enrolls an authenticator and requires saving recovery codes", async ({ page }) => {
+  await mockDashboardApi(page, "Admin");
+  await page.route("**/api/v1/auth/login", async (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ success: true, data: { mfaSetupRequired: true, challengeToken: "enrollment-token" } }),
+  }));
+  await page.route("**/api/v1/auth/mfa/setup", async (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ success: true, data: { secret: "JBSWY3DPEHPK3PXP", otpauthUrl: "otpauth://totp/PharmaSense%3Aqa%40pharmasense.local?secret=JBSWY3DPEHPK3PXP" } }),
+  }));
+  const recoveryCodes = Array.from({ length: 10 }, (_, index) => `RECOVERY${String(index).padStart(2, "0")}`);
+  await page.route("**/api/v1/auth/mfa/confirm", async (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({
+      success: true,
+      data: { token: "mfa-session-token", user: { id: 1, name: "QA User", email: "qa@pharmasense.local", role: "Admin" }, recoveryCodes },
+    }),
+  }));
+
+  await signIn(page);
+  await expect(page.getByRole("heading", { name: "Set up an authenticator" })).toBeVisible();
+  await expect(page.getByLabel("Authenticator setup key")).toHaveText("JBSWY3DPEHPK3PXP");
+  await page.getByLabel("Authenticator code").fill("123456");
+  await page.getByRole("button", { name: "Enable MFA" }).click();
+  await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toBeVisible();
+  await expect(page.getByText("RECOVERY00")).toBeVisible();
+  const continueButton = page.getByRole("button", { name: "Continue to PharmaSense" });
+  await expect(continueButton).toBeDisabled();
+  await page.getByLabel("I saved these recovery codes in a secure place.").check();
+  await continueButton.click();
+  await expect(page.getByRole("heading", { name: "Inventory command center" })).toBeVisible();
+});
+
+test("verifies an MFA challenge before opening the dashboard", async ({ page }) => {
+  await mockDashboardApi(page, "Admin");
+  await page.route("**/api/v1/auth/login", async (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ success: true, data: { mfaRequired: true, challengeToken: "verification-token" } }),
+  }));
+  await page.route("**/api/v1/auth/mfa/verify", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ challengeToken: "verification-token", code: "123456" });
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        data: { token: "mfa-session-token", user: { id: 1, name: "QA User", email: "qa@pharmasense.local", role: "Admin" } },
+      }),
+    });
+  });
+
+  await signIn(page);
+  await expect(page.getByRole("heading", { name: "Two-step verification" })).toBeVisible();
+  await page.getByLabel("Authenticator or recovery code").fill("123456");
+  await page.getByRole("button", { name: "Verify and sign in" }).click();
+  await expect(page.getByRole("heading", { name: "Inventory command center" })).toBeVisible();
+});
+
 test("loads replenishment review decisions from the shared API", async ({
   page,
 }) => {

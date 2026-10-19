@@ -6,6 +6,7 @@ import type { AddressInfo } from 'node:net';
 import { app } from './server';
 import { createAccessToken } from './auth';
 import prisma from './lib/prisma';
+import { totpForStep, totpStepAt } from './mfa';
 
 let server: ReturnType<typeof app.listen>;
 let baseUrl = '';
@@ -58,6 +59,171 @@ describe('PharmaSense API', () => {
       body: JSON.stringify({ email: 'not-an-email', password: 'short' }),
     });
     assert.equal(response.status, 400);
+  });
+
+  it('does not issue a login challenge or access token to an inactive user', async () => {
+    const role = await prisma.role.findUnique({ where: { name: 'Staff' } });
+    assert.ok(role);
+    const user = await prisma.user.create({
+      data: {
+        name: 'Inactive Login Test',
+        email: `inactive-${crypto.randomUUID()}@pharmasense.local`,
+        passwordHash: await bcrypt.hash('valid-test-password', 4),
+        active: false,
+        roleId: role.id,
+      },
+    });
+    try {
+      const response = await fetch(`${baseUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, password: 'valid-test-password' }),
+      });
+      assert.equal(response.status, 401);
+      assert.deepEqual(await response.json(), { success: false, error: 'Invalid email or password' });
+    } finally {
+      await prisma.user.delete({ where: { id: user.id } });
+    }
+  });
+
+  it('requires privileged MFA enrollment and checks authenticator and single-use recovery codes', async () => {
+    const previousRequireMfa = process.env.REQUIRE_PRIVILEGED_MFA;
+    const previousEncryptionKey = process.env.MFA_ENCRYPTION_KEY;
+    process.env.REQUIRE_PRIVILEGED_MFA = 'true';
+    process.env.MFA_ENCRYPTION_KEY = Buffer.alloc(32, 11).toString('base64');
+    const role = await prisma.role.findUnique({ where: { name: 'Admin' } });
+    assert.ok(role);
+    const password = `Mfa-Test-${crypto.randomUUID()}`;
+    const user = await prisma.user.create({
+      data: {
+        name: 'MFA Integration User',
+        email: `mfa-${crypto.randomUUID()}@pharmasense.local`,
+        passwordHash: await bcrypt.hash(password, 4),
+        roleId: role.id,
+      },
+    });
+
+    try {
+      const login = async () => fetch(`${baseUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, password }),
+      });
+      const enrollmentResponse = await login();
+      assert.equal(enrollmentResponse.status, 200);
+      const enrollment = (await enrollmentResponse.json()) as { data: { mfaSetupRequired: boolean; challengeToken: string } };
+      assert.equal(enrollment.data.mfaSetupRequired, true);
+
+      const limitedAccess = await fetch(`${baseUrl}/api/v1/reports/summary`, {
+        headers: { Authorization: `Bearer ${enrollment.data.challengeToken}` },
+      });
+      assert.equal(limitedAccess.status, 401);
+
+      const setupResponse = await fetch(`${baseUrl}/api/v1/auth/mfa/setup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enrollmentToken: enrollment.data.challengeToken }),
+      });
+      assert.equal(setupResponse.status, 200);
+      const setup = (await setupResponse.json()) as { data: { secret: string; otpauthUrl: string } };
+      assert.match(setup.data.otpauthUrl, /^otpauth:\/\/totp\//u);
+
+      const enrollmentStep = totpStepAt();
+      const confirmResponse = await fetch(`${baseUrl}/api/v1/auth/mfa/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enrollmentToken: enrollment.data.challengeToken, code: totpForStep(setup.data.secret, enrollmentStep) }),
+      });
+      assert.equal(confirmResponse.status, 200);
+      const confirmed = (await confirmResponse.json()) as { data: { token: string; recoveryCodes: string[] } };
+      assert.equal(confirmed.data.recoveryCodes.length, 10);
+      assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).mfaEnabled, true);
+
+      const verificationLogin = await login();
+      const verification = (await verificationLogin.json()) as { data: { mfaRequired: boolean; challengeToken: string } };
+      assert.equal(verification.data.mfaRequired, true);
+      const reusedTotpResponse = await fetch(`${baseUrl}/api/v1/auth/mfa/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeToken: verification.data.challengeToken, code: totpForStep(setup.data.secret, enrollmentStep) }),
+      });
+      assert.equal(reusedTotpResponse.status, 401);
+
+      const recoveryResponse = await fetch(`${baseUrl}/api/v1/auth/mfa/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeToken: verification.data.challengeToken, code: confirmed.data.recoveryCodes[0] }),
+      });
+      assert.equal(recoveryResponse.status, 200);
+
+      const anotherLogin = await login();
+      const anotherChallenge = (await anotherLogin.json()) as { data: { challengeToken: string } };
+      const reusedRecoveryResponse = await fetch(`${baseUrl}/api/v1/auth/mfa/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeToken: anotherChallenge.data.challengeToken, code: confirmed.data.recoveryCodes[0] }),
+      });
+      assert.equal(reusedRecoveryResponse.status, 401);
+    } finally {
+      await prisma.$transaction(async (database) => {
+        await database.auditLog.deleteMany({ where: { userId: user.id } });
+        await database.user.delete({ where: { id: user.id } });
+      });
+      if (previousRequireMfa === undefined) delete process.env.REQUIRE_PRIVILEGED_MFA;
+      else process.env.REQUIRE_PRIVILEGED_MFA = previousRequireMfa;
+      if (previousEncryptionKey === undefined) delete process.env.MFA_ENCRYPTION_KEY;
+      else process.env.MFA_ENCRYPTION_KEY = previousEncryptionKey;
+    }
+  });
+
+  it('requires administrator reauthentication to reset another user MFA', async () => {
+    const administrator = await prisma.user.findUnique({ where: { email: 'admin@pharmasense.local' } });
+    assert.ok(administrator);
+    const target = await createUserForRole('Staff');
+    await prisma.user.update({
+      where: { id: target.id },
+      data: {
+        mfaEnabled: true,
+        mfaSecretEncrypted: 'encrypted-test-secret',
+        mfaRecoveryCodes: JSON.stringify(['test-hash']),
+        mfaLastUsedStep: 12,
+      },
+    });
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${createAccessToken({ id: administrator.id, role: 'Admin', sessionVersion: administrator.sessionVersion })}`,
+    };
+    try {
+      const missingPassword = await fetch(`${baseUrl}/api/v1/users/${target.id}/reset-mfa`, { method: 'POST', headers });
+      assert.equal(missingPassword.status, 400);
+
+      const wrongPassword = await fetch(`${baseUrl}/api/v1/users/${target.id}/reset-mfa`, {
+        method: 'POST', headers, body: JSON.stringify({ currentPassword: 'incorrect-password-123' }),
+      });
+      assert.equal(wrongPassword.status, 401);
+
+      const selfReset = await fetch(`${baseUrl}/api/v1/users/${administrator.id}/reset-mfa`, {
+        method: 'POST', headers, body: JSON.stringify({ currentPassword: seededAdminPassword }),
+      });
+      assert.equal(selfReset.status, 409);
+
+      const reset = await fetch(`${baseUrl}/api/v1/users/${target.id}/reset-mfa`, {
+        method: 'POST', headers, body: JSON.stringify({ currentPassword: seededAdminPassword }),
+      });
+      assert.equal(reset.status, 200);
+      const updated = await prisma.user.findUniqueOrThrow({ where: { id: target.id } });
+      assert.equal(updated.mfaEnabled, false);
+      assert.equal(updated.mfaSecretEncrypted, null);
+      assert.equal(updated.mfaRecoveryCodes, null);
+      assert.equal(updated.mfaLastUsedStep, null);
+      assert.equal(updated.sessionVersion, target.sessionVersion + 1);
+      assert.equal(await prisma.auditLog.count({ where: { action: 'USER_MFA_RESET', entityId: target.id } }), 1);
+    } finally {
+      await prisma.$transaction(async (database) => {
+        await database.auditLog.deleteMany({ where: { entityId: target.id } });
+        await database.user.delete({ where: { id: target.id } });
+      });
+    }
   });
 
   it('rejects undersized JWT signing secrets', () => {

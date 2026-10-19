@@ -8,7 +8,7 @@
 - [ ] Review [SECURITY_REVIEW.md](SECURITY_REVIEW.md) and assign owners/dates to unresolved risks.
 - [ ] Confirm `.env` files, credentials, database dumps, confidential exports, and sensitive test artifacts are not committed or attached.
 - [ ] Confirm the target environment injects unique secrets, restricts database/network access, and terminates HTTPS correctly.
-- [ ] Verify privileged-user MFA and confirm login throttling and trusted client IP behavior at the deployed edge.
+- [ ] Verify authenticator enrollment and recovery-code storage for every operational account; confirm login throttling and trusted client IP behavior at the deployed edge.
 - [ ] Capture and verify the target database backup/recovery point; confirm restore procedure and responsible operator.
 - [ ] Review migrations for backward compatibility and deployment order. Migrations have no automatic down path here.
 - [ ] Run the deployment rehearsal and smoke checks in [DEPLOYMENT_RUNBOOK.md](DEPLOYMENT_RUNBOOK.md) using a disposable environment.
