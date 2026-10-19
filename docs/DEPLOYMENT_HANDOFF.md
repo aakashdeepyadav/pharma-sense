@@ -4,9 +4,10 @@
 
 The replenishment review workflow now persists the latest decision per
 medicine, shows the reviewer in the dashboard, and writes each decision with
-its audit event atomically. The release is **not ready for operational
-handoff**: the new migration has not been applied, and database-backed
-integration checks must pass before release.
+its audit event atomically. The release is **not ready for production
+handoff**: local database-backed checks and the live browser workflow pass,
+but target-environment migration, operations, backup/restore, and rollback
+rehearsal remain open.
 
 ## Verified evidence
 
@@ -100,11 +101,12 @@ failure is no longer the current database status.
 - Backend build passed; all 35 backend tests passed.
 - Frontend lint and production build passed; all 13 mocked Playwright tests
   passed.
+- Backend and frontend production dependency audits reported 0 vulnerabilities.
 - Database quality passed with 0 errors and 0 warnings; stock reconciliation
   reported 0 discrepancies and 0 unsupported movements. Both checks were
   read-only (`modifiedData: false`).
-- The live browser workflow was not run because `E2E_DATABASE_URL` is not
-  configured. It needs a disposable PostgreSQL database.
+- The live browser workflow passed against an isolated disposable PostgreSQL
+  database (1 workflow, 2.4 minutes); the temporary database was removed.
 - A read-only browser smoke test against the running local app passed
   administrator sign-in and dashboard loading, with no API failures or console
   warnings; all 290 stock transaction rows were unique across paginated pages.
@@ -124,11 +126,12 @@ The following release gates remain open for this change:
 
 - [x] pass the full backend integration test suite against the configured local database
 - [x] pass database quality and stock reconciliation checks
-- [ ] apply migrations and run the live browser workflow against a disposable PostgreSQL database
+- [x] apply migrations and run the live browser workflow against a disposable PostgreSQL database
 - [ ] complete final release rehearsal and rollback review
 
-Frontend build and browser tests, Prisma schema validation, and
-database-independent backend tests passed locally.
+Frontend build and browser tests, Prisma schema validation, and backend
+integration tests passed locally. See [project completion estimate](PROJECT_COMPLETION_PLAN.md)
+for weighted completion and remaining work.
 
 ## Remaining operational owner actions
 

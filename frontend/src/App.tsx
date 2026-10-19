@@ -3930,6 +3930,7 @@ function App() {
                           {canWriteStock && (
                             <>
                               <button
+                                type="button"
                                 onClick={() => openStockForm(batch, "OUT")}
                                 disabled={isExpiryDatePast(batch.expiryDate)}
                                 className="mr-3 font-medium text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
@@ -3937,6 +3938,7 @@ function App() {
                                 Issue
                               </button>
                               <button
+                                type="button"
                                 onClick={() => openStockForm(batch, "ADJ")}
                                 className="text-gray-600 hover:text-gray-900 font-medium"
                               >

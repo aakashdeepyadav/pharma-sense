@@ -3,7 +3,7 @@
 ## Before Release
 
 - [ ] Confirm the release commit is reviewed and merged through the intended pull-request target.
-- [ ] Confirm CI passed migrations, seed, database quality, stock reconciliation, backend build/tests, research validation, frontend lint/build, browser smoke/live workflows, secret scanning, dependency audit, and dependency review where applicable.
+- [ ] Confirm CI passed migrations, seed, database quality, stock reconciliation, backend build/tests, research validation, frontend lint/build, browser smoke/live workflows, secret scanning, dependency audit, and dependency review where applicable. Local dependency audits passed with 0 vulnerabilities; hosted CI status is not verified here.
 - [ ] Review pull-request security impact, migration impact, environment changes, and known limitations.
 - [ ] Review [SECURITY_REVIEW.md](SECURITY_REVIEW.md) and assign owners/dates to unresolved risks.
 - [ ] Confirm `.env` files, credentials, database dumps, confidential exports, and sensitive test artifacts are not committed or attached.

@@ -14,8 +14,9 @@ on 2026-10-20 passed against the configured local PostgreSQL database:
 - Database quality: passed, 0 errors and 0 warnings
 - Stock reconciliation: 0 discrepancies and 0 unsupported movements
 - Both database checks reported `modifiedData: false`
-- Live browser workflow against a disposable database: not run because
-  `E2E_DATABASE_URL` is not configured
+- Live browser workflow against an isolated disposable PostgreSQL database:
+  passed (1 workflow, 2.4 minutes); the temporary database was removed
+- Backend and frontend production dependency audits: 0 vulnerabilities
 - Read-only live local browser smoke: administrator sign-in and dashboard load
   passed; all API requests succeeded, no browser console warnings occurred, and
   all 290 stock transaction rows had unique IDs across pages
@@ -24,10 +25,10 @@ on 2026-10-20 passed against the configured local PostgreSQL database:
 
 ## Conclusion
 
-The system is **not signed off for production deployment**. Local database and
-automated checks pass, but the live browser workflow has not been run against a
-disposable database, and hosting, backup/restore, secret management, and
-rollback ownership still require a deployment rehearsal. Forecast and
+The system is **not signed off for production deployment**. Local database,
+automated checks, and the disposable-database live workflow pass, but hosting,
+backup/restore, secret management, and rollback ownership still require a
+deployment rehearsal. Forecast and
 replenishment outputs remain advisory and must not trigger autonomous inventory
 action. The forecasting model is synthetic-data research, not a production
 forecast; production forecasting requires representative operational history
@@ -44,7 +45,7 @@ and separate validation.
 ## Required next actions
 
 - Freeze the approved operational dataset and model baseline.
-- Run the live browser workflow against a disposable PostgreSQL database.
+- Complete a deployment rehearsal against the selected target environment.
 - Review the forecast risk and replenishment recommendation workflow.
 - Verify audit logging for every recommendation decision.
 - Confirm that no stock movement is triggered automatically from a review decision.

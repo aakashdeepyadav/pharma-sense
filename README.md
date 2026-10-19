@@ -101,9 +101,9 @@ npm run test:e2e:live
 
 ## Latest Local Verification
 
-Verified on 2026-10-20: backend build and all 35 backend tests passed; frontend lint, production build, and all 13 mocked browser tests passed. Database quality passed with no errors or warnings, and stock reconciliation found no discrepancies. A read-only browser sign-in and dashboard smoke test against the local API succeeded with no failed API requests or browser console warnings.
+Verified on 2026-10-20: backend build and all 35 backend tests passed; frontend lint, production build, and all 13 mocked browser tests passed. The live browser workflow passed against an isolated disposable PostgreSQL database (1 workflow, 2.4 minutes); the database was removed afterward. Backend and frontend production dependency audits reported 0 vulnerabilities. Database quality passed with no errors or warnings, and stock reconciliation found no discrepancies. A read-only browser sign-in and dashboard smoke test against the local API succeeded with no failed API requests or browser console warnings.
 
-The live browser workflow against an isolated disposable PostgreSQL database and production deployment rehearsal remain release checks. See [production signoff](docs/PRODUCTION_SIGNOFF.md) and [deployment handoff](docs/DEPLOYMENT_HANDOFF.md) for current status.
+The production deployment rehearsal remains open because no target hosting, secrets, HTTPS edge, or backup/restore environment has been provided. See [project completion estimate](docs/PROJECT_COMPLETION_PLAN.md), [production signoff](docs/PRODUCTION_SIGNOFF.md), and [deployment handoff](docs/DEPLOYMENT_HANDOFF.md) for current status.
 
 ## Security Notes
 

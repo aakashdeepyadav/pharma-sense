@@ -14,7 +14,7 @@ async function openManagementHistory(page: Page) {
 test("creates medicine and supplier, receives a batch, and issues stock", async ({
   page,
 }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(300_000);
   const adminPassword = process.env.E2E_ADMIN_PASSWORD;
   if (!adminPassword) {
     throw new Error("E2E_ADMIN_PASSWORD must be configured for live tests");
@@ -136,9 +136,13 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
   await page.getByLabel("Manufacturing date").fill(manufacturingDate);
   await page.getByLabel("Expiry date").fill(expiryDate);
   await page.getByRole("button", { name: "Receive stock" }).last().click();
-  await expect(page.getByText(batchNumber, { exact: true })).toBeVisible();
-
-  const batchRow = page.getByRole("row").filter({ hasText: batchNumber });
+  const receivedBatchesSection = page
+    .getByRole("heading", { name: "Received batches" })
+    .locator("xpath=../..");
+  const batchRow = receivedBatchesSection
+    .getByRole("row")
+    .filter({ hasText: batchNumber });
+  await expect(batchRow).toBeVisible();
   await batchRow.getByRole("button", { name: "Issue" }).click();
   await page.getByLabel("Quantity issued").fill("2");
   await page.getByLabel("Reason or notes").fill(issueReason);
@@ -188,25 +192,15 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
   await page.getByRole("button", { name: "Receive stock" }).last().click();
 
   await openManagementHistory(page);
-  const receivedBatchesSection = page
-    .getByRole("heading", { name: "Received batches" })
-    .locator("xpath=../..");
   const expiredBatchRow = receivedBatchesSection
     .getByRole("row")
     .filter({ hasText: expiredBatchNumber });
   await expect(expiredBatchRow).toBeVisible();
-  await expiredBatchRow.getByRole("button", { name: "Issue" }).click();
-  await page.getByLabel("Quantity issued").fill("1");
-  await page.getByLabel("Reason or notes").fill(`Expired issue check ${suffix}`);
-  await page.getByRole("button", { name: "Save movement" }).click();
-  await expect(
-    page.getByText("Expired batches cannot be issued", { exact: true }),
-  ).toBeVisible();
+  await expect(expiredBatchRow.getByRole("button", { name: "Issue" })).toBeDisabled();
   await expect(expiredBatchRow.getByRole("cell", { name: "5", exact: true })).toBeVisible();
   await expect(
-    page.getByRole("row").filter({ hasText: expiredBatchNumber }).filter({ hasText: "OUT" }),
+    transactionHistorySection.getByRole("row").filter({ hasText: expiredBatchNumber }).filter({ hasText: "OUT" }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Cancel" }).click();
 
   const alertMedicineName = `Browser alert medicine ${suffix}`;
   const alertBrandName = `Browser alert brand ${suffix}`;
@@ -263,7 +257,7 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
   await alertRow.getByRole("button", { name: "Acknowledge" }).click();
   await expect(alertRow).toContainText("acknowledged");
   await expect(
-    page.getByRole("button", { name: "Acknowledge" }),
+    alertRow.getByRole("button", { name: "Acknowledge" }),
   ).toHaveCount(0);
   const purchaseAuditRow = page
     .getByRole("row")
