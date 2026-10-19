@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthenticatedRequest, requireRoles } from '../auth';
 import { buildPaginationMeta, sendApiError } from '../lib/api';
@@ -28,7 +29,7 @@ router.get('/', requireRoles('Admin', 'Inventory Manager'), async (req: Authenti
       prisma.auditLog.findMany({
         where,
       include: { user: { select: { name: true, email: true, role: { select: { name: true } } } } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] as Prisma.AuditLogOrderByWithRelationInput[],
         skip: (query.data.page - 1) * query.data.pageSize,
         take: query.data.pageSize,
       }),

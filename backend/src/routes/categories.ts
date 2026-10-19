@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { buildPaginationMeta, sendApiError } from '../lib/api';
 import { categorySchema, categoryUpdateSchema, listQuerySchema } from '../validation/schemas';
@@ -19,7 +20,9 @@ router.get('/', async (req: Request, res: Response) => {
     const [total, categories] = await Promise.all([
       prisma.category.count(),
       prisma.category.findMany({
-        orderBy: { [sortBy]: query.data.sortOrder } as Record<string, 'asc' | 'desc'>,
+        orderBy: (sortBy === 'id'
+          ? [{ id: query.data.sortOrder }]
+          : [{ [sortBy]: query.data.sortOrder }, { id: 'asc' }]) as Prisma.CategoryOrderByWithRelationInput[],
         skip: (query.data.page - 1) * query.data.pageSize,
         take: query.data.pageSize,
       }),

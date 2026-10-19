@@ -97,7 +97,7 @@ failure is no longer the current database status.
 
 ### Current project verification (2026-10-20)
 
-- Backend build passed; all 34 backend tests passed.
+- Backend build passed; all 35 backend tests passed.
 - Frontend lint and production build passed; all 13 mocked Playwright tests
   passed.
 - Database quality passed with 0 errors and 0 warnings; stock reconciliation
@@ -105,6 +105,9 @@ failure is no longer the current database status.
   read-only (`modifiedData: false`).
 - The live browser workflow was not run because `E2E_DATABASE_URL` is not
   configured. It needs a disposable PostgreSQL database.
+- A read-only browser smoke test against the running local app passed
+  administrator sign-in and dashboard loading, with no API failures or console
+  warnings; all 290 stock transaction rows were unique across paginated pages.
 
 ## Operational interpretation
 

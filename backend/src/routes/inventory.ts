@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { buildPaginationMeta, sendApiError } from '../lib/api';
 import { AuthenticatedRequest, requireRoles } from '../auth';
@@ -24,7 +25,9 @@ router.get('/transactions', async (req: AuthenticatedRequest, res: Response) => 
           batch: { include: { medicine: true, supplier: true } },
           user: { select: { name: true, email: true } },
         },
-        orderBy: { [sortBy]: sortOrder } as Record<string, 'asc' | 'desc'>,
+        orderBy: (sortBy === 'id'
+          ? [{ id: sortOrder }]
+          : [{ [sortBy]: sortOrder }, { id: 'asc' }]) as Prisma.StockTransactionOrderByWithRelationInput[],
         skip: (query.data.page - 1) * query.data.pageSize,
         take: query.data.pageSize,
       }),

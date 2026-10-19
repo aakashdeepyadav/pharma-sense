@@ -24,7 +24,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
           createdBy: { select: { name: true, email: true } },
           items: { include: { medicine: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip: (result.data.page - 1) * result.data.pageSize,
         take: result.data.pageSize,
       }),

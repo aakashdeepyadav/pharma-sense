@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { buildPaginationMeta, sendApiError } from '../lib/api';
 import { supplierQuerySchema, supplierSchema, supplierUpdateSchema } from '../validation/schemas';
@@ -35,7 +36,9 @@ router.get('/', async (req: Request, res: Response) => {
       prisma.supplier.findMany({
         where,
         include: { _count: { select: { batches: true } } },
-        orderBy: { [query.data.sortBy]: query.data.sortOrder } as Record<string, 'asc' | 'desc'>,
+        orderBy: (query.data.sortBy === 'id'
+          ? [{ id: query.data.sortOrder }]
+          : [{ [query.data.sortBy]: query.data.sortOrder }, { id: 'asc' }]) as Prisma.SupplierOrderByWithRelationInput[],
         skip: (query.data.page - 1) * query.data.pageSize,
         take: query.data.pageSize,
       }),

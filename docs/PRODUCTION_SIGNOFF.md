@@ -7,7 +7,7 @@ status, reviewer attribution, and atomic audit logging. Verification recorded
 on 2026-10-20 passed against the configured local PostgreSQL database:
 
 - Backend TypeScript build: passed
-- Backend test suite: 34 passed
+- Backend test suite: 35 passed
 - Frontend production build: passed
 - Frontend lint: passed
 - Mocked Playwright browser suite: 13 passed
@@ -16,6 +16,11 @@ on 2026-10-20 passed against the configured local PostgreSQL database:
 - Both database checks reported `modifiedData: false`
 - Live browser workflow against a disposable database: not run because
   `E2E_DATABASE_URL` is not configured
+- Read-only live local browser smoke: administrator sign-in and dashboard load
+  passed; all API requests succeeded, no browser console warnings occurred, and
+  all 290 stock transaction rows had unique IDs across pages
+- Paginated API collections use stable secondary ID ordering to prevent records
+  from repeating or disappearing when primary sort values tie
 
 ## Conclusion
 

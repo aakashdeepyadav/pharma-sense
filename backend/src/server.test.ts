@@ -108,6 +108,29 @@ describe('PharmaSense API', () => {
     assert.equal(typeof result.data.medicineCount, 'number');
   });
 
+  it('returns non-overlapping stock transaction pages', async () => {
+    const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@pharmasense.local', password: seededAdminPassword }),
+    });
+    assert.equal(loginResponse.status, 200);
+    const login = (await loginResponse.json()) as { data: { token: string } };
+    const headers = { Authorization: `Bearer ${login.data.token}` };
+    const [firstResponse, secondResponse] = await Promise.all([
+      fetch(`${baseUrl}/api/v1/inventory/transactions?page=1&pageSize=100`, { headers }),
+      fetch(`${baseUrl}/api/v1/inventory/transactions?page=2&pageSize=100`, { headers }),
+    ]);
+    assert.equal(firstResponse.status, 200);
+    assert.equal(secondResponse.status, 200);
+    const firstPage = (await firstResponse.json()) as { data: { id: number }[] };
+    const secondPage = (await secondResponse.json()) as { data: { id: number }[] };
+    const firstIds = new Set(firstPage.data.map(({ id }) => id));
+    assert.equal(firstIds.size, firstPage.data.length);
+    assert.ok(secondPage.data.length > 0);
+    assert.ok(secondPage.data.every(({ id }) => !firstIds.has(id)));
+  });
+
   it('shares replenishment review decisions and records the authenticated reviewer', async () => {
     const reviewer = await createUserForRole('Pharmacist');
     const staff = await createUserForRole('Staff');
