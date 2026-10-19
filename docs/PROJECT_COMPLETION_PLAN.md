@@ -2,7 +2,7 @@
 
 ## Status as of 2026-10-20
 
-**Estimated completion: 80% for the full production-ready project.** The
+**Estimated completion: 83% for the full production-ready project.** The
 inventory application and its local verification are complete for the tested
 scope. The remaining work is mainly production operations and evidence-based
 forecasting; neither can be closed by local code changes alone.
