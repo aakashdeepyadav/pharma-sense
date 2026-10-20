@@ -21,8 +21,8 @@ The workflow uses unique records and removes them after the test. Run it with `c
 ## Execution Evidence
 
 - CI definition: `.github/workflows/ci.yml` (`backend` job: migration, seed, database quality, reconciliation, build, tests, and research validation).
-- Local verification recorded on 2026-10-20: backend build, schema validation, and all 41 tests passed; frontend lint/build and all 15 mocked browser tests passed. MFA integration used a disposable PostgreSQL schema that was removed afterward.
-- Database quality reported 0 errors and warnings; reconciliation reported 0 discrepancies and unsupported movements. Both checks were read-only.
+- Local verification recorded on 2026-10-21: backend build, schema validation, and all 46 tests passed; frontend lint/build and all 15 mocked browser tests passed. MFA integration used a disposable PostgreSQL schema that was removed afterward.
+- Database quality reported 0 errors and 0 warnings after the demo seed expiry was corrected; reconciliation reported 0 discrepancies and unsupported movements. Both checks were read-only.
 - One live inventory workflow passed against an isolated disposable PostgreSQL database; that temporary database was removed.
 - Backend and frontend production dependency audits reported 0 vulnerabilities.
 - Render deployment configuration is in `render.yaml`; only YAML syntax was parsed locally. Render CLI validation, hosted CI, deployment, and backup/restore rehearsal remain outstanding.

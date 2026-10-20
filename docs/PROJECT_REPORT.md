@@ -128,13 +128,13 @@ This is important because model output is treated as advisory evidence, not as a
 
 ## 7. Verified Results
 
-The latest local verification was recorded on 2026-10-20:
+The latest local verification was recorded on 2026-10-21:
 
-- Backend TypeScript build, Prisma schema validation, and all 41 tests passed.
+- Backend TypeScript build, Prisma schema validation, and all 46 tests passed.
 - Frontend lint and production build passed; all 15 mocked Playwright tests passed.
 - MFA migration, enrollment, replay rejection, and single-use recovery passed on a temporary PostgreSQL schema, which was removed afterward.
 - One live Playwright workflow passed against an isolated disposable PostgreSQL database; the temporary database was removed.
-- Database quality reported 0 errors and warnings; stock reconciliation reported 0 discrepancies. Both checks were read-only.
+- Database quality reported 0 errors and 0 warnings; stock reconciliation reported 0 discrepancies. Both checks were read-only.
 - Backend and frontend production dependency audits reported 0 vulnerabilities.
 - The Render Blueprint YAML syntax parses; Render CLI validation and hosted deployment remain unverified.
 

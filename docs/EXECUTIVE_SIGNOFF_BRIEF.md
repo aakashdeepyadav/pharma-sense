@@ -42,9 +42,9 @@ The system is designed around controlled usage and clear accountability:
 
 ## Verified evidence
 
-Local verification recorded on 2026-10-20 passed:
+Local verification recorded on 2026-10-21 passed:
 
-- backend build, Prisma schema validation, and all 41 backend tests
+- backend build, Prisma schema validation, and all 46 backend tests
 - frontend lint, production build, and all 15 mocked browser tests
 - MFA enrollment, TOTP replay protection, one-time recovery, and migration integration against a disposable PostgreSQL schema
 - one live browser workflow against an isolated disposable PostgreSQL database

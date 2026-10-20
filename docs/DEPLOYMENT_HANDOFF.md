@@ -32,7 +32,7 @@ npm run research:validate
 
 Result:
 
-- 30 tests passed
+- 46 tests passed
 - 0 failed
 - database quality check passed with warnings only
 - stock reconciliation reported zero discrepancies
@@ -90,20 +90,21 @@ npm run test:e2e
 Results:
 
 - backend TypeScript build and Prisma schema validation passed
-- all 10 database-independent backend tests passed
-- frontend build passed and all 10 browser tests passed
+- all 17 database-independent backend tests passed
+- frontend build passed and all 15 browser tests passed
 - lint completed with one existing forecast-selector React warning
 
 These results predate the verification below. The old PostgreSQL connection
 failure is no longer the current database status.
 
-### Current project verification (2026-10-20)
+### Current project verification (2026-10-21)
 
-- Backend build and schema validation passed; all 41 backend tests passed.
+- Backend build and schema validation passed; all 46 backend tests passed.
 - Frontend lint and production build passed; all 15 mocked Playwright tests
   passed.
 - Backend and frontend production dependency audits reported 0 vulnerabilities.
-- Database quality passed with 0 errors and 0 warnings; stock reconciliation
+- Database quality passed with 0 errors and 0 warnings after the demo seed
+  expiry was corrected; stock reconciliation
   reported 0 discrepancies and 0 unsupported movements. Both checks were
   read-only (`modifiedData: false`).
 - The live browser workflow passed against an isolated disposable PostgreSQL

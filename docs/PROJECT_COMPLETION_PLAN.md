@@ -13,7 +13,7 @@ has shipped. The weights make the scope explicit:
 | Workstream | Weight | Completion | Weighted points | Evidence / open work |
 |---|---:|---:|---:|---|
 | Core inventory application | 50% | 100% | 50 | Authentication and roles, inventory, receiving/issuing, purchase history, alerts, reporting, and replenishment review are implemented. |
-| Local verification | 25% | 100% | 25 | Backend build, Prisma validation and 41 tests, frontend lint/build and 15 mocked browser tests, plus a separate live inventory workflow on disposable PostgreSQL passed. Earlier database quality/reconciliation, local dashboard smoke, and production dependency audits also passed. |
+| Local verification | 25% | 100% | 25 | Backend build, Prisma validation and 46 tests, frontend lint/build and 15 mocked browser tests, plus a separate live inventory workflow on disposable PostgreSQL passed. Database quality and reconciliation now pass cleanly against the seeded local database. |
 | Production operations | 15% | 60% | 9 | Render config now requires MFA for all roles; the app supports encrypted TOTP enrollment, replay protection, one-time recovery codes, and audited admin reset. Actual Render deploy, hosted MFA recovery rehearsal, backup/restore, monitoring, and rollback remain open. |
 | Production forecasting | 10% | 0% | 0 | Current forecasting remains advisory/research. The roadmap requires representative operational history (at least 12 months of daily demand) before model validation and a governed pilot. |
 
@@ -85,7 +85,7 @@ local PostgreSQL service was available.
 
 ### Previously recorded verification
 
-- Backend TypeScript build and Prisma schema validation: passed; all 41 backend tests passed.
+- Backend TypeScript build and Prisma schema validation: passed; all 46 backend tests passed.
 - The MFA migration, enrollment, replay rejection, and single-use recovery flow passed against a temporary PostgreSQL schema; that schema was dropped afterward.
 - Frontend lint, production build, and all 15 mocked Playwright tests passed.
 - Live browser workflow: 1 passed against a disposable isolated PostgreSQL
@@ -98,5 +98,5 @@ local PostgreSQL service was available.
 - Render Blueprint YAML syntax parses successfully; the Render CLI schema
   validator and an actual account deployment have not been run.
 
-These are local results recorded on 2026-10-20. They do not establish hosted CI
+These are local results recorded on 2026-10-21. They do not establish hosted CI
 success or production deployment readiness.

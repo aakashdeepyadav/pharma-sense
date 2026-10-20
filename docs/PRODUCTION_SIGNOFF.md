@@ -4,15 +4,15 @@
 
 The replenishment review workflow is implemented, including persistent review
 status, reviewer attribution, and atomic audit logging. Verification recorded
-on 2026-10-20 passed against the configured local PostgreSQL database:
+on 2026-10-21 passed against the configured local PostgreSQL database:
 
 - Backend TypeScript build: passed
-- Backend test suite: 41 passed, including MFA unit, enrollment, recovery, and admin reset integration coverage
+- Backend test suite: 46 passed, including MFA unit, enrollment, recovery, and admin reset integration coverage
 - Frontend production build: passed
 - Frontend lint: passed
 - Mocked Playwright browser suite: 15 passed, including MFA enrollment and verification
 - MFA migration and API flow passed against a disposable PostgreSQL schema; the schema was removed after the run
-- Database quality: passed, 0 errors and 0 warnings
+- Database quality: passed, 0 errors and 0 warnings after correcting the demo seed's expired batch
 - Stock reconciliation: 0 discrepancies and 0 unsupported movements
 - Both database checks reported `modifiedData: false`
 - Live browser workflow against an isolated disposable PostgreSQL database:
