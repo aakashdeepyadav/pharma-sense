@@ -31,15 +31,18 @@ automated checks, and the disposable-database live workflow pass. A Render
 Blueprint requires MFA for all operational roles, with encrypted authenticator
 secrets and one-time recovery codes implemented in the application. No hosted
 deployment, deployed MFA recovery rehearsal, backup/restore rehearsal, or
-rollback evidence exists yet. Forecast and
-replenishment outputs remain advisory and must not trigger autonomous inventory
-action. The forecasting model is synthetic-data research, not a production
-forecast; production forecasting requires representative operational history
-and separate validation.
+rollback evidence exists yet. Forecast and replenishment outputs remain
+advisory and must not trigger autonomous inventory action. The current
+forecasting artifact is trained and evaluated on the expanded operational
+dataset, but it is not production-approved: the dataset has no
+stockout-censored rows, and governance, privacy, business, and deployment
+sign-off are still required.
 
 ## Release rules
 
-1. Keep the current operational dataset as the approved baseline for future comparisons.
+1. Preserve the current operational dataset and model as review candidates for
+   future comparisons; do not call them approved production baselines until
+   governance sign-off is recorded.
 2. Treat forecasting as advisory and human-reviewed.
 3. Require a reviewer decision before any operational action is taken from forecast output.
 4. Record every recommendation, review action, and override in the audit trail.
@@ -47,7 +50,8 @@ and separate validation.
 
 ## Required next actions
 
-- Freeze the approved operational dataset and model baseline.
+- Freeze the operational dataset and model baseline only after data-governance
+  approval.
 - Complete a deployment rehearsal against the selected target environment.
 - Verify MFA enrollment, recovery codes, and administrator recovery for operational accounts before use.
 - Review the forecast risk and replenishment recommendation workflow.
