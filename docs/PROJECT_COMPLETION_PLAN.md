@@ -74,6 +74,8 @@ production forecast readiness. See
   added.
 - Frontend production build passed.
 - All 15 mocked Playwright browser tests passed.
+- The live browser workflow passed: 1 workflow against the named disposable
+  PostgreSQL database; the database was removed after the run.
 - The frontend now treats a successful but incomplete LightGBM response as an
   unavailable prediction instead of allowing an undefined `forecasts` array to
   crash the dashboard.

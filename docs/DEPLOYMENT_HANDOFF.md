@@ -102,13 +102,14 @@ failure is no longer the current database status.
 - Backend build and schema validation passed; all 46 backend tests passed.
 - Frontend lint and production build passed; all 15 mocked Playwright tests
   passed.
+- The live browser workflow passed with 1 workflow against a separately named
+  disposable PostgreSQL database; the temporary database was removed after the
+  run.
 - Backend and frontend production dependency audits reported 0 vulnerabilities.
 - Database quality passed with 0 errors and 0 warnings after the demo seed
   expiry was corrected; stock reconciliation
   reported 0 discrepancies and 0 unsupported movements. Both checks were
   read-only (`modifiedData: false`).
-- The live browser workflow passed against an isolated disposable PostgreSQL
-  database (1 workflow, 2.4 minutes); the temporary database was removed.
 - A read-only browser smoke test against the running local app passed
   administrator sign-in and dashboard loading, with no API failures or console
   warnings; all 290 stock transaction rows were unique across paginated pages.
