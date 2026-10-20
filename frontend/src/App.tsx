@@ -2104,7 +2104,7 @@ function App() {
           </section>
         )}
 
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+        <div className="dashboard-actions mt-5 flex flex-wrap items-center gap-3">
           {canReceiveStock && (
             <button
               onClick={openCreatePurchaseForm}
@@ -3275,7 +3275,7 @@ function App() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="dashboard-metric-grid grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 font-medium mb-2">
             Total Medicines (SKUs)
@@ -3309,7 +3309,7 @@ function App() {
         </div>
       </div>
 
-      <section className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <section className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">Forecast risk</h2>
           <p className="text-sm text-gray-500 mt-1">
@@ -3388,7 +3388,7 @@ function App() {
         )}
       </section>
 
-      <section className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <section className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">Inventory alerts</h2>
         </div>
@@ -3437,7 +3437,7 @@ function App() {
         )}
       </section>
 
-      <section className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <section className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">
             Replenishment recommendations

@@ -323,6 +323,72 @@
   background: linear-gradient(145deg, #ffffff, #f8fbfa);
 }
 
+.dashboard-actions {
+  position: relative;
+  z-index: 1;
+  padding-top: 18px;
+  border-top: 1px solid rgba(203, 220, 216, 0.8);
+}
+
+.dashboard-actions button {
+  min-height: 42px;
+  border-radius: 10px;
+  letter-spacing: -0.01em;
+}
+
+.dashboard-actions button:first-child {
+  box-shadow: 0 7px 14px rgba(37, 99, 235, 0.18);
+}
+
+.dashboard-metric-grid {
+  gap: 18px;
+}
+
+.dashboard-metric-grid h3 {
+  color: #637873;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.dashboard-metric-grid p {
+  letter-spacing: -0.04em;
+}
+
+.dashboard-section {
+  position: relative;
+}
+
+.dashboard-section > div:first-child {
+  padding: 20px 24px;
+}
+
+.dashboard-section > div:first-child h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-section > div:first-child h2::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #2d9ca3;
+  box-shadow: 0 0 0 5px rgba(45, 156, 163, 0.12);
+  content: "";
+}
+
+.dashboard-section:nth-of-type(2) > div:first-child h2::before {
+  background: #dc5a5a;
+  box-shadow: 0 0 0 5px rgba(220, 90, 90, 0.12);
+}
+
+.dashboard-section:nth-of-type(3) > div:first-child h2::before {
+  background: #7967c7;
+  box-shadow: 0 0 0 5px rgba(121, 103, 199, 0.12);
+}
+
 .dashboard-shell > .grid > div::before {
   position: absolute;
   left: 0;
