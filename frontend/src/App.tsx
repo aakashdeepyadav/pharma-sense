@@ -400,31 +400,39 @@ function readStoredSession(): Session | null {
 
 const roleThemeMap: Record<
   string,
-  { tone: string; accent: string; description: string }
+  { tone: string; accent: string; description: string; workspace: string; priorities: string[] }
 > = {
   Admin: {
     tone: "bg-emerald-100 text-emerald-800 border-emerald-200",
     accent: "text-emerald-700",
     description:
       "Full operational control across inventory, purchasing, and reporting.",
+    workspace: "Administration and operational oversight",
+    priorities: ["Approve replenishment reviews", "Manage users and access", "Monitor inventory integrity"],
   },
   Pharmacist: {
     tone: "bg-cyan-100 text-cyan-800 border-cyan-200",
     accent: "text-cyan-700",
     description:
       "Medication and stock management with read-write dispensing controls.",
+    workspace: "Medication and dispensing operations",
+    priorities: ["Maintain medicine records", "Receive stock and purchases", "Review demand risk before issuing"],
   },
   "Inventory Manager": {
     tone: "bg-violet-100 text-violet-800 border-violet-200",
     accent: "text-violet-700",
     description:
       "Vendor, batch, and stock integrity oversight for the supply chain.",
+    workspace: "Supply chain and stock integrity",
+    priorities: ["Manage suppliers and batches", "Receive and reconcile stock", "Review audit history"],
   },
   Staff: {
     tone: "bg-amber-100 text-amber-800 border-amber-200",
     accent: "text-amber-700",
     description:
       "Operational access for daily stock movement and issue monitoring.",
+    workspace: "Daily stock movement",
+    priorities: ["Issue and adjust stock", "Monitor alerts and coverage", "Escalate replenishment needs"],
   },
 };
 
@@ -556,6 +564,8 @@ function App() {
     tone: "bg-slate-100 text-slate-700 border-slate-200",
     accent: "text-slate-700",
     description: "Operational access across the PharmaSense workspace.",
+    workspace: "Operational workspace",
+    priorities: ["Monitor inventory", "Review alerts", "Escalate issues"],
   };
 
   useEffect(() => {
@@ -2152,6 +2162,27 @@ function App() {
             </button>
           )}
         </div>
+
+        <section className="role-workspace-panel mt-6" aria-label="Role workspace">
+          <div>
+            <p className="role-workspace-eyebrow">Your workspace</p>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">
+              {roleMeta.workspace}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Your dashboard is organized around the work available to the{" "}
+              {session.user.role.toLowerCase()} role.
+            </p>
+          </div>
+          <ul className="role-priority-list" aria-label={`${session.user.role} priorities`}>
+            {roleMeta.priorities.map((priority) => (
+              <li key={priority}>
+                <span aria-hidden="true">✓</span>
+                {priority}
+              </li>
+            ))}
+          </ul>
+        </section>
       </header>
 
       {stockFormOpen && (
