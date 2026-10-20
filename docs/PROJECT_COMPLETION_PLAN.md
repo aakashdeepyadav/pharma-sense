@@ -59,11 +59,17 @@ production forecast readiness. See
 ### Current repository verification (2026-10-21)
 
 - Backend TypeScript build passed.
-- Database-independent backend tests passed: 17 tests, 0 failures.
+- Full backend test suite passed: 46 tests, 0 failures.
 - Prisma schema validation passed.
 - Synthetic demand dataset validation passed with the documented research
   warnings and no validation errors.
 - Backend production dependency audit passed with 0 vulnerabilities.
+- Local PostgreSQL migrations applied successfully and development seed
+  completed successfully.
+- Database quality passed with 0 errors and 1 documented
+  `EXPIRED_BATCH_HAS_STOCK` warning; the check did not modify data.
+- Stock reconciliation passed with 0 discrepancies and 0 unsupported
+  movements; the check did not modify data.
 - Frontend lint passed with no warnings after the forecast response guard was
   added.
 - Frontend production build passed.
@@ -72,10 +78,10 @@ production forecast readiness. See
   unavailable prediction instead of allowing an undefined `forecasts` array to
   crash the dashboard.
 
-The full backend integration suite was attempted, but its database-backed
-tests could not run because Docker Desktop was unavailable and the configured
-PostgreSQL service could not be reached. This is an environment blocker, not
-a passing integration result.
+The full backend integration suite initially required database preparation.
+After applying migrations and seeding the configured local PostgreSQL service,
+all database-backed tests passed. Docker Desktop was not required because the
+local PostgreSQL service was available.
 
 ### Previously recorded verification
 
