@@ -1661,6 +1661,8 @@ function App() {
   const selectedLightGbmForecast = lightGbmPrediction?.forecasts.find(
     (forecast) => forecast.medicineId === effectiveForecastMedicineId,
   );
+  const effectiveLightGbmPrediction =
+    session && effectiveForecastMedicineId !== null ? lightGbmPrediction : null;
 
   useEffect(() => {
     if (!session || effectiveForecastMedicineId === null) {
@@ -1709,7 +1711,6 @@ function App() {
 
   useEffect(() => {
     if (!session || effectiveForecastMedicineId === null) {
-      setLightGbmPrediction(null);
       return;
     }
 
@@ -3679,9 +3680,9 @@ function App() {
                         LightGBM next-day prediction
                       </h4>
                       <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-indigo-800">
-                        {!lightGbmPrediction
+                        {!effectiveLightGbmPrediction
                           ? "Model unavailable"
-                          : lightGbmPrediction.trainingDataSource === "synthetic"
+                          : effectiveLightGbmPrediction.trainingDataSource === "synthetic"
                             ? "Synthetic training data"
                             : "Operational training data"}
                       </span>
@@ -3703,7 +3704,7 @@ function App() {
                         Not enough recorded demand for this medicine. The model needs 30 days of history.
                       </p>
                     )}
-                    {lightGbmPrediction?.trainingDataSource === "synthetic" && (
+                    {effectiveLightGbmPrediction?.trainingDataSource === "synthetic" && (
                       <p className="mt-2 text-xs text-indigo-800">
                         Demo inference uses this medicine's recent stock issues, but the model was trained on synthetic data and is not production-calibrated.
                       </p>
