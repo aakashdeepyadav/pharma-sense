@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -338,6 +339,7 @@ def recommend_replenishment(row: pd.Series) -> dict:
 
 
 def main() -> None:
+    export_operational_requested = '--export-operational' in sys.argv[1:]
     data_path, data_source = choose_data_source()
     if data_source == 'synthetic':
         print('Using synthetic fallback dataset because operational history is insufficient for a real production check.')
@@ -409,7 +411,9 @@ def main() -> None:
         ],
     }
 
-    export_model_artifact = data_source == 'synthetic'
+    export_model_artifact = data_source == 'synthetic' or (
+        data_source == 'operational' and export_operational_requested
+    )
     if export_model_artifact:
         MODEL_ARTIFACT_PATH.parent.mkdir(parents=True, exist_ok=True)
         artifact = {
@@ -423,7 +427,10 @@ def main() -> None:
         MODEL_ARTIFACT_PATH.write_text(json.dumps(artifact, separators=(',', ':')), encoding='utf-8')
         print(f'Portable inference artifact written to {MODEL_ARTIFACT_PATH.relative_to(ROOT)}')
     else:
-        print('Operational model artifact was not exported. A governed, private model-release process is required for operational data.')
+        print(
+            'Operational model artifact was not exported. Re-run with '
+            '--export-operational after approved model review and release authorization.'
+        )
 
     RESULTS_DIR.joinpath('lightgbm_forecast_metrics.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
     RESULTS_DIR.joinpath('lightgbm_predictions.csv').write_text(

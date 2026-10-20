@@ -764,7 +764,7 @@ describe('PharmaSense API', () => {
       };
       assert.equal(body.success, true);
       assert.equal(body.data.model, 'LightGBM baseline');
-      assert.equal(body.data.trainingDataSource, 'synthetic');
+      assert.equal(body.data.trainingDataSource, 'operational');
       assert.deepEqual(body.data.forecasts[0], {
         medicineId: medicine.id,
         medicineName: medicine.genericName,

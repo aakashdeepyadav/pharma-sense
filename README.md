@@ -172,7 +172,27 @@ npm run research:evaluate
 npm run research:ml
 ```
 
-When the synthetic dataset is selected, training also refreshes the portable API artifact and its metric files under `backend/ml-artifacts/`. Redeploy the API after regenerating them. Operational model artifacts are deliberately not exported by the research script; releasing a model trained on operational data requires approval, representative evaluation, and a private governed release process. Model results must not be described as production accuracy without approved, representative operational history. Read the [data contract](research/data/DATA_CONTRACT.md), [forecasting roadmap](docs/PRODUCTION_FORECASTING_ROADMAP.md), and [ML governance workflow](docs/ML_GOVERNANCE_WORKFLOW.md) before using real or de-identified data.
+When an approved operational dataset is ready, export the model used by the
+live API with `npm run research:ml:operational`. This is an explicit release
+command; it does not bypass the data-governance and human model-review gates.
+
+The current checked-in artifact was trained from the operational demand
+dataset. Its time-based evaluation achieved MAE `0.748` and RMSE `1.344`,
+beating the seven-day moving-average MAE of `1.834` and naive MAE of `2.001`.
+The dataset has no stockout-censored rows, so these metrics are not a complete
+estimate of unconstrained demand.
+
+Training refreshes the portable API artifact and its metric files under
+`backend/ml-artifacts/`. The standard `research:ml` command uses the
+development/synthetic path, while `research:ml:operational` explicitly exports
+an operational artifact. Redeploy the API after regenerating artifacts.
+Operational model release still requires approval, representative evaluation,
+and a private governed release process. Model results must not be described as
+production accuracy without approved, representative operational history. Read
+the [data contract](research/data/DATA_CONTRACT.md), [forecasting
+roadmap](docs/PRODUCTION_FORECASTING_ROADMAP.md), and [ML governance
+workflow](docs/ML_GOVERNANCE_WORKFLOW.md) before using real or de-identified
+data.
 
 ## Deployment
 

@@ -36,6 +36,17 @@ Run the research-grade LightGBM demand model from the backend directory:
 npm run research:ml
 ```
 
+For an approved operational dataset, use the explicit release command:
+
+```bash
+npm run research:ml:operational
+```
+
+This command exports the operationally trained artifact used by the live API.
+It is intentionally separate from `research:ml` so a synthetic fallback cannot
+silently replace an operational release. Confirm the readiness, governance,
+privacy, and model-review gates before running it for a deployed environment.
+
 This script trains and selects a LightGBM regressor using calendar, lag, and
 rolling-window features. It compares three regularized parameter sets with
 three rolling time-series validation folds, then evaluates the selected model
@@ -52,10 +63,25 @@ The current synthetic run selected `lightgbm_regularized`:
 - final holdout naive MAE: `2.844`
 
 These results show improvement on the synthetic benchmark only. The
-operational file currently contains 10 unique days across 24 medicines, so it
-is not sufficient for production model selection. The pipeline therefore
-refuses to train a production candidate from it and uses the synthetic data
-only as a development fallback.
+operational dataset is evaluated separately and is preferred automatically
+when it meets the readiness gate.
+
+The current operational run selected `lightgbm_baseline`:
+
+- 20,080 rows across 20 medicines
+- 1,004 complete daily dates from 2024-01-01 through 2026-09-30
+- no duplicate medicine/date rows and no missing values
+- rolling-validation MAE: `0.750`
+- final holdout MAE: `0.748`
+- final holdout RMSE: `1.344`
+- final holdout seven-day moving-average MAE: `1.834`
+- final holdout naive MAE: `2.001`
+
+The operational data contains no stockout-censored rows. That is a limitation
+for production demand interpretation: observed issues may not represent
+unmet demand during stockouts. The model artifact is therefore operationally
+trained but remains advisory until censoring coverage, privacy review, and
+business model sign-off are complete.
 
 When the synthetic dataset is selected, the script writes evaluation metrics
 and prediction output under `research/results/` and exports a portable tree

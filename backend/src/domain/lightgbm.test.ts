@@ -80,7 +80,7 @@ describe('LightGBM inference', () => {
     );
     const prediction = predictLightGbm(artifact, features);
 
-    assert.equal(artifact.training_data_source, 'synthetic');
+    assert.equal(artifact.training_data_source, 'operational');
     assert.equal(artifact.feature_names.length, LIGHTGBM_FEATURE_NAMES.length);
     assert.ok(Number.isFinite(prediction));
     assert.ok(prediction >= 0);
