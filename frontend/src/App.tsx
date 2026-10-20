@@ -1753,10 +1753,18 @@ function App() {
       <main className="auth-shell min-h-screen">
         <div className="auth-card">
           <section className="auth-hero">
-            <div className="auth-brand">PHARMASENSE</div>
+            <div className="auth-brand-row">
+              <div className="auth-mark" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+              <div className="auth-brand">PHARMASENSE</div>
+            </div>
             <h1 className="auth-title mt-6">PharmaSense</h1>
             <p className="auth-description mt-3 max-w-md">
-              Medicine inventory, purchasing, and operational history.
+              A clearer way to manage medicine inventory, purchasing, and
+              operational history.
             </p>
 
             <div className="auth-feature-list mt-8">
@@ -1769,6 +1777,10 @@ function App() {
                 <div key={feature}>{feature}</div>
               ))}
             </div>
+            <div className="auth-hero-footer">
+              <span className="auth-status-dot" aria-hidden="true" />
+              Built for accountable pharmacy operations
+            </div>
           </section>
 
           <section className="auth-form-shell">
@@ -1776,7 +1788,7 @@ function App() {
               <p className="auth-eyebrow">Sign in</p>
               <h2 className="auth-heading mt-2">Welcome back</h2>
               <p className="auth-form-description mt-1">
-                Use your assigned account to continue.
+                Continue to your operational workspace.
               </p>
             </div>
 

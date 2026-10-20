@@ -39,6 +39,42 @@
   letter-spacing: 0.16em;
 }
 
+.auth-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.auth-mark {
+  display: flex;
+  align-items: end;
+  gap: 3px;
+  height: 22px;
+  padding: 4px;
+  border: 1px solid rgba(185, 232, 223, 0.38);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.auth-mark span {
+  display: block;
+  width: 3px;
+  border-radius: 3px;
+  background: #b9e8df;
+}
+
+.auth-mark span:nth-child(1) {
+  height: 7px;
+}
+
+.auth-mark span:nth-child(2) {
+  height: 12px;
+}
+
+.auth-mark span:nth-child(3) {
+  height: 16px;
+}
+
 .auth-title {
   color: #fff;
   font-size: 42px;
@@ -63,6 +99,24 @@
 .auth-feature-list > div {
   border-top: 1px solid rgba(255, 255, 255, 0.18);
   padding-top: 9px;
+}
+
+.auth-hero-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 54px;
+  color: rgba(224, 237, 235, 0.72);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.auth-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #7dd3b8;
+  box-shadow: 0 0 0 4px rgba(125, 211, 184, 0.12);
 }
 
 .auth-eyebrow {
