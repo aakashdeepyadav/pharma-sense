@@ -17,7 +17,7 @@ rehearsal remain open.
 The following results are historical project evidence and were not rerun for
 the current change.
 
-Command run:
+Commands run:
 
 ```powershell
 cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\backend"
@@ -28,6 +28,8 @@ npm test
 npm run db:quality
 npm run db:reconcile
 npm run research:validate
+npm run research:readiness
+npm run research:ml:operational
 ```
 
 Result:
@@ -37,23 +39,25 @@ Result:
 - database quality check passed with warnings only
 - stock reconciliation reported zero discrepancies
 - research validation passed for the demand dataset
+- operational readiness passed for the expanded demand dataset
+- operational model training and artifact export passed
 
 ### Forecasting readiness
 
-Command run:
-
-```powershell
-cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense"
-python research/train_lightgbm_forecast.py
-```
+The current operational release uses `npm run research:ml:operational`.
+The expanded dataset contains 20,080 rows across 20 medicines and 1,004
+complete daily dates from 2024-01-01 through 2026-09-30.
 
 Result:
 
 - data source: operational
 - model: LightGBM baseline
-- MAE: 1.3775
-- RMSE: 2.0038
-- naive baseline MAE: 3.2724
+- rolling-validation MAE: 0.750
+- final holdout MAE: 0.748
+- final holdout RMSE: 1.344
+- seven-day moving-average baseline MAE: 1.834
+- naive baseline MAE: 2.001
+- stockout-censored rows: 0
 
 ### Frontend build
 
@@ -68,7 +72,7 @@ npm run build
 Result:
 
 - build succeeded
-- one non-blocking React warning remained in the forecast selector effect during linting
+- no lint warnings remained
 - production bundle was generated successfully
 
 ### Historical local validation (superseded)

@@ -66,8 +66,8 @@ production forecast readiness. See
 - Backend production dependency audit passed with 0 vulnerabilities.
 - Local PostgreSQL migrations applied successfully and development seed
   completed successfully.
-- Database quality passed with 0 errors and 1 documented
-  `EXPIRED_BATCH_HAS_STOCK` warning; the check did not modify data.
+- Database quality passed with 0 errors and 0 warnings; the check did not
+  modify data.
 - Stock reconciliation passed with 0 discrepancies and 0 unsupported
   movements; the check did not modify data.
 - Frontend lint passed with no warnings after the forecast response guard was
