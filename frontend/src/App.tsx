@@ -1658,7 +1658,7 @@ function App() {
           ? selectedForecastMedicineId
           : medicines[0].id)
       : null;
-  const selectedLightGbmForecast = lightGbmPrediction?.forecasts.find(
+  const selectedLightGbmForecast = lightGbmPrediction?.forecasts?.find(
     (forecast) => forecast.medicineId === effectiveForecastMedicineId,
   );
   const effectiveLightGbmPrediction =
@@ -1729,8 +1729,13 @@ function App() {
           success?: boolean;
           data?: LightGbmPrediction;
         };
+        const prediction = result.data;
         if (isMounted) {
-          setLightGbmPrediction(result.success ? result.data ?? null : null);
+          setLightGbmPrediction(
+            result.success && prediction && Array.isArray(prediction.forecasts)
+              ? prediction
+              : null,
+          );
         }
       } catch {
         if (isMounted) setLightGbmPrediction(null);
