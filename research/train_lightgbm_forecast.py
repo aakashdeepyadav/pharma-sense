@@ -28,6 +28,50 @@ RESULTS_DIR = ROOT / 'research' / 'results'
 MODEL_ARTIFACT_PATH = ROOT / 'backend' / 'ml-artifacts' / 'lightgbm_model.json'
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
+MODEL_CANDIDATES = [
+    {
+        'name': 'lightgbm_conservative',
+        'n_estimators': 150,
+        'learning_rate': 0.03,
+        'num_leaves': 7,
+        'min_child_samples': 10,
+        'subsample': 0.9,
+        'colsample_bytree': 0.9,
+    },
+    {
+        'name': 'lightgbm_baseline',
+        'n_estimators': 250,
+        'learning_rate': 0.05,
+        'num_leaves': 15,
+        'min_child_samples': 10,
+        'subsample': 0.9,
+        'colsample_bytree': 0.9,
+    },
+    {
+        'name': 'lightgbm_regularized',
+        'n_estimators': 200,
+        'learning_rate': 0.04,
+        'num_leaves': 15,
+        'min_child_samples': 20,
+        'subsample': 0.8,
+        'colsample_bytree': 0.8,
+        'reg_lambda': 1.0,
+    },
+]
+FEATURE_NAMES = [
+    'day_of_week',
+    'month',
+    'week_of_year',
+    'is_weekend',
+    'lag_1',
+    'lag_7',
+    'lag_14',
+    'lag_30',
+    'rolling_mean_7',
+    'rolling_mean_14',
+    'rolling_mean_30',
+]
+
 
 def choose_data_source() -> tuple[Path, str]:
     if OPERATIONAL_DATA_PATH.exists():
@@ -73,6 +117,36 @@ def validate_dataset(df: pd.DataFrame) -> dict:
     }
 
 
+def analyze_dataset(df: pd.DataFrame) -> dict:
+    coverage = (
+        df.groupby('medicine_id')
+        .agg(
+            observations=('quantity_issued', 'size'),
+            unique_days=('date', 'nunique'),
+            mean_demand=('quantity_issued', 'mean'),
+            zero_demand_rate=('quantity_issued', lambda values: float((values == 0).mean())),
+        )
+        .reset_index()
+    )
+    return {
+        'rows': int(len(df)),
+        'medicines': int(df['medicine_id'].nunique()),
+        'unique_days': int(df['date'].nunique()),
+        'date_from': df['date'].min().isoformat(),
+        'date_to': df['date'].max().isoformat(),
+        'mean_demand': float(df['quantity_issued'].mean()),
+        'zero_demand_rate': float((df['quantity_issued'] == 0).mean()),
+        'duplicate_medicine_dates': int(df.duplicated(subset=['date', 'medicine_id']).sum()),
+        'medicine_coverage': [
+            {
+                key: (float(value) if isinstance(value, (np.floating, float)) else int(value) if isinstance(value, (np.integer, int)) else str(value))
+                for key, value in row.items()
+            }
+            for row in coverage.to_dict(orient='records')
+        ],
+    }
+
+
 def load_data() -> pd.DataFrame:
     df = pd.read_csv(DATA_PATH)
     validation = validate_dataset(df)
@@ -113,30 +187,17 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def train_model(train_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[LGBMRegressor, pd.DataFrame, dict, list[str]]:
-    numeric = [
-        'day_of_week',
-        'month',
-        'week_of_year',
-        'is_weekend',
-        'lag_1',
-        'lag_7',
-        'lag_14',
-        'lag_30',
-        'rolling_mean_7',
-        'rolling_mean_14',
-        'rolling_mean_30',
-    ]
-    feature_names = numeric
+def train_model(
+    train_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    model_params: dict,
+) -> tuple[LGBMRegressor, pd.DataFrame, dict, list[str]]:
+    feature_names = FEATURE_NAMES
     model = LGBMRegressor(
         objective='regression',
-        n_estimators=250,
-        learning_rate=0.05,
-        num_leaves=15,
-        subsample=0.9,
-        colsample_bytree=0.9,
         random_state=42,
         verbose=-1,
+        **{key: value for key, value in model_params.items() if key != 'name'},
     )
 
     X_train = train_df[feature_names]
@@ -147,6 +208,12 @@ def train_model(train_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[LGBMRegr
     model.fit(X_train, y_train)
     preds = model.predict(X_test)
     preds = np.clip(preds, 0, None)
+    result_df = pd.DataFrame({
+        'actual': y_test.reset_index(drop=True),
+        'predicted': preds,
+        'medicine_id': test_df['medicine_id'].reset_index(drop=True),
+        'date': test_df['date'].reset_index(drop=True),
+    })
 
     importances = model.feature_importances_
     ranked_features = sorted(
@@ -161,20 +228,92 @@ def train_model(train_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[LGBMRegr
         'train_rows': int(len(train_df)),
         'test_rows': int(len(test_df)),
         'baseline_naive_mae': float(np.mean(np.abs(y_test.to_numpy() - test_df['lag_1'].to_numpy()))),
+        'baseline_moving_average_7_mae': float(
+            mean_absolute_error(y_test, test_df['rolling_mean_7'])
+        ),
+        'metrics_by_medicine': [
+            {
+                'medicine_id': str(medicine_id),
+                'observations': int(len(group)),
+                'mae': float(mean_absolute_error(group['actual'], group['predicted'])),
+                'rmse': float(np.sqrt(mean_squared_error(group['actual'], group['predicted']))),
+            }
+            for medicine_id, group in result_df.groupby('medicine_id')
+        ],
         'top_feature_importance': [
             {'feature': feature, 'importance': float(score)}
             for feature, score in ranked_features
         ],
     }
 
-    result_df = pd.DataFrame({
-        'actual': y_test.reset_index(drop=True),
-        'predicted': preds,
-        'medicine_id': test_df['medicine_id'].reset_index(drop=True),
-        'date': test_df['date'].reset_index(drop=True),
-    })
-
     return model, result_df, metrics, feature_names
+
+
+def rolling_validation_splits(feature_df: pd.DataFrame, folds: int = 3) -> list[tuple[pd.DataFrame, pd.DataFrame]]:
+    dates = sorted(feature_df['date'].drop_duplicates())
+    if len(dates) < folds + 2:
+        raise ValueError('Insufficient dates for rolling time-series validation.')
+    validation_size = max(7, len(dates) // (folds + 2))
+    splits = []
+    for fold in range(folds):
+        validation_end = len(dates) - (folds - fold - 1) * validation_size
+        validation_start = validation_end - validation_size
+        train_dates = dates[:validation_start]
+        validation_dates = dates[validation_start:validation_end]
+        train = feature_df[feature_df['date'].isin(train_dates)].copy()
+        validation = feature_df[feature_df['date'].isin(validation_dates)].copy()
+        if len(train) >= 30 and not validation.empty:
+            splits.append((train, validation))
+    if len(splits) < 2:
+        raise ValueError('Insufficient rows for rolling time-series validation.')
+    return list(reversed(splits))
+
+
+def select_model(feature_df: pd.DataFrame, feature_names: list[str]) -> tuple[dict, list[dict]]:
+    scores = []
+    for candidate in MODEL_CANDIDATES:
+        fold_scores = []
+        for train_df, validation_df in rolling_validation_splits(feature_df):
+            model = LGBMRegressor(
+                objective='regression',
+                random_state=42,
+                verbose=-1,
+                **{key: value for key, value in candidate.items() if key != 'name'},
+            )
+            model.fit(train_df[feature_names], train_df['target'])
+            predictions = np.clip(model.predict(validation_df[feature_names]), 0, None)
+            fold_scores.append({
+                'mae': float(mean_absolute_error(validation_df['target'], predictions)),
+                'rmse': float(np.sqrt(mean_squared_error(validation_df['target'], predictions))),
+            })
+        scores.append({
+            'model': candidate['name'],
+            'mean_mae': float(np.mean([score['mae'] for score in fold_scores])),
+            'mean_rmse': float(np.mean([score['rmse'] for score in fold_scores])),
+            'folds': fold_scores,
+            'parameters': candidate,
+        })
+    scores.sort(key=lambda score: (score['mean_mae'], score['mean_rmse']))
+    return next(candidate for candidate in MODEL_CANDIDATES if candidate['name'] == scores[0]['model']), scores
+
+
+def evaluate_baselines(feature_df: pd.DataFrame) -> list[dict]:
+    fold_scores = {'naive_last_value': [], 'moving_average_7': []}
+    for _, validation_df in rolling_validation_splits(feature_df):
+        fold_scores['naive_last_value'].append(
+            float(mean_absolute_error(validation_df['target'], validation_df['lag_1']))
+        )
+        fold_scores['moving_average_7'].append(
+            float(mean_absolute_error(validation_df['target'], validation_df['rolling_mean_7']))
+        )
+    return [
+        {
+            'model': model_name,
+            'mean_mae': float(np.mean(scores)),
+            'folds': scores,
+        }
+        for model_name, scores in fold_scores.items()
+    ]
 
 
 def recommend_replenishment(row: pd.Series) -> dict:
@@ -205,6 +344,7 @@ def main() -> None:
 
     df = pd.read_csv(data_path)
     validation = validate_dataset(df)
+    data_profile = analyze_dataset(df)
     df['date'] = pd.to_datetime(df['date'], utc=True)
     df = df.sort_values(['medicine_id', 'date']).reset_index(drop=True)
     feature_df = build_features(df)
@@ -229,10 +369,18 @@ def main() -> None:
     if train_df.empty or test_df.empty:
         raise ValueError('Insufficient data for a valid time-based train and test split.')
 
-    model, result_df, metrics, feature_names = train_model(train_df, test_df)
+    selected_params, cross_validation = select_model(feature_df, FEATURE_NAMES)
+    model, result_df, metrics, feature_names = train_model(train_df, test_df, selected_params)
+    final_model = LGBMRegressor(
+        objective='regression',
+        random_state=42,
+        verbose=-1,
+        **{key: value for key, value in selected_params.items() if key != 'name'},
+    )
+    final_model.fit(feature_df[FEATURE_NAMES], feature_df['target'])
 
     summary = {
-        'model': 'LightGBM baseline',
+        'model': selected_params['name'],
         'dataset': str(data_path.relative_to(ROOT)),
         'data_source': data_source,
         'production_ready': False,
@@ -246,6 +394,13 @@ def main() -> None:
         'validation': validation,
         'forecast_horizon_days': 1,
         'metrics': metrics,
+        'model_selection': {
+            'selection_metric': 'mean_mae',
+            'selected_model': selected_params['name'],
+            'candidates': cross_validation,
+            'baselines': evaluate_baselines(feature_df),
+        },
+        'data_profile': data_profile,
         'feature_names': feature_names,
         'notes': [
             'Operational data is preferred for production evaluation; a synthetic fallback is used only when operational history is insufficient.',
@@ -263,7 +418,7 @@ def main() -> None:
             'training_data_source': data_source,
             'trained_at': datetime.now(timezone.utc).isoformat(),
             'feature_names': feature_names,
-            'booster': model.booster_.dump_model(),
+            'booster': final_model.booster_.dump_model(),
         }
         MODEL_ARTIFACT_PATH.write_text(json.dumps(artifact, separators=(',', ':')), encoding='utf-8')
         print(f'Portable inference artifact written to {MODEL_ARTIFACT_PATH.relative_to(ROOT)}')

@@ -159,7 +159,7 @@ The project has three forecasting paths:
 
 1. **Live advisory calculations:** the TypeScript API computes moving-average forecasts, demand risk, and replenishment suggestions from stock-out transactions and current inventory in PostgreSQL. These results are advisory and require human review.
 2. **Live LightGBM inference:** the API loads the portable tree artifact at `backend/ml-artifacts/lightgbm_model.json` and runs the exported LightGBM trees in TypeScript. `GET /api/v1/reports/forecast-ml/predictions?medicineId={id}` predicts next-day demand from the medicine's last 30 full UTC days of stock OUT activity. It returns `INSUFFICIENT_HISTORY` when it cannot establish that history.
-3. **LightGBM research benchmark:** Python scripts validate a dataset, build features, train and evaluate a LightGBM baseline, and write metrics and predictions under `research/results/`. The checked-in model was trained on synthetic demand. The live inference endpoint uses recent database transactions as inputs, but synthetic training means the result is a demonstration only and is not production-calibrated.
+3. **LightGBM research benchmark:** Python scripts validate a dataset, profile its coverage, compare naive and moving-average baselines, select among regularized LightGBM candidates with rolling time-series validation, and write metrics and predictions under `research/results/`. The checked-in model was trained on synthetic demand. The live inference endpoint uses recent database transactions as inputs, but synthetic training means the result is a demonstration only and is not production-calibrated.
 
 Run the research pipeline from the repository root:
 

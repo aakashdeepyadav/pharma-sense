@@ -79,6 +79,17 @@ production forecast readiness. See
 - The frontend now treats a successful but incomplete LightGBM response as an
   unavailable prediction instead of allowing an undefined `forecasts` array to
   crash the dashboard.
+- The forecasting pipeline now selects a regularized LightGBM configuration
+  using three rolling time-series validation folds, compares naive and
+  moving-average baselines, reports per-medicine metrics and data coverage,
+  and retrains the exported synthetic demonstration artifact on all available
+  feature rows.
+
+The current synthetic benchmark selected `lightgbm_regularized` with rolling
+validation MAE `1.295`, final holdout MAE `1.317`, and final holdout RMSE
+`1.661`. The seven-day moving-average holdout MAE was `1.711`, and the naive
+holdout MAE was `2.844`. The operational dataset remains unsuitable for
+production training: it contains only 10 unique days across 24 medicines.
 
 The full backend integration suite initially required database preparation.
 After applying migrations and seeding the configured local PostgreSQL service,

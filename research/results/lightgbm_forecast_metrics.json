@@ -1,8 +1,9 @@
 {
-  "model": "LightGBM baseline",
+  "model": "lightgbm_regularized",
   "dataset": "research\\data\\synthetic_demand.csv",
   "data_source": "synthetic",
   "production_ready": false,
+  "production_readiness_reason": "A research baseline requires approved data, representative evaluation, and human sign-off before production use.",
   "production_ready_structure": {
     "time_based_split": true,
     "feature_validation": true,
@@ -17,51 +18,216 @@
   },
   "forecast_horizon_days": 1,
   "metrics": {
-    "mae": 1.3847498114617602,
-    "rmse": 1.739740899213147,
+    "mae": 1.3171076767545147,
+    "rmse": 1.6612567939396756,
     "train_rows": 357,
     "test_rows": 90,
     "baseline_naive_mae": 2.8444444444444446,
+    "baseline_moving_average_7_mae": 1.711111111111111,
+    "metrics_by_medicine": [
+      {
+        "medicine_id": "1",
+        "observations": 30,
+        "mae": 1.9821519929958809,
+        "rmse": 2.265912434050778
+      },
+      {
+        "medicine_id": "2",
+        "observations": 30,
+        "mae": 1.2697747424889263,
+        "rmse": 1.5536415401151695
+      },
+      {
+        "medicine_id": "3",
+        "observations": 30,
+        "mae": 0.6993962947787377,
+        "rmse": 0.8550796525908166
+      }
+    ],
     "top_feature_importance": [
       {
         "feature": "rolling_mean_7",
-        "importance": 483.0
-      },
-      {
-        "feature": "rolling_mean_30",
-        "importance": 457.0
-      },
-      {
-        "feature": "rolling_mean_14",
-        "importance": 420.0
+        "importance": 385.0
       },
       {
         "feature": "week_of_year",
-        "importance": 410.0
+        "importance": 346.0
       },
       {
         "feature": "day_of_week",
-        "importance": 356.0
+        "importance": 337.0
       },
       {
-        "feature": "lag_1",
-        "importance": 318.0
+        "feature": "rolling_mean_14",
+        "importance": 313.0
+      },
+      {
+        "feature": "rolling_mean_30",
+        "importance": 260.0
       },
       {
         "feature": "lag_30",
-        "importance": 257.0
+        "importance": 254.0
+      },
+      {
+        "feature": "lag_1",
+        "importance": 232.0
       },
       {
         "feature": "lag_7",
-        "importance": 220.0
+        "importance": 136.0
       },
       {
         "feature": "lag_14",
-        "importance": 192.0
+        "importance": 135.0
       },
       {
         "feature": "month",
-        "importance": 50.0
+        "importance": 54.0
+      }
+    ]
+  },
+  "model_selection": {
+    "selection_metric": "mean_mae",
+    "selected_model": "lightgbm_regularized",
+    "candidates": [
+      {
+        "model": "lightgbm_regularized",
+        "mean_mae": 1.295412414579176,
+        "mean_rmse": 1.7153534252573264,
+        "folds": [
+          {
+            "mae": 1.3195904276683508,
+            "rmse": 1.6855546000421797
+          },
+          {
+            "mae": 1.3990662927074067,
+            "rmse": 1.9381118536092086
+          },
+          {
+            "mae": 1.1675805233617707,
+            "rmse": 1.5223938221205902
+          }
+        ],
+        "parameters": {
+          "name": "lightgbm_regularized",
+          "n_estimators": 200,
+          "learning_rate": 0.04,
+          "num_leaves": 15,
+          "min_child_samples": 20,
+          "subsample": 0.8,
+          "colsample_bytree": 0.8,
+          "reg_lambda": 1.0
+        }
+      },
+      {
+        "model": "lightgbm_conservative",
+        "mean_mae": 1.2975874169909114,
+        "mean_rmse": 1.7197905562370084,
+        "folds": [
+          {
+            "mae": 1.303969064435792,
+            "rmse": 1.624320147007071
+          },
+          {
+            "mae": 1.4141628911364872,
+            "rmse": 1.9683463586242513
+          },
+          {
+            "mae": 1.1746302954004548,
+            "rmse": 1.5667051630797035
+          }
+        ],
+        "parameters": {
+          "name": "lightgbm_conservative",
+          "n_estimators": 150,
+          "learning_rate": 0.03,
+          "num_leaves": 7,
+          "min_child_samples": 10,
+          "subsample": 0.9,
+          "colsample_bytree": 0.9
+        }
+      },
+      {
+        "model": "lightgbm_baseline",
+        "mean_mae": 1.415995241038108,
+        "mean_rmse": 1.9130336970938588,
+        "folds": [
+          {
+            "mae": 1.3209256717543243,
+            "rmse": 1.724921457012686
+          },
+          {
+            "mae": 1.532736923393741,
+            "rmse": 2.145908387939165
+          },
+          {
+            "mae": 1.3943231279662593,
+            "rmse": 1.8682712463297257
+          }
+        ],
+        "parameters": {
+          "name": "lightgbm_baseline",
+          "n_estimators": 250,
+          "learning_rate": 0.05,
+          "num_leaves": 15,
+          "min_child_samples": 10,
+          "subsample": 0.9,
+          "colsample_bytree": 0.9
+        }
+      }
+    ],
+    "baselines": [
+      {
+        "model": "naive_last_value",
+        "mean_mae": 2.494252873563218,
+        "folds": [
+          2.7701149425287355,
+          2.528735632183908,
+          2.1839080459770117
+        ]
+      },
+      {
+        "model": "moving_average_7",
+        "mean_mae": 1.5944170771756978,
+        "folds": [
+          1.653530377668309,
+          1.7504105090311983,
+          1.3793103448275863
+        ]
+      }
+    ]
+  },
+  "data_profile": {
+    "rows": 540,
+    "medicines": 3,
+    "unique_days": 180,
+    "date_from": "2026-01-01T00:00:00+00:00",
+    "date_to": "2026-06-29T00:00:00+00:00",
+    "mean_demand": 15.214814814814815,
+    "zero_demand_rate": 0.0,
+    "duplicate_medicine_dates": 0,
+    "medicine_coverage": [
+      {
+        "medicine_id": 1,
+        "observations": 180,
+        "unique_days": 180,
+        "mean_demand": 22.666666666666668,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": 2,
+        "observations": 180,
+        "unique_days": 180,
+        "mean_demand": 14.28888888888889,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": 3,
+        "observations": 180,
+        "unique_days": 180,
+        "mean_demand": 8.688888888888888,
+        "zero_demand_rate": 0.0
       }
     ]
   },
