@@ -23,7 +23,7 @@ need a server runtime.
    direct connection string as `DATABASE_URL`; never commit it.
 2. Create a free Render web service from the repository. Set the root
    directory to `backend`, build command to
-   `npm ci && npx prisma generate && npm run build`, and start command to
+   `npm ci --include=dev && npx prisma generate && npm run build`, and start command to
    `npm start`. Run `npx prisma migrate deploy` once from a trusted machine
    against the hosted database before the first API start, or configure the
    provider's pre-deploy command if available on the selected free plan.
