@@ -14,7 +14,7 @@ The sign-in screen now uses compact product identity and restrained feature rows
 - `npm run build` passed.
 - `npm run test:e2e` passed: 9 tests, including login, role visibility, admin user form, responsive dashboard controls, and medicine-dialog keyboard behavior.
 - Vite started at `http://127.0.0.1:4173/`.
-- The live workflow in `frontend/e2e-live/inventory-workflow.spec.ts` covers medicine creation, purchase receiving, stock issue, alert acknowledgement, and role-limited controls through the real API. It passed locally against the Docker PostgreSQL database with one test in 20 seconds; CI runs it again against an isolated database with ephemeral credentials.
+- The live workflow in `frontend/e2e-live/inventory-workflow.spec.ts` covers medicine creation, purchase receiving, stock issue, alert acknowledgement, and role-limited controls through the real API. It passed locally against an isolated disposable PostgreSQL database on 2026-10-20; the temporary database was removed afterward. CI also defines an isolated database run with ephemeral credentials.
 
 ## Impact
 

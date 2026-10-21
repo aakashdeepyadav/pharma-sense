@@ -1,8 +1,9 @@
 {
-  "model": "LightGBM baseline",
+  "model": "lightgbm_baseline",
   "dataset": "research\\data\\operational_demand.csv",
   "data_source": "operational",
-  "production_ready": true,
+  "production_ready": false,
+  "production_readiness_reason": "A research baseline requires approved data, representative evaluation, and human sign-off before production use.",
   "production_ready_structure": {
     "time_based_split": true,
     "feature_validation": true,
@@ -17,126 +18,576 @@
   },
   "forecast_horizon_days": 1,
   "metrics": {
-    "mae": 0.6573981127058152,
-    "rmse": 1.1550714611233035,
+    "mae": 0.7476080654484917,
+    "rmse": 1.3441985416743694,
     "train_rows": 15560,
     "test_rows": 3900,
-    "baseline_naive_mae": 1.1046236686390534,
+    "baseline_naive_mae": 2.0012820512820513,
+    "baseline_moving_average_7_mae": 1.8335897435897437,
+    "metrics_by_medicine": [
+      {
+        "medicine_id": "MED-001",
+        "observations": 195,
+        "mae": 1.370118800884303,
+        "rmse": 2.150359928019169
+      },
+      {
+        "medicine_id": "MED-002",
+        "observations": 195,
+        "mae": 0.8998981794229338,
+        "rmse": 1.6638924838562261
+      },
+      {
+        "medicine_id": "MED-003",
+        "observations": 195,
+        "mae": 0.6332634595196522,
+        "rmse": 1.0984820046297716
+      },
+      {
+        "medicine_id": "MED-004",
+        "observations": 195,
+        "mae": 0.8985025200262802,
+        "rmse": 1.6349470753930078
+      },
+      {
+        "medicine_id": "MED-005",
+        "observations": 195,
+        "mae": 0.603356274797938,
+        "rmse": 0.9427376951027915
+      },
+      {
+        "medicine_id": "MED-006",
+        "observations": 195,
+        "mae": 0.9747351492561114,
+        "rmse": 1.6172393341571667
+      },
+      {
+        "medicine_id": "MED-007",
+        "observations": 195,
+        "mae": 0.8467098548878672,
+        "rmse": 1.4895086842684608
+      },
+      {
+        "medicine_id": "MED-008",
+        "observations": 195,
+        "mae": 0.6638291350020644,
+        "rmse": 1.2302744733807143
+      },
+      {
+        "medicine_id": "MED-009",
+        "observations": 195,
+        "mae": 0.9187136933763718,
+        "rmse": 1.6352772219279055
+      },
+      {
+        "medicine_id": "MED-010",
+        "observations": 195,
+        "mae": 0.6532129324342761,
+        "rmse": 1.0991975365402695
+      },
+      {
+        "medicine_id": "MED-011",
+        "observations": 195,
+        "mae": 0.8646333609401465,
+        "rmse": 1.565908211615879
+      },
+      {
+        "medicine_id": "MED-012",
+        "observations": 195,
+        "mae": 0.6843125839712174,
+        "rmse": 1.2293036384751164
+      },
+      {
+        "medicine_id": "MED-013",
+        "observations": 195,
+        "mae": 0.5558409754834326,
+        "rmse": 0.9836915865036556
+      },
+      {
+        "medicine_id": "MED-014",
+        "observations": 195,
+        "mae": 1.0944421889826703,
+        "rmse": 1.928677771732936
+      },
+      {
+        "medicine_id": "MED-015",
+        "observations": 195,
+        "mae": 0.4881998962312266,
+        "rmse": 0.7786460361192068
+      },
+      {
+        "medicine_id": "MED-016",
+        "observations": 195,
+        "mae": 0.4206038164899095,
+        "rmse": 0.6965935138992347
+      },
+      {
+        "medicine_id": "MED-017",
+        "observations": 195,
+        "mae": 0.6100711800061877,
+        "rmse": 1.0439089384733597
+      },
+      {
+        "medicine_id": "MED-018",
+        "observations": 195,
+        "mae": 0.6668046102196147,
+        "rmse": 1.196147090841507
+      },
+      {
+        "medicine_id": "MED-019",
+        "observations": 195,
+        "mae": 0.5696135457728818,
+        "rmse": 0.9514319505344933
+      },
+      {
+        "medicine_id": "MED-020",
+        "observations": 195,
+        "mae": 0.535299151264748,
+        "rmse": 0.7604777198546068
+      }
+    ],
     "top_feature_importance": [
       {
-        "feature": "num__rolling_mean_7",
-        "importance": 2075.0
+        "feature": "day_of_week",
+        "importance": 656.0
       },
       {
-        "feature": "num__week_of_year",
-        "importance": 1707.0
+        "feature": "rolling_mean_7",
+        "importance": 612.0
       },
       {
-        "feature": "num__available_units_at_start",
-        "importance": 1602.0
+        "feature": "lag_1",
+        "importance": 550.0
       },
       {
-        "feature": "num__lag_1",
-        "importance": 1483.0
+        "feature": "week_of_year",
+        "importance": 525.0
       },
       {
-        "feature": "num__rolling_mean_30",
-        "importance": 1318.0
+        "feature": "lag_30",
+        "importance": 340.0
       },
       {
-        "feature": "num__rolling_mean_14",
-        "importance": 1255.0
+        "feature": "rolling_mean_14",
+        "importance": 243.0
       },
       {
-        "feature": "num__day_of_week",
-        "importance": 1078.0
+        "feature": "rolling_mean_30",
+        "importance": 226.0
       },
       {
-        "feature": "num__lag_30",
-        "importance": 922.0
+        "feature": "lag_7",
+        "importance": 197.0
       },
       {
-        "feature": "num__lag_7",
-        "importance": 585.0
+        "feature": "month",
+        "importance": 78.0
       },
       {
-        "feature": "num__lag_14",
-        "importance": 407.0
+        "feature": "lag_14",
+        "importance": 67.0
+      }
+    ]
+  },
+  "model_selection": {
+    "selection_metric": "mean_mae",
+    "selected_model": "lightgbm_baseline",
+    "best_benchmark_model": "extra_trees",
+    "deployable_model": "lightgbm_baseline",
+    "comparison": [
+      {
+        "model": "extra_trees",
+        "deployable": false,
+        "mean_mae": 0.7404073970190521,
+        "mean_rmse": 1.4396339034334222,
+        "folds": [
+          {
+            "mae": 0.7188396719460232,
+            "rmse": 1.3899934400704534
+          },
+          {
+            "mae": 0.805888116872836,
+            "rmse": 1.555562558360121
+          },
+          {
+            "mae": 0.6964944022382972,
+            "rmse": 1.3733457118696926
+          }
+        ]
+      },
+      {
+        "model": "lightgbm_baseline",
+        "deployable": true,
+        "mean_mae": 0.7496658817793348,
+        "mean_rmse": 1.3950121312221524,
+        "folds": [
+          {
+            "mae": 0.7419598259718166,
+            "rmse": 1.3430322175528104
+          },
+          {
+            "mae": 0.7795557847825942,
+            "rmse": 1.4853575528018437
+          },
+          {
+            "mae": 0.7274820345835936,
+            "rmse": 1.3566466233118024
+          }
+        ]
+      },
+      {
+        "model": "hist_gradient_boosting",
+        "deployable": false,
+        "mean_mae": 0.7498708036836893,
+        "mean_rmse": 1.3871836283053465,
+        "folds": [
+          {
+            "mae": 0.7496827954762717,
+            "rmse": 1.3493877967761347
+          },
+          {
+            "mae": 0.7737927344358542,
+            "rmse": 1.4818991194800257
+          },
+          {
+            "mae": 0.726136881138942,
+            "rmse": 1.3302639686598785
+          }
+        ]
+      },
+      {
+        "model": "random_forest",
+        "deployable": false,
+        "mean_mae": 0.756898250630145,
+        "mean_rmse": 1.4420804580450683,
+        "folds": [
+          {
+            "mae": 0.7229160376636536,
+            "rmse": 1.3881807509175446
+          },
+          {
+            "mae": 0.832634858372584,
+            "rmse": 1.5619572562987902
+          },
+          {
+            "mae": 0.7151438558541974,
+            "rmse": 1.3761033669188698
+          }
+        ]
+      },
+      {
+        "model": "lightgbm_regularized",
+        "deployable": true,
+        "mean_mae": 0.7685017282586211,
+        "mean_rmse": 1.396970665161656,
+        "folds": [
+          {
+            "mae": 0.7735427148660284,
+            "rmse": 1.3658709088704597
+          },
+          {
+            "mae": 0.7888061939289799,
+            "rmse": 1.4814935035809744
+          },
+          {
+            "mae": 0.7431562759808549,
+            "rmse": 1.3435475830335342
+          }
+        ]
+      },
+      {
+        "model": "lightgbm_conservative",
+        "deployable": true,
+        "mean_mae": 1.0040698046123533,
+        "mean_rmse": 1.5762888030427336,
+        "folds": [
+          {
+            "mae": 1.011524246045204,
+            "rmse": 1.5556412077916857
+          },
+          {
+            "mae": 1.0398623605466055,
+            "rmse": 1.6680376343376682
+          },
+          {
+            "mae": 0.9608228072452499,
+            "rmse": 1.5051875669988468
+          }
+        ]
+      }
+    ],
+    "candidates": [
+      {
+        "model": "lightgbm_baseline",
+        "mean_mae": 0.7496658817793348,
+        "mean_rmse": 1.3950121312221524,
+        "folds": [
+          {
+            "mae": 0.7419598259718166,
+            "rmse": 1.3430322175528104
+          },
+          {
+            "mae": 0.7795557847825942,
+            "rmse": 1.4853575528018437
+          },
+          {
+            "mae": 0.7274820345835936,
+            "rmse": 1.3566466233118024
+          }
+        ],
+        "parameters": {
+          "name": "lightgbm_baseline",
+          "n_estimators": 250,
+          "learning_rate": 0.05,
+          "num_leaves": 15,
+          "min_child_samples": 10,
+          "subsample": 0.9,
+          "colsample_bytree": 0.9
+        }
+      },
+      {
+        "model": "lightgbm_regularized",
+        "mean_mae": 0.7685017282586211,
+        "mean_rmse": 1.396970665161656,
+        "folds": [
+          {
+            "mae": 0.7735427148660284,
+            "rmse": 1.3658709088704597
+          },
+          {
+            "mae": 0.7888061939289799,
+            "rmse": 1.4814935035809744
+          },
+          {
+            "mae": 0.7431562759808549,
+            "rmse": 1.3435475830335342
+          }
+        ],
+        "parameters": {
+          "name": "lightgbm_regularized",
+          "n_estimators": 200,
+          "learning_rate": 0.04,
+          "num_leaves": 15,
+          "min_child_samples": 20,
+          "subsample": 0.8,
+          "colsample_bytree": 0.8,
+          "reg_lambda": 1.0
+        }
+      },
+      {
+        "model": "lightgbm_conservative",
+        "mean_mae": 1.0040698046123533,
+        "mean_rmse": 1.5762888030427336,
+        "folds": [
+          {
+            "mae": 1.011524246045204,
+            "rmse": 1.5556412077916857
+          },
+          {
+            "mae": 1.0398623605466055,
+            "rmse": 1.6680376343376682
+          },
+          {
+            "mae": 0.9608228072452499,
+            "rmse": 1.5051875669988468
+          }
+        ],
+        "parameters": {
+          "name": "lightgbm_conservative",
+          "n_estimators": 150,
+          "learning_rate": 0.03,
+          "num_leaves": 7,
+          "min_child_samples": 10,
+          "subsample": 0.9,
+          "colsample_bytree": 0.9
+        }
+      }
+    ],
+    "baselines": [
+      {
+        "model": "naive_last_value",
+        "mean_mae": 2.00713058419244,
+        "folds": [
+          2.009020618556701,
+          2.1167525773195877,
+          1.8956185567010309
+        ]
+      },
+      {
+        "model": "moving_average_7",
+        "mean_mae": 1.8484045164457534,
+        "folds": [
+          1.8353092783505154,
+          1.9534241531664212,
+          1.756480117820324
+        ]
+      }
+    ]
+  },
+  "data_profile": {
+    "rows": 20080,
+    "medicines": 20,
+    "unique_days": 1004,
+    "date_from": "2024-01-01T00:00:00+00:00",
+    "date_to": "2026-09-30T00:00:00+00:00",
+    "mean_demand": 14.509810756972112,
+    "zero_demand_rate": 0.0,
+    "duplicate_medicine_dates": 0,
+    "medicine_coverage": [
+      {
+        "medicine_id": "MED-001",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 25.45617529880478,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-002",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 19.154382470119522,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-003",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 12.78784860557769,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-004",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 16.999003984063744,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-005",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 9.558764940239044,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-006",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 22.355577689243027,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-007",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 15.965139442231076,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-008",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 13.792828685258964,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-009",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 20.237051792828684,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-010",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 11.68824701195219,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-011",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 18.046812749003983,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-012",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 14.885458167330677,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-013",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 10.624501992031872,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-014",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 21.26792828685259,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-015",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 8.49402390438247,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-016",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 7.444223107569721,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-017",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 10.628486055776893,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-018",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 12.74402390438247,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-019",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 11.695219123505977,
+        "zero_demand_rate": 0.0
+      },
+      {
+        "medicine_id": "MED-020",
+        "observations": 1004,
+        "unique_days": 1004,
+        "mean_demand": 6.370517928286852,
+        "zero_demand_rate": 0.0
       }
     ]
   },
   "feature_names": [
-    "cat__medicine_id_MED-001",
-    "cat__medicine_id_MED-002",
-    "cat__medicine_id_MED-003",
-    "cat__medicine_id_MED-004",
-    "cat__medicine_id_MED-005",
-    "cat__medicine_id_MED-006",
-    "cat__medicine_id_MED-007",
-    "cat__medicine_id_MED-008",
-    "cat__medicine_id_MED-009",
-    "cat__medicine_id_MED-010",
-    "cat__medicine_id_MED-011",
-    "cat__medicine_id_MED-012",
-    "cat__medicine_id_MED-013",
-    "cat__medicine_id_MED-014",
-    "cat__medicine_id_MED-015",
-    "cat__medicine_id_MED-016",
-    "cat__medicine_id_MED-017",
-    "cat__medicine_id_MED-018",
-    "cat__medicine_id_MED-019",
-    "cat__medicine_id_MED-020",
-    "cat__medicine_category_Analgesic",
-    "cat__medicine_category_Anthelmintic",
-    "cat__medicine_category_Anti-inflammatory",
-    "cat__medicine_category_Antibiotic",
-    "cat__medicine_category_Antihistamine",
-    "cat__medicine_category_Cardiovascular",
-    "cat__medicine_category_Diabetes",
-    "cat__medicine_category_Endocrine",
-    "cat__medicine_category_Gastrointestinal",
-    "cat__medicine_category_Respiratory",
-    "cat__medicine_category_Supplement",
-    "cat__organization_group_Central",
-    "cat__organization_group_East",
-    "cat__organization_group_North",
-    "cat__organization_group_South",
-    "cat__organization_group_West",
-    "cat__medicine_name_Albendazole 400mg",
-    "cat__medicine_name_Amlodipine 5mg",
-    "cat__medicine_name_Amoxicillin 250mg",
-    "cat__medicine_name_Atorvastatin 20mg",
-    "cat__medicine_name_Azithromycin 250mg",
-    "cat__medicine_name_Cetrizine 10mg",
-    "cat__medicine_name_Cough Syrup",
-    "cat__medicine_name_Fexofenadine 180mg",
-    "cat__medicine_name_Ibuprofen 400mg",
-    "cat__medicine_name_Insulin Glargine",
-    "cat__medicine_name_Levothyroxine 50mcg",
-    "cat__medicine_name_Losartan 50mg",
-    "cat__medicine_name_Metformin 500mg",
-    "cat__medicine_name_Multivitamin Complex",
-    "cat__medicine_name_Omeprazole 20mg",
-    "cat__medicine_name_Paracetamol 500mg",
-    "cat__medicine_name_Prednisolone 5mg",
-    "cat__medicine_name_Ranitidine 150mg",
-    "cat__medicine_name_Salbutamol Inhaler",
-    "cat__medicine_name_Vitamin D3",
-    "num__day_of_week",
-    "num__month",
-    "num__week_of_year",
-    "num__is_weekend",
-    "num__lag_1",
-    "num__lag_7",
-    "num__lag_14",
-    "num__lag_30",
-    "num__rolling_mean_7",
-    "num__rolling_mean_14",
-    "num__rolling_mean_30",
-    "num__is_stockout_censored",
-    "num__available_units_at_start",
-    "num__expiry_units_at_start",
-    "num__supplier_lead_days"
+    "day_of_week",
+    "month",
+    "week_of_year",
+    "is_weekend",
+    "lag_1",
+    "lag_7",
+    "lag_14",
+    "lag_30",
+    "rolling_mean_7",
+    "rolling_mean_14",
+    "rolling_mean_30"
   ],
   "notes": [
     "Operational data is preferred for production evaluation; a synthetic fallback is used only when operational history is insufficient.",

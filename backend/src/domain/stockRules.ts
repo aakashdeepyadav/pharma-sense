@@ -13,5 +13,17 @@ export function canApplyStockDelta(currentQuantity: number, delta: number) {
 }
 
 export function isBatchExpired(expiryDate: Date, now = new Date()) {
-  return expiryDate.getTime() <= now.getTime();
+  const expiryDay = Date.UTC(expiryDate.getUTCFullYear(), expiryDate.getUTCMonth(), expiryDate.getUTCDate());
+  const currentDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return expiryDay < currentDay;
+}
+
+export function availableStock(
+  batches: Array<{ quantity: number; expiryDate: Date }>,
+  now = new Date(),
+) {
+  return batches.reduce(
+    (total, batch) => total + (isBatchExpired(batch.expiryDate, now) ? 0 : batch.quantity),
+    0,
+  );
 }

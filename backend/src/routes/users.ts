@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcrypt';
+import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthenticatedRequest, requireRoles } from '../auth';
@@ -11,6 +12,7 @@ const safeUserSelect = {
   name: true,
   email: true,
   active: true,
+  mfaEnabled: true,
   role: { select: { id: true, name: true } },
 } as const;
 
@@ -34,6 +36,7 @@ router.get('/', requireRoles('Admin'), async (_req: AuthenticatedRequest, res: R
         name: true,
         email: true,
         active: true,
+        mfaEnabled: true,
         role: { select: { id: true, name: true } },
       },
       orderBy: { name: 'asc' },
@@ -208,6 +211,57 @@ router.post('/:id/reset-password', requireRoles('Admin'), async (req: Authentica
         },
       });
       return updatedUser;
+    });
+    res.json({ success: true, data: user });
+  } catch {
+    res.status(404).json({ success: false, error: 'User not found' });
+  }
+});
+
+router.post('/:id/reset-mfa', requireRoles('Admin'), async (req: AuthenticatedRequest, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    res.status(400).json({ success: false, error: 'User id must be a positive integer' });
+    return;
+  }
+  if (id === req.user!.id) {
+    res.status(409).json({ success: false, error: 'Use an MFA recovery code to regain access to your own account' });
+    return;
+  }
+
+  const input = z.object({ currentPassword: z.string().min(12).max(100) }).safeParse(req.body);
+  if (!input.success) {
+    res.status(400).json({ success: false, error: 'Enter your password to confirm the MFA reset' });
+    return;
+  }
+
+  try {
+    const administrator = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { passwordHash: true } });
+    if (!administrator || !(await bcrypt.compare(input.data.currentPassword, administrator.passwordHash))) {
+      res.status(401).json({ success: false, error: 'Administrator password is incorrect' });
+      return;
+    }
+    const user = await prisma.$transaction(async (database) => {
+      const updated = await database.user.update({
+        where: { id },
+        data: {
+          mfaEnabled: false,
+          mfaSecretEncrypted: null,
+          mfaRecoveryCodes: null,
+          mfaLastUsedStep: null,
+          sessionVersion: { increment: 1 },
+        },
+        select: safeUserSelect,
+      });
+      await database.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: 'USER_MFA_RESET',
+          entity: 'User',
+          entityId: updated.id,
+        },
+      });
+      return updated;
     });
     res.json({ success: true, data: user });
   } catch {

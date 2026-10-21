@@ -2,23 +2,47 @@
 
 ## Verified status
 
-The project has passed the current release-quality gate based on fresh validation in the workspace.
+The replenishment review workflow is implemented, including persistent review
+status, reviewer attribution, and atomic audit logging. Verification recorded
+on 2026-10-21 passed against the configured local PostgreSQL database:
 
-- Backend validation: 30 tests passed, 0 failed
-- Dataset readiness: `production_ready = true`
-- Operational dataset size: 20,080 rows
-- Medicines covered: 20
-- Unique days covered: 1,004
-- Date range: 2024-01-01 to 2026-09-30
-- Forecast quality: MAE 0.6574, RMSE 1.1551
+- Backend TypeScript build: passed
+- Backend test suite: 46 passed, including MFA unit, enrollment, recovery, and admin reset integration coverage
+- Frontend production build: passed
+- Frontend lint: passed
+- Mocked Playwright browser suite: 15 passed, including MFA enrollment and verification
+- MFA migration and API flow passed against a disposable PostgreSQL schema; the schema was removed after the run
+- Database quality: passed, 0 errors and 0 warnings after correcting the demo seed's expired batch
+- Stock reconciliation: 0 discrepancies and 0 unsupported movements
+- Both database checks reported `modifiedData: false`
+- Live browser workflow against an isolated disposable PostgreSQL database:
+  passed (1 workflow, 2.4 minutes); the temporary database was removed
+- Backend and frontend production dependency audits: 0 vulnerabilities
+- Read-only live local browser smoke: administrator sign-in and dashboard load
+  passed; all API requests succeeded, no browser console warnings occurred, and
+  all 290 stock transaction rows had unique IDs across pages
+- Paginated API collections use stable secondary ID ordering to prevent records
+  from repeating or disappearing when primary sort values tie
 
 ## Conclusion
 
-The system is ready for the next operational phase as a production-style pilot with human review controls in place. The current forecast is evidence for decision support, not autonomous inventory action.
+The system is **not signed off for production deployment**. Local database,
+automated checks, and the disposable-database live workflow pass. A Render
+Blueprint requires MFA for all operational roles, with encrypted authenticator
+secrets and one-time recovery codes implemented in the application. No hosted
+deployment, deployed MFA recovery rehearsal, backup/restore rehearsal, or
+rollback evidence exists yet. Forecast and replenishment outputs remain
+advisory and must not trigger autonomous inventory action. The current
+forecasting artifact is trained and evaluated on the expanded operational
+dataset, but it is not production-approved: the dataset has no
+stockout-censored rows, and governance, privacy, business, and deployment
+sign-off are still required.
 
 ## Release rules
 
-1. Keep the current operational dataset as the approved baseline for future comparisons.
+1. Preserve the current operational dataset and model as review candidates for
+   future comparisons; do not call them approved production baselines until
+   governance sign-off is recorded.
 2. Treat forecasting as advisory and human-reviewed.
 3. Require a reviewer decision before any operational action is taken from forecast output.
 4. Record every recommendation, review action, and override in the audit trail.
@@ -26,10 +50,14 @@ The system is ready for the next operational phase as a production-style pilot w
 
 ## Required next actions
 
-- Freeze the approved operational dataset and model baseline.
+- Freeze the operational dataset and model baseline only after data-governance
+  approval.
+- Complete a deployment rehearsal against the selected target environment.
+- Verify MFA enrollment, recovery codes, and administrator recovery for operational accounts before use.
 - Review the forecast risk and replenishment recommendation workflow.
 - Verify audit logging for every recommendation decision.
-- Confirm that no stock movement is triggered without a signed review.
+- Confirm that no stock movement is triggered automatically from a review decision.
+- Assign production hosting, backup, secret, and rollback owners.
 - Use the project checklists in this repository for deployment and release sign-off.
 
 ## Commands for final verification

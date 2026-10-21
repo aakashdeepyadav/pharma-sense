@@ -42,33 +42,37 @@ The system is designed around controlled usage and clear accountability:
 
 ## Verified evidence
 
-The project has passed the latest validation checks as executed locally:
+Local verification recorded on 2026-10-21 passed:
 
-- backend tests: 30 passed, 0 failed
-- stock reconciliation: 0 discrepancies
-- database quality: PASS_WITH_WARNINGS only
-- research validation: passed
-- operational readiness gate: production-ready data path passed
-- forecasting model on operational demand data:
-  - MAE: 1.3775
-  - RMSE: 2.0038
-- frontend production build: succeeded
+- backend build, Prisma schema validation, and all 46 backend tests
+- frontend lint, production build, and all 15 mocked browser tests
+- MFA enrollment, TOTP replay protection, one-time recovery, and migration integration against a disposable PostgreSQL schema
+- one live browser workflow against an isolated disposable PostgreSQL database
+- database quality with 0 errors or warnings and stock reconciliation with 0 discrepancies
+- local browser dashboard smoke and zero high-severity production dependency audit findings
+- Render Blueprint YAML syntax parsing
+
+The Render CLI schema validator and an actual Render account deployment have
+not been run. Forecasting remains research/advisory; synthetic-data metrics are
+not evidence of production forecasting performance.
 
 ## Operational risk position
 
-The current implementation is appropriate for a controlled operational rollout under the following conditions:
+The current implementation is prepared for a controlled Render pilot. Before
+operational inventory use, the following gates remain:
 
-- controlled deployment environment
-- managed database and backup plan
-- secret management and restricted networking
-- role approval and release ownership
-- release rehearsal and rollback procedure
+- deploy the Blueprint and verify service health and database privacy
+- verify MFA enrollment and recovery for every operational account on the deployed target
+- configure monitoring and rehearse backup restoration
+- assign role approval and release ownership
+- complete release and rollback rehearsal
 
 This remains an advisory platform, not an autonomous replenishment engine.
 
 ## Executive recommendation
 
-Approve the project to proceed to controlled deployment and team handoff, with the following design policy:
+Proceed with a controlled pilot deployment, subject to the open production
+gates, with the following design policy:
 
 - keep forecasting advisory and auditable
 - require human sign-off before any replenishment action is executed
@@ -77,4 +81,7 @@ Approve the project to proceed to controlled deployment and team handoff, with t
 
 ## Decision statement
 
-The system is ready for controlled operational deployment under governance safeguards and human review. It is not yet a fully autonomous procurement system and must remain so until the business approves broader operational policy and release controls.
+The codebase and Render deployment configuration are ready for a controlled
+pilot. Production operational use is not approved until deployed MFA recovery, backup/restore,
+monitoring, and release sign-off are verified. Forecasting remains advisory;
+the system does not automate procurement.

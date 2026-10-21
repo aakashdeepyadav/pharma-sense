@@ -15,6 +15,7 @@ import purchaseRoutes from './routes/purchases';
 import userRoutes from './routes/users';
 import prisma from './lib/prisma';
 import { requireAuth, validateJwtSecret } from './auth';
+import { validateMfaEncryptionKey } from './mfa';
 
 dotenv.config();
 validateJwtSecret();
@@ -32,19 +33,33 @@ function validateRuntimeConfiguration() {
   if (!process.env.FRONTEND_URLS && !process.env.FRONTEND_URL) {
     throw new Error('Production FRONTEND_URLS or FRONTEND_URL is required');
   }
+  if (process.env.REQUIRE_PRIVILEGED_MFA !== 'true') {
+    throw new Error('Production REQUIRE_PRIVILEGED_MFA must be true');
+  }
+  validateMfaEncryptionKey();
 }
 
 validateRuntimeConfiguration();
 
 export const app = express();
 const port = process.env.PORT || 5000;
-const trustProxy = process.env.TRUST_PROXY === 'true';
+const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 0);
+if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 5) {
+  throw new Error('TRUST_PROXY_HOPS must be an integer between 0 and 5');
+}
 const allowedOrigins = (
   process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? 'http://localhost:5173'
 )
   .split(',')
   .map((origin) => origin.trim())
-  .filter(Boolean);
+  .filter(Boolean)
+  .map((origin) => {
+    try {
+      return new URL(origin.includes('://') ? origin : `https://${origin}`).origin;
+    } catch {
+      throw new Error('FRONTEND_URLS must contain valid origins or hostnames');
+    }
+  });
 function positiveIntegerSetting(name: string, fallback: number) {
   const value = Number(process.env[name]);
   return Number.isInteger(value) && value > 0 ? value : fallback;
@@ -55,7 +70,7 @@ const RATE_LIMIT_MAX_REQUESTS = positiveIntegerSetting('RATE_LIMIT_MAX_REQUESTS'
 const requestCounts = new Map<string, { count: number; windowStart: number }>();
 
 app.disable('x-powered-by');
-app.set('trust proxy', trustProxy);
+app.set('trust proxy', trustProxyHops);
 app.use((_req, res, next) => {
   res.setHeader('X-Request-Id', crypto.randomUUID());
   next();
@@ -76,13 +91,7 @@ app.use(cors({
   },
 }));
 app.use((req, res, next) => {
-  const forwarded = req.headers['x-forwarded-for'];
-  const clientKey = trustProxy && Array.isArray(forwarded)
-    ? forwarded[0]
-    : trustProxy && typeof forwarded === 'string'
-      ? forwarded.split(',')[0].trim()
-      : req.socket.remoteAddress ?? 'unknown';
-  const rateLimitKey = `${clientKey}:${req.path}`;
+  const rateLimitKey = `${req.ip ?? req.socket.remoteAddress ?? 'unknown'}:${req.path}`;
 
   const now = Date.now();
   const currentWindow = requestCounts.get(rateLimitKey) ?? { count: 0, windowStart: now };

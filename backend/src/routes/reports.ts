@@ -1,11 +1,13 @@
 import { Router, Response } from 'express';
 import prisma from '../lib/prisma';
 import { AuthenticatedRequest, requireRoles } from '../auth';
-import { demandHistoryQuerySchema } from '../validation/schemas';
+import { demandHistoryQuerySchema, forecastMlPredictionQuerySchema } from '../validation/schemas';
 import { forecastQuerySchema } from '../validation/schemas';
 import { replenishmentDecisionSchema, replenishmentQuerySchema } from '../validation/schemas';
 import { assessDemandDrift, assessDemandRisk, assessForecastQuality, assessForecastReadiness, movingAverageForecast, movingAverageMae } from '../domain/forecasting';
+import { buildLightGbmFeatures, loadLightGbmArtifact, predictLightGbm } from '../domain/lightgbm';
 import { calculateReplenishment } from '../domain/replenishment';
+import { availableStock } from '../domain/stockRules';
 import { sendApiError } from '../lib/api';
 
 const router = Router();
@@ -19,11 +21,11 @@ router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
           id: true,
           genericName: true,
           reorderLevel: true,
-          batches: { select: { quantity: true } },
+          batches: { select: { quantity: true, expiryDate: true } },
         },
       }),
       prisma.supplier.count(),
-      prisma.batch.findMany({ select: { quantity: true, purchasePrice: true } }),
+      prisma.batch.findMany({ select: { quantity: true, purchasePrice: true, expiryDate: true } }),
       prisma.stockTransaction.findMany({
         where: { type: 'OUT' },
         select: { quantity: true, timestamp: true, batch: { select: { medicineId: true } } },
@@ -59,7 +61,7 @@ router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
         currentDate = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth(), currentDate.getUTCDate() + 1));
       }
 
-      const currentStock = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
+      const currentStock = availableStock(medicine.batches, to);
       const risk = assessDemandRisk(values, currentStock, medicine.reorderLevel, 7);
       const quality = assessForecastQuality(
         values.slice(7),
@@ -102,7 +104,7 @@ router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
         medicineCount: medicines.length,
         supplierCount: suppliers,
         batchCount: batches.length,
-        totalUnits: batches.reduce((total, batch) => total + batch.quantity, 0),
+        totalUnits: availableStock(batches, to),
         inventoryCost: batches.reduce((total, batch) => total + batch.quantity * Number(batch.purchasePrice), 0),
         issuedUnits: transactions.reduce((total, transaction) => total + transaction.quantity, 0),
         forecastWatchCount: monitoringExposure.filter(
@@ -183,7 +185,7 @@ router.get('/forecast-risk', async (_req: AuthenticatedRequest, res: Response) =
           id: true,
           genericName: true,
           reorderLevel: true,
-          batches: { select: { quantity: true } },
+          batches: { select: { quantity: true, expiryDate: true } },
         },
         orderBy: { genericName: 'asc' },
       }),
@@ -221,7 +223,7 @@ router.get('/forecast-risk', async (_req: AuthenticatedRequest, res: Response) =
         workingDate.setUTCDate(workingDate.getUTCDate() + 1);
       }
 
-      const currentStock = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
+      const currentStock = availableStock(medicine.batches, to);
       const risk = assessDemandRisk(values, currentStock, medicine.reorderLevel, 7);
       const actualValues = values.slice(7);
       const predictions = actualValues.map((_, index) => {
@@ -333,6 +335,162 @@ router.get('/forecast-baseline', async (req: AuthenticatedRequest, res: Response
   }
 });
 
+router.get('/forecast-ml', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const candidateDirs = [
+      path.resolve(process.cwd(), 'ml-artifacts'),
+      path.resolve(process.cwd(), '../research/results'),
+      path.resolve(process.cwd(), 'research/results'),
+      path.resolve(__dirname, '../../../research/results'),
+    ];
+
+    let metrics: unknown = null;
+    let replenishmentExample: unknown = null;
+
+    for (const dir of candidateDirs) {
+      const metricsFile = path.join(dir, 'lightgbm_forecast_metrics.json');
+      const exampleFile = path.join(dir, 'lightgbm_replenishment_example.json');
+      try {
+        const raw = await fs.readFile(metricsFile, 'utf8');
+        metrics = JSON.parse(raw);
+        try {
+          const rawExample = await fs.readFile(exampleFile, 'utf8');
+          replenishmentExample = JSON.parse(rawExample);
+        } catch {
+          replenishmentExample = null;
+        }
+        break;
+      } catch {
+        // try next candidate directory
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        available: metrics !== null,
+        metrics,
+        replenishmentExample,
+      },
+    });
+  } catch {
+    sendApiError(res, 500, 'GET_FORECAST_ML_FAILED', 'Failed to retrieve ML forecast insights');
+  }
+});
+
+router.get('/forecast-ml/predictions', async (req: AuthenticatedRequest, res: Response) => {
+  const query = forecastMlPredictionQuerySchema.safeParse(req.query);
+  if (!query.success) {
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', query.error.issues);
+    return;
+  }
+
+  try {
+    let model: Awaited<ReturnType<typeof loadLightGbmArtifact>>;
+    try {
+      model = await loadLightGbmArtifact();
+    } catch {
+      sendApiError(res, 503, 'FORECAST_MODEL_UNAVAILABLE', 'The LightGBM inference artifact is not installed');
+      return;
+    }
+
+    const medicines = await prisma.medicine.findMany({
+      where: query.data.medicineId ? { id: query.data.medicineId, active: true } : { active: true },
+      select: { id: true, genericName: true },
+      orderBy: { genericName: 'asc' },
+    });
+    if (query.data.medicineId && medicines.length === 0) {
+      sendApiError(res, 404, 'MEDICINE_NOT_FOUND', 'Active medicine not found');
+      return;
+    }
+
+    const today = new Date();
+    const forecastDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const historyStart = new Date(forecastDate);
+    historyStart.setUTCDate(historyStart.getUTCDate() - 30);
+    const medicineIds = medicines.map((medicine) => medicine.id);
+    const transactions = medicineIds.length === 0
+      ? []
+      : await prisma.stockTransaction.findMany({
+          where: {
+            type: 'OUT',
+            timestamp: { gte: historyStart, lt: forecastDate },
+            batch: { medicineId: { in: medicineIds } },
+          },
+          select: {
+            quantity: true,
+            timestamp: true,
+            batch: { select: { medicineId: true } },
+          },
+          orderBy: { timestamp: 'asc' },
+        });
+
+    const demandByMedicine = new Map<number, number[]>(medicineIds.map((id) => [id, Array(30).fill(0)]));
+    const firstDemandDay = new Map<number, number>();
+    const activeDemandDays = new Map<number, Set<number>>();
+    for (const transaction of transactions) {
+      const dayIndex = Math.floor((Date.UTC(
+        transaction.timestamp.getUTCFullYear(),
+        transaction.timestamp.getUTCMonth(),
+        transaction.timestamp.getUTCDate(),
+      ) - historyStart.getTime()) / (24 * 60 * 60 * 1000));
+      if (dayIndex < 0 || dayIndex >= 30) continue;
+      const medicineId = transaction.batch.medicineId;
+      const dailyValues = demandByMedicine.get(medicineId);
+      if (!dailyValues) continue;
+      dailyValues[dayIndex] += transaction.quantity;
+      firstDemandDay.set(medicineId, Math.min(firstDemandDay.get(medicineId) ?? dayIndex, dayIndex));
+      const activeDays = activeDemandDays.get(medicineId) ?? new Set<number>();
+      activeDays.add(dayIndex);
+      activeDemandDays.set(medicineId, activeDays);
+    }
+
+    const forecasts = medicines.map((medicine) => {
+      const dailyDemand = demandByMedicine.get(medicine.id) ?? Array(30).fill(0);
+      const firstDay = firstDemandDay.get(medicine.id);
+      const historyDays = firstDay === undefined ? 0 : 30 - firstDay;
+      const demandDays = activeDemandDays.get(medicine.id)?.size ?? 0;
+      if (historyDays < 30 || demandDays === 0) {
+        return {
+          medicineId: medicine.id,
+          medicineName: medicine.genericName,
+          forecastDate: forecastDate.toISOString().slice(0, 10),
+          predictedQuantity: null,
+          status: 'INSUFFICIENT_HISTORY' as const,
+          historyDays,
+          demandDays,
+        };
+      }
+
+      const features = buildLightGbmFeatures(dailyDemand, forecastDate);
+      return {
+        medicineId: medicine.id,
+        medicineName: medicine.genericName,
+        forecastDate: forecastDate.toISOString().slice(0, 10),
+        predictedQuantity: Number(predictLightGbm(model, features).toFixed(2)),
+        status: 'READY' as const,
+        historyDays,
+        demandDays,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        model: model.model,
+        trainingDataSource: model.training_data_source,
+        trainedAt: model.trained_at,
+        inferenceDataSource: 'recent_stock_out_transactions',
+        forecasts,
+      },
+    });
+  } catch {
+    sendApiError(res, 500, 'CALCULATE_ML_FORECAST_FAILED', 'Failed to calculate LightGBM forecasts');
+  }
+});
+
 router.get('/replenishment', async (req: AuthenticatedRequest, res: Response) => {
   const result = replenishmentQuerySchema.safeParse(req.query);
   if (!result.success) {
@@ -350,7 +508,7 @@ router.get('/replenishment', async (req: AuthenticatedRequest, res: Response) =>
           id: true,
           genericName: true,
           reorderLevel: true,
-          batches: { select: { quantity: true } },
+          batches: { select: { quantity: true, expiryDate: true } },
         },
         orderBy: { genericName: 'asc' },
       }),
@@ -368,14 +526,35 @@ router.get('/replenishment', async (req: AuthenticatedRequest, res: Response) =>
       );
     }
 
+    const reviews = await prisma.replenishmentReview.findMany({
+      where: { medicineId: { in: medicines.map((medicine) => medicine.id) } },
+      select: {
+        medicineId: true,
+        decision: true,
+        notes: true,
+        reviewedAt: true,
+        reviewer: { select: { id: true, name: true } },
+      },
+    });
+    const reviewsByMedicine = new Map(reviews.map((review) => [review.medicineId, review]));
+
     const recommendations = medicines.map((medicine) => {
-      const currentUnits = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
+      const currentUnits = availableStock(medicine.batches, to);
       const averageDailyDemand = (issuedByMedicine.get(medicine.id) ?? 0) / result.data.window;
+      const review = reviewsByMedicine.get(medicine.id);
       return {
         medicineId: medicine.id,
         medicineName: medicine.genericName,
         ...calculateReplenishment(currentUnits, medicine.reorderLevel, averageDailyDemand, result.data.targetDays),
         explanation: 'Read-only estimate using completed OUT transactions and the medicine reorder level.',
+        review: review
+          ? {
+              decision: review.decision,
+              notes: review.notes,
+              reviewedAt: review.reviewedAt,
+              reviewer: review.reviewer,
+            }
+          : null,
       };
     });
 
@@ -408,14 +587,37 @@ router.post('/replenishment/decision', requireRoles('Admin', 'Pharmacist', 'Inve
     }
 
     const summary = `${result.data.decision === 'APPROVED' ? 'Approved' : 'Dismissed'} replenishment review for ${medicine.genericName}`;
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.id,
-        action: 'REPLENISHMENT_DECISION',
-        entity: 'Medicine',
-        entityId: medicine.id,
-        details: `${summary}${result.data.notes ? `: ${result.data.notes}` : ''}`,
-      },
+    const review = await prisma.$transaction(async (transaction) => {
+      const savedReview = await transaction.replenishmentReview.upsert({
+        where: { medicineId: medicine.id },
+        create: {
+          medicineId: medicine.id,
+          reviewerId: req.user!.id,
+          decision: result.data.decision,
+          notes: result.data.notes,
+        },
+        update: {
+          reviewerId: req.user!.id,
+          decision: result.data.decision,
+          notes: result.data.notes,
+        },
+        select: {
+          decision: true,
+          notes: true,
+          reviewedAt: true,
+          reviewer: { select: { id: true, name: true } },
+        },
+      });
+      await transaction.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: 'REPLENISHMENT_DECISION',
+          entity: 'Medicine',
+          entityId: medicine.id,
+          details: `${summary}${result.data.notes ? `: ${result.data.notes}` : ''}`,
+        },
+      });
+      return savedReview;
     });
 
     res.json({
@@ -423,8 +625,7 @@ router.post('/replenishment/decision', requireRoles('Admin', 'Pharmacist', 'Inve
       data: {
         medicineId: medicine.id,
         medicineName: medicine.genericName,
-        decision: result.data.decision,
-        notes: result.data.notes ?? null,
+        review,
       },
     });
   } catch {

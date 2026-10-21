@@ -1,11 +1,10 @@
 import {
   type FormEvent,
-  useCallback,
   useEffect,
   useRef,
   useState,
 } from "react";
-import { apiFetch } from "./api";
+import { apiFetch, fetchAllPages, readAllPages } from "./api";
 import "./App.css";
 
 type Medicine = {
@@ -19,7 +18,7 @@ type Medicine = {
   active: boolean;
   unit: string;
   reorderLevel: number;
-  batches: { quantity: number }[];
+  batches: { quantity: number; expiryDate: string }[];
 };
 
 type Category = { id: number; name: string; description: string | null };
@@ -107,6 +106,12 @@ type ReplenishmentRecommendation = {
   recommendedUnits: number;
   status: "REPLENISH" | "NO_ACTION";
   explanation: string;
+  review?: {
+    decision: Exclude<ReplenishmentDecision, "PENDING">;
+    notes: string | null;
+    reviewedAt: string;
+    reviewer: { id: number; name: string };
+  } | null;
 };
 
 type ReplenishmentDecision = "PENDING" | "APPROVED" | "DISMISSED";
@@ -147,6 +152,48 @@ type ForecastBaseline = {
   };
 };
 
+type ForecastMlData = {
+  available: boolean;
+  metrics?: {
+    model: string;
+    dataset: string;
+    data_source: string;
+    metrics: {
+      mae: number;
+      rmse: number;
+      baseline_naive_mae: number;
+      train_rows: number;
+      test_rows: number;
+      top_feature_importance: { feature: string; importance: number }[];
+    };
+    feature_names: string[];
+    notes: string[];
+  } | null;
+  replenishmentExample?: {
+    status: string;
+    recommended_units: number;
+    projected_need: number;
+    target_cover: number;
+    current_stock: number;
+  } | null;
+};
+
+type LightGbmPrediction = {
+  model: string;
+  trainingDataSource: "synthetic" | "operational";
+  trainedAt: string;
+  inferenceDataSource: string;
+  forecasts: {
+    medicineId: number;
+    medicineName: string;
+    forecastDate: string;
+    predictedQuantity: number | null;
+    status: "READY" | "INSUFFICIENT_HISTORY";
+    historyDays: number;
+    demandDays: number;
+  }[];
+};
+
 type AuditLog = {
   id: number;
   action: string;
@@ -162,6 +209,7 @@ type ManagedUser = {
   name: string;
   email: string;
   active: boolean;
+  mfaEnabled: boolean;
   role: { id: number; name: string };
 };
 
@@ -219,9 +267,25 @@ type BatchForm = {
   sellingPrice: string;
 };
 
-type PurchaseForm = BatchForm & {
+type PurchaseLineForm = Omit<BatchForm, "supplierId">;
+
+type PurchaseForm = {
+  supplierId: string;
+  items: PurchaseLineForm[];
   notes: string;
 };
+
+function emptyPurchaseLine(medicineId = ""): PurchaseLineForm {
+  return {
+    medicineId,
+    batchNumber: "",
+    mfgDate: "",
+    expiryDate: "",
+    quantity: "1",
+    purchasePrice: "0",
+    sellingPrice: "0",
+  };
+}
 
 type StockForm = {
   batchId: string;
@@ -230,21 +294,32 @@ type StockForm = {
   notes: string;
 };
 
-type ApiResponse = {
-  success: boolean;
-  data: Medicine[];
-};
-
 type Session = {
   token: string;
   user: { id?: number; name: string; email?: string; role: string };
 };
+
+type MfaFlow =
+  | { stage: "verify"; challengeToken: string }
+  | { stage: "setup"; challengeToken: string; secret: string; otpauthUrl: string }
+  | { stage: "recovery"; session: Session; recoveryCodes: string[] };
 
 type ApiErrorPayload = {
   code?: string;
   message?: string;
   details?: unknown[];
 };
+
+function isExpiryDatePast(expiryDate: string, now = new Date()) {
+  return expiryDate.slice(0, 10) < now.toISOString().slice(0, 10);
+}
+
+function availableMedicineUnits(medicine: Medicine, now = new Date()) {
+  return medicine.batches.reduce(
+    (total, batch) => total + (isExpiryDatePast(batch.expiryDate, now) ? 0 : batch.quantity),
+    0,
+  );
+}
 
 function extractErrorMessage(payload: unknown, fallback: string): string {
   if (!payload || typeof payload !== "object") {
@@ -325,31 +400,47 @@ function readStoredSession(): Session | null {
 
 const roleThemeMap: Record<
   string,
-  { tone: string; accent: string; description: string }
+  { tone: string; accent: string; description: string; workspace: string; priorities: string[] }
 > = {
   Admin: {
     tone: "bg-emerald-100 text-emerald-800 border-emerald-200",
     accent: "text-emerald-700",
     description:
       "Full operational control across inventory, purchasing, and reporting.",
+    workspace: "Administration and operational oversight",
+    priorities: ["Approve replenishment reviews", "Manage users and access", "Monitor inventory integrity"],
   },
   Pharmacist: {
     tone: "bg-cyan-100 text-cyan-800 border-cyan-200",
     accent: "text-cyan-700",
     description:
       "Medication and stock management with read-write dispensing controls.",
+    workspace: "Medication and dispensing operations",
+    priorities: ["Maintain medicine records", "Receive stock and purchases", "Review demand risk before issuing"],
   },
   "Inventory Manager": {
     tone: "bg-violet-100 text-violet-800 border-violet-200",
     accent: "text-violet-700",
     description:
       "Vendor, batch, and stock integrity oversight for the supply chain.",
+    workspace: "Supply chain and stock integrity",
+    priorities: ["Manage suppliers and batches", "Receive and reconcile stock", "Review audit history"],
   },
   Staff: {
     tone: "bg-amber-100 text-amber-800 border-amber-200",
     accent: "text-amber-700",
     description:
       "Operational access for daily stock movement and issue monitoring.",
+    workspace: "Daily stock movement",
+    priorities: ["Issue and adjust stock", "Monitor alerts and coverage", "Escalate replenishment needs"],
+  },
+  Management: {
+    tone: "bg-slate-100 text-slate-800 border-slate-200",
+    accent: "text-slate-700",
+    description:
+      "Read-only visibility into inventory health, demand risk, and reviewed recommendations.",
+    workspace: "Management reporting and oversight",
+    priorities: ["Review inventory health", "Monitor demand risk", "Track approved replenishment reviews"],
   },
 };
 
@@ -359,6 +450,9 @@ function App() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
+  const [mfaFlow, setMfaFlow] = useState<MfaFlow | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [recoveryCodesSaved, setRecoveryCodesSaved] = useState(false);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -373,28 +467,14 @@ function App() {
   const [selectedForecastMedicineId, setSelectedForecastMedicineId] = useState<
     number | null
   >(null);
+  const [forecastMl, setForecastMl] = useState<ForecastMlData | null>(null);
+  const [lightGbmPrediction, setLightGbmPrediction] =
+    useState<LightGbmPrediction | null>(null);
   const [replenishment, setReplenishment] = useState<
     ReplenishmentRecommendation[]
   >([]);
-  const [replenishmentDecisions, setReplenishmentDecisions] = useState<
-    Record<number, ReplenishmentDecision>
-  >(() => {
-    try {
-      const storedValue = sessionStorage.getItem(
-        "pharmasense-replenishment-decisions",
-      );
-      if (!storedValue) return {};
-      const parsed = JSON.parse(storedValue) as Record<
-        string,
-        ReplenishmentDecision
-      >;
-      return Object.fromEntries(
-        Object.entries(parsed).map(([key, value]) => [Number(key), value]),
-      );
-    } catch {
-      return {};
-    }
-  });
+  const [savingReplenishmentDecision, setSavingReplenishmentDecision] =
+    useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [auditSearch, setAuditSearch] = useState("");
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
@@ -456,14 +536,8 @@ function App() {
   });
   const [purchaseFormOpen, setPurchaseFormOpen] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState<PurchaseForm>({
-    medicineId: "",
     supplierId: "",
-    batchNumber: "",
-    mfgDate: "",
-    expiryDate: "",
-    quantity: "0",
-    purchasePrice: "0",
-    sellingPrice: "0",
+    items: [emptyPurchaseLine()],
     notes: "",
   });
   const [stockFormOpen, setStockFormOpen] = useState(false);
@@ -498,6 +572,8 @@ function App() {
     tone: "bg-slate-100 text-slate-700 border-slate-200",
     accent: "text-slate-700",
     description: "Operational access across the PharmaSense workspace.",
+    workspace: "Operational workspace",
+    priorities: ["Monitor inventory", "Review alerts", "Escalate issues"],
   };
 
   useEffect(() => {
@@ -521,11 +597,11 @@ function App() {
           replenishmentResponse,
         ] = await Promise.all([
           apiFetch("/api/v1/medicines?pageSize=100", { headers }),
-          apiFetch("/api/v1/categories", { headers }),
-          apiFetch("/api/v1/suppliers", { headers }),
+          apiFetch("/api/v1/categories?pageSize=100", { headers }),
+          apiFetch("/api/v1/suppliers?pageSize=100", { headers }),
           apiFetch("/api/v1/batches?pageSize=100", { headers }),
-          apiFetch("/api/v1/purchases", { headers }),
-          apiFetch("/api/v1/inventory/transactions", {
+          apiFetch("/api/v1/purchases?pageSize=100", { headers }),
+          apiFetch("/api/v1/inventory/transactions?pageSize=100", {
             headers,
           }),
           apiFetch("/api/v1/alerts", { headers }),
@@ -548,36 +624,14 @@ function App() {
           throw new Error("The inventory service returned an error.");
         }
 
-        const medicineResult = (await medicineResponse.json()) as {
-          success?: boolean;
-          data?: Medicine[];
-          error?: string | ApiErrorPayload;
-        };
-        const categoryResult = (await categoryResponse.json()) as {
-          success?: boolean;
-          data?: Category[];
-          error?: string | ApiErrorPayload;
-        };
-        const supplierResult = (await supplierResponse.json()) as {
-          success?: boolean;
-          data?: Supplier[];
-          error?: string | ApiErrorPayload;
-        };
-        const batchResult = (await batchResponse.json()) as {
-          success?: boolean;
-          data?: Batch[];
-          error?: string | ApiErrorPayload;
-        };
-        const purchaseResult = (await purchaseResponse.json()) as {
-          success?: boolean;
-          data?: Purchase[];
-          error?: string | ApiErrorPayload;
-        };
-        const transactionResult = (await transactionResponse.json()) as {
-          success?: boolean;
-          data?: StockTransaction[];
-          error?: string | ApiErrorPayload;
-        };
+        const [allMedicines, allCategories, allSuppliers, allBatches, allPurchases, allTransactions] = await Promise.all([
+          readAllPages<Medicine>(medicineResponse, "/api/v1/medicines", { headers }),
+          readAllPages<Category>(categoryResponse, "/api/v1/categories", { headers }),
+          readAllPages<Supplier>(supplierResponse, "/api/v1/suppliers", { headers }),
+          readAllPages<Batch>(batchResponse, "/api/v1/batches", { headers }),
+          readAllPages<Purchase>(purchaseResponse, "/api/v1/purchases", { headers }),
+          readAllPages<StockTransaction>(transactionResponse, "/api/v1/inventory/transactions", { headers }),
+        ]);
         const alertResult = (await alertResponse.json()) as {
           success?: boolean;
           data?: InventoryAlert[];
@@ -600,12 +654,6 @@ function App() {
         };
 
         if (
-          !medicineResult.success ||
-          !categoryResult.success ||
-          !supplierResult.success ||
-          !batchResult.success ||
-          !purchaseResult.success ||
-          !transactionResult.success ||
           !alertResult.success ||
           !reportResult.success ||
           !forecastRiskResult.success ||
@@ -613,12 +661,6 @@ function App() {
         ) {
           throw new Error(
             extractErrorMessage(
-              medicineResult.error ??
-                categoryResult.error ??
-                supplierResult.error ??
-                batchResult.error ??
-                purchaseResult.error ??
-                transactionResult.error ??
                 alertResult.error ??
                 reportResult.error ??
                 forecastRiskResult.error ??
@@ -628,32 +670,31 @@ function App() {
           );
         }
 
-        setMedicines(medicineResult.data ?? []);
-        setCategories(categoryResult.data ?? []);
-        setSuppliers(supplierResult.data ?? []);
-        setBatches(batchResult.data ?? []);
-        setPurchases(purchaseResult.data ?? []);
-        setTransactions(transactionResult.data ?? []);
+        setMedicines(allMedicines);
+        setCategories(allCategories);
+        setSuppliers(allSuppliers);
+        setBatches(allBatches);
+        setPurchases(allPurchases);
+        setTransactions(allTransactions);
         setAlerts(alertResult.data ?? []);
         setReport(reportResult.data ?? null);
         setForecastRisk(forecastRiskResult.data ?? []);
         setReplenishment(replenishmentResult.data ?? []);
+        void apiFetch("/api/v1/reports/forecast-ml", { headers })
+          .then(async (res) => {
+            if (res.ok) {
+              const mlResult = (await res.json()) as { success?: boolean; data?: ForecastMlData };
+              if (mlResult.success && mlResult.data) {
+                setForecastMl(mlResult.data);
+              }
+            }
+          })
+          .catch(() => {});
         if (
           session.user.role === "Admin" ||
           session.user.role === "Inventory Manager"
         ) {
-          const auditResponse = await apiFetch(
-            "/api/v1/audit-logs?page=1&pageSize=100",
-            {
-              headers,
-            },
-          );
-          if (auditResponse.ok) {
-            const auditResult = (await auditResponse.json()) as {
-              data: AuditLog[];
-            };
-            setAuditLogs(auditResult.data);
-          }
+          setAuditLogs(await fetchAllPages<AuditLog>("/api/v1/audit-logs", { headers }));
         } else {
           setAuditLogs([]);
         }
@@ -693,25 +734,93 @@ function App() {
       });
       const result = (await response.json()) as {
         success?: boolean;
-        data?: Session;
+        data?: Session & {
+          mfaRequired?: boolean;
+          mfaSetupRequired?: boolean;
+          challengeToken?: string;
+        };
         error?: string | ApiErrorPayload;
       };
       if (!response.ok || !result.success || !result.data) {
         throw new Error(extractErrorMessage(result, "Unable to sign in."));
       }
 
-      sessionStorage.setItem(
-        "pharmasense-session",
-        JSON.stringify(result.data),
-      );
-      setLoading(true);
-      setSession(result.data);
+      if (result.data.token) {
+        startAuthenticatedSession(result.data);
+        return;
+      }
+      if (!result.data.challengeToken) {
+        throw new Error("The server returned an incomplete sign-in response.");
+      }
+      if (result.data.mfaSetupRequired) {
+        const setupResponse = await apiFetch("/api/v1/auth/mfa/setup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enrollmentToken: result.data.challengeToken }),
+        });
+        const setup = (await setupResponse.json()) as {
+          success?: boolean;
+          data?: { secret: string; otpauthUrl: string };
+          error?: string | ApiErrorPayload;
+        };
+        if (!setupResponse.ok || !setup.success || !setup.data) {
+          throw new Error(extractErrorMessage(setup, "Unable to start MFA setup."));
+        }
+        setMfaFlow({ stage: "setup", challengeToken: result.data.challengeToken, ...setup.data });
+      } else {
+        setMfaFlow({ stage: "verify", challengeToken: result.data.challengeToken });
+      }
+      setMfaCode("");
+      setLoginError("");
     } catch (requestError) {
       setLoginError(
         requestError instanceof Error
           ? requestError.message
           : "Unable to sign in.",
       );
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const startAuthenticatedSession = (nextSession: Session) => {
+    sessionStorage.setItem("pharmasense-session", JSON.stringify(nextSession));
+    setLoading(true);
+    setMfaFlow(null);
+    setSession(nextSession);
+  };
+
+  const handleMfaSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!mfaFlow || mfaFlow.stage === "recovery") return;
+    setLoggingIn(true);
+    setLoginError("");
+    try {
+      const isSetup = mfaFlow.stage === "setup";
+      const response = await apiFetch(isSetup ? "/api/v1/auth/mfa/confirm" : "/api/v1/auth/mfa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(isSetup
+          ? { enrollmentToken: mfaFlow.challengeToken, code: mfaCode }
+          : { challengeToken: mfaFlow.challengeToken, code: mfaCode }),
+      });
+      const result = (await response.json()) as {
+        success?: boolean;
+        data?: Session & { recoveryCodes?: string[] };
+        error?: string | ApiErrorPayload;
+      };
+      if (!response.ok || !result.success || !result.data?.token) {
+        throw new Error(extractErrorMessage(result, "Unable to verify the authenticator code."));
+      }
+      if (isSetup) {
+        if (!result.data.recoveryCodes?.length) throw new Error("MFA was enabled, but recovery codes were not returned. Sign in again to continue.");
+        setMfaFlow({ stage: "recovery", session: result.data, recoveryCodes: result.data.recoveryCodes });
+      } else {
+        startAuthenticatedSession(result.data);
+      }
+      setMfaCode("");
+    } catch (requestError) {
+      setLoginError(requestError instanceof Error ? requestError.message : "Unable to verify MFA.");
     } finally {
       setLoggingIn(false);
     }
@@ -727,56 +836,15 @@ function App() {
 
     const query = new URLSearchParams({ page: "1", pageSize: "100" });
     if (search.trim()) query.set("search", search.trim());
-    const response = await apiFetch(`/api/v1/audit-logs?${query.toString()}`, {
-      headers: { Authorization: `Bearer ${session.token}` },
-    });
-    if (response.ok) {
-      const result = (await response.json()) as { data: AuditLog[] };
-      setAuditLogs(result.data);
+    try {
+      setAuditLogs(await fetchAllPages<AuditLog>(`/api/v1/audit-logs?${query.toString()}`, {
+        headers: { Authorization: `Bearer ${session.token}` },
+      }));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to load audit history.");
     }
   };
 
-  const loadForecastBaseline = useCallback(
-    async (medicineId: number | null) => {
-      if (!session || !medicineId) {
-        setForecastBaseline(null);
-        return;
-      }
-
-      try {
-        const response = await apiFetch(
-          `/api/v1/reports/forecast-baseline?medicineId=${medicineId}&window=7&horizon=7`,
-          {
-            headers: { Authorization: `Bearer ${session.token}` },
-          },
-        );
-        if (!response.ok) {
-          setForecastBaseline(null);
-          return;
-        }
-        const result = (await response.json()) as {
-          success?: boolean;
-          data?: ForecastBaseline;
-          error?: string | ApiErrorPayload;
-        };
-        const baseline = result.data;
-        if (
-          !result.success ||
-          !baseline ||
-          typeof baseline !== "object" ||
-          !baseline.evaluation ||
-          !Array.isArray(baseline.forecast)
-        ) {
-          setForecastBaseline(null);
-          return;
-        }
-        setForecastBaseline(baseline);
-      } catch {
-        setForecastBaseline(null);
-      }
-    },
-    [session],
-  );
 
   const exportAuditLogs = () => {
     const escapeCsv = (value: string) => `"${value.replaceAll('"', '""')}"`;
@@ -810,13 +878,25 @@ function App() {
 
   const refreshPurchases = async () => {
     if (!session) return;
-    const response = await apiFetch("/api/v1/purchases", {
-      headers: { Authorization: `Bearer ${session.token}` },
-    });
-    if (response.ok) {
-      const result = (await response.json()) as { data: Purchase[] };
-      setPurchases(result.data);
+    try {
+      setPurchases(await fetchAllPages<Purchase>("/api/v1/purchases", {
+        headers: { Authorization: `Bearer ${session.token}` },
+      }));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to load purchases.");
     }
+  };
+
+  const refreshInventoryCollections = async (token: string) => {
+    const headers = { Authorization: `Bearer ${token}` };
+    const [nextMedicines, nextBatches, nextTransactions] = await Promise.all([
+      fetchAllPages<Medicine>("/api/v1/medicines", { headers }),
+      fetchAllPages<Batch>("/api/v1/batches", { headers }),
+      fetchAllPages<StockTransaction>("/api/v1/inventory/transactions", { headers }),
+    ]);
+    setMedicines(nextMedicines);
+    setBatches(nextBatches);
+    setTransactions(nextTransactions);
   };
 
   const openCreateForm = () => {
@@ -895,11 +975,7 @@ function App() {
 
       setFormOpen(false);
       setEditingMedicine(null);
-      const refreshed = await apiFetch("/api/v1/medicines?pageSize=100", {
-        headers: { Authorization: `Bearer ${session.token}` },
-      });
-      const refreshedResult = (await refreshed.json()) as ApiResponse;
-      setMedicines(refreshedResult.data);
+      await refreshInventoryCollections(session.token);
       await refreshAuditLogs();
     } catch (requestError) {
       setFormError(
@@ -1020,6 +1096,32 @@ function App() {
           ? requestError.message
           : "Unable to save user.",
       );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUserMfaReset = async () => {
+    if (!session || !editingUser || editingUser.id === session.user.id) return;
+    if (!window.confirm(`Reset MFA for ${editingUser.name}? They will need to enroll an authenticator again, and their current sessions will end.`)) return;
+    const currentPassword = window.prompt("Enter your password to confirm the MFA reset.");
+    if (!currentPassword) return;
+    setSaving(true);
+    setFormError("");
+    try {
+      const response = await apiFetch(`/api/v1/users/${editingUser.id}/reset-mfa`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.token}` },
+        body: JSON.stringify({ currentPassword }),
+      });
+      const result = (await response.json()) as { success?: boolean; error?: string | ApiErrorPayload };
+      if (!response.ok || !result.success) throw new Error(extractErrorMessage(result, "Unable to reset user MFA."));
+      await refreshUserAdministration();
+      await refreshAuditLogs();
+      setUserFormOpen(false);
+      setEditingUser(null);
+    } catch (requestError) {
+      setFormError(requestError instanceof Error ? requestError.message : "Unable to reset user MFA.");
     } finally {
       setSaving(false);
     }
@@ -1148,17 +1250,54 @@ function App() {
     setBatchFormOpen(true);
   };
 
+  const updatePurchaseItem = (
+    index: number,
+    field: keyof PurchaseLineForm,
+    value: string,
+  ) => {
+    setPurchaseForm((current) => ({
+      ...current,
+      items: current.items.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    }));
+  };
+
   const openCreatePurchaseForm = () => {
     setPurchaseForm({
-      medicineId: medicines[0] ? String(medicines[0].id) : "",
       supplierId: suppliers[0] ? String(suppliers[0].id) : "",
-      batchNumber: "",
-      mfgDate: "",
-      expiryDate: "",
-      quantity: "1",
-      purchasePrice: "0",
-      sellingPrice: "0",
+      items: [emptyPurchaseLine(medicines[0] ? String(medicines[0].id) : "")],
       notes: "",
+    });
+    setFormError("");
+    setPurchaseFormOpen(true);
+  };
+
+  const openPurchaseFormForReplenishment = (
+    item: ReplenishmentRecommendation,
+  ) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const nextYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const existingBatch = batches.find((b) => b.medicineId === item.medicineId);
+
+    setPurchaseForm({
+      supplierId: existingBatch
+        ? String(existingBatch.supplierId)
+        : suppliers[0]
+          ? String(suppliers[0].id)
+          : "",
+      items: [{
+        ...emptyPurchaseLine(String(item.medicineId)),
+        batchNumber: `PO-${item.medicineId}-${Date.now().toString().slice(-6)}`,
+        mfgDate: today,
+        expiryDate: nextYear,
+        quantity: String(Math.max(1, item.recommendedUnits)),
+        purchasePrice: existingBatch ? String(existingBatch.purchasePrice) : "10.00",
+        sellingPrice: existingBatch ? String(existingBatch.sellingPrice) : "15.00",
+      }],
+      notes: `Replenishment order for ${item.medicineName} (${item.recommendedUnits} units approved by ${item.review?.reviewer?.name ?? "reviewer"})`,
     });
     setFormError("");
     setPurchaseFormOpen(true);
@@ -1167,6 +1306,10 @@ function App() {
   const handlePurchaseSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!session) return;
+    const submitter = (event.nativeEvent as SubmitEvent)
+      .submitter as HTMLButtonElement | null;
+    const receiveImmediately = submitter?.value === "receive";
+    let createdPurchaseId: number | null = null;
 
     setSaving(true);
     setFormError("");
@@ -1181,17 +1324,15 @@ function App() {
         body: JSON.stringify({
           supplierId: Number(purchaseForm.supplierId),
           notes: purchaseForm.notes,
-          items: [
-            {
-              medicineId: Number(purchaseForm.medicineId),
-              batchNumber: purchaseForm.batchNumber,
-              mfgDate: purchaseForm.mfgDate,
-              expiryDate: purchaseForm.expiryDate,
-              quantity: Number(purchaseForm.quantity),
-              purchasePrice: Number(purchaseForm.purchasePrice),
-              sellingPrice: Number(purchaseForm.sellingPrice),
-            },
-          ],
+          items: purchaseForm.items.map((item) => ({
+              medicineId: Number(item.medicineId),
+              batchNumber: item.batchNumber,
+              mfgDate: item.mfgDate,
+              expiryDate: item.expiryDate,
+              quantity: Number(item.quantity),
+              purchasePrice: Number(item.purchasePrice),
+              sellingPrice: Number(item.sellingPrice),
+          })),
         }),
       });
       const purchaseResult = (await purchaseResponse.json()) as {
@@ -1207,6 +1348,14 @@ function App() {
         throw new Error(
           extractErrorMessage(purchaseResult, "Unable to create purchase."),
         );
+      }
+      createdPurchaseId = purchaseResult.data.id;
+
+      if (!receiveImmediately) {
+        await refreshPurchases();
+        setPurchaseFormOpen(false);
+        await refreshAuditLogs();
+        return;
       }
 
       const receiveResponse = await apiFetch(
@@ -1224,27 +1373,8 @@ function App() {
       }
 
       const authHeaders = { Authorization: `Bearer ${session.token}` };
-      const [
-        batchResponse,
-        medicineResponse,
-        transactionResponse,
-        alertResponse,
-      ] = await Promise.all([
-        apiFetch("/api/v1/batches?pageSize=100", { headers: authHeaders }),
-        apiFetch("/api/v1/medicines?pageSize=100", {
-          headers: authHeaders,
-        }),
-        apiFetch("/api/v1/inventory/transactions", {
-          headers: authHeaders,
-        }),
-        apiFetch("/api/v1/alerts", { headers: authHeaders }),
-      ]);
-      setBatches(((await batchResponse.json()) as { data: Batch[] }).data);
-      setMedicines(((await medicineResponse.json()) as ApiResponse).data);
-      setTransactions(
-        ((await transactionResponse.json()) as { data: StockTransaction[] })
-          .data,
-      );
+      const alertResponse = await apiFetch("/api/v1/alerts", { headers: authHeaders });
+      await refreshInventoryCollections(session.token);
       setAlerts(
         ((await alertResponse.json()) as { data: InventoryAlert[] }).data,
       );
@@ -1252,11 +1382,17 @@ function App() {
       setPurchaseFormOpen(false);
       await refreshAuditLogs();
     } catch (requestError) {
-      setFormError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to receive purchase.",
-      );
+      const message = requestError instanceof Error
+        ? requestError.message
+        : "Unable to receive purchase.";
+      if (receiveImmediately && createdPurchaseId !== null) {
+        setPurchaseFormOpen(false);
+        await refreshPurchases();
+        await refreshAuditLogs();
+        setError(`${message} Purchase #${createdPurchaseId} remains a draft; receive it from purchase history.`);
+      } else {
+        setFormError(message);
+      }
     } finally {
       setSaving(false);
     }
@@ -1294,15 +1430,7 @@ function App() {
         );
       }
 
-      const headers = { Authorization: `Bearer ${session.token}` };
-      const [batchResponse, medicineResponse] = await Promise.all([
-        apiFetch("/api/v1/batches?pageSize=100", { headers }),
-        apiFetch("/api/v1/medicines?pageSize=100", { headers }),
-      ]);
-      const batchResult = (await batchResponse.json()) as { data: Batch[] };
-      const medicineResult = (await medicineResponse.json()) as ApiResponse;
-      setBatches(batchResult.data);
-      setMedicines(medicineResult.data);
+      await refreshInventoryCollections(session.token);
       setBatchFormOpen(false);
       await refreshAuditLogs();
     } catch (requestError) {
@@ -1356,23 +1484,7 @@ function App() {
         );
       }
 
-      const headers = { Authorization: `Bearer ${session.token}` };
-      const [batchResponse, medicineResponse, transactionResponse] =
-        await Promise.all([
-          apiFetch("/api/v1/batches?pageSize=100", { headers }),
-          apiFetch("/api/v1/medicines?pageSize=100", { headers }),
-          apiFetch("/api/v1/inventory/transactions", {
-            headers,
-          }),
-        ]);
-      const batchResult = (await batchResponse.json()) as { data: Batch[] };
-      const medicineResult = (await medicineResponse.json()) as ApiResponse;
-      const transactionResult = (await transactionResponse.json()) as {
-        data: StockTransaction[];
-      };
-      setBatches(batchResult.data);
-      setMedicines(medicineResult.data);
-      setTransactions(transactionResult.data);
+      await refreshInventoryCollections(session.token);
       setStockFormOpen(false);
       await refreshAuditLogs();
     } catch (requestError) {
@@ -1402,22 +1514,8 @@ function App() {
       return;
     }
 
-    const [
-      batchResponse,
-      medicineResponse,
-      transactionResponse,
-      alertResponse,
-    ] = await Promise.all([
-      apiFetch("/api/v1/batches?pageSize=100", { headers }),
-      apiFetch("/api/v1/medicines?pageSize=100", { headers }),
-      apiFetch("/api/v1/inventory/transactions", { headers }),
-      apiFetch("/api/v1/alerts", { headers }),
-    ]);
-    setBatches(((await batchResponse.json()) as { data: Batch[] }).data);
-    setMedicines(((await medicineResponse.json()) as ApiResponse).data);
-    setTransactions(
-      ((await transactionResponse.json()) as { data: StockTransaction[] }).data,
-    );
+    const alertResponse = await apiFetch("/api/v1/alerts", { headers });
+    await refreshInventoryCollections(session.token);
     setAlerts(
       ((await alertResponse.json()) as { data: InventoryAlert[] }).data,
     );
@@ -1463,6 +1561,8 @@ function App() {
     } finally {
       sessionStorage.removeItem("pharmasense-session");
       setSession(null);
+      setForecastBaseline(null);
+      setForecastMl(null);
     }
   };
 
@@ -1570,42 +1670,119 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    sessionStorage.setItem(
-      "pharmasense-replenishment-decisions",
-      JSON.stringify(replenishmentDecisions),
-    );
-  }, [replenishmentDecisions]);
+  const effectiveForecastMedicineId =
+    medicines.length > 0
+      ? (medicines.some((medicine) => medicine.id === selectedForecastMedicineId)
+          ? selectedForecastMedicineId
+          : medicines[0].id)
+      : null;
+  const selectedLightGbmForecast = lightGbmPrediction?.forecasts?.find(
+    (forecast) => forecast.medicineId === effectiveForecastMedicineId,
+  );
+  const effectiveLightGbmPrediction =
+    session && effectiveForecastMedicineId !== null ? lightGbmPrediction : null;
 
   useEffect(() => {
-    if (!session || medicines.length === 0) {
-      setForecastBaseline(null);
+    if (!session || effectiveForecastMedicineId === null) {
       return;
     }
 
-    const preferredMedicineId = medicines.some(
-      (medicine) => medicine.id === selectedForecastMedicineId,
-    )
-      ? selectedForecastMedicineId
-      : medicines[0].id;
+    let isMounted = true;
+    const fetchBaseline = async () => {
+      try {
+        const response = await apiFetch(
+          `/api/v1/reports/forecast-baseline?medicineId=${effectiveForecastMedicineId}&window=7&horizon=7`,
+          {
+            headers: { Authorization: `Bearer ${session.token}` },
+          },
+        );
+        if (!response.ok) {
+          if (isMounted) setForecastBaseline(null);
+          return;
+        }
+        const result = (await response.json()) as {
+          success?: boolean;
+          data?: ForecastBaseline;
+        };
+        const baseline = result.data;
+        if (
+          !result.success ||
+          !baseline ||
+          typeof baseline !== "object" ||
+          !baseline.evaluation ||
+          !Array.isArray(baseline.forecast)
+        ) {
+          if (isMounted) setForecastBaseline(null);
+          return;
+        }
+        if (isMounted) setForecastBaseline(baseline);
+      } catch {
+        if (isMounted) setForecastBaseline(null);
+      }
+    };
 
-    if (preferredMedicineId !== selectedForecastMedicineId) {
-      setSelectedForecastMedicineId(preferredMedicineId);
+    void fetchBaseline();
+    return () => {
+      isMounted = false;
+    };
+  }, [session, effectiveForecastMedicineId]);
+
+  useEffect(() => {
+    if (!session || effectiveForecastMedicineId === null) {
       return;
     }
 
-    void loadForecastBaseline(preferredMedicineId);
-  }, [session, medicines, selectedForecastMedicineId, loadForecastBaseline]);
+    let isMounted = true;
+    const fetchLightGbmPrediction = async () => {
+      try {
+        const response = await apiFetch(
+          `/api/v1/reports/forecast-ml/predictions?medicineId=${effectiveForecastMedicineId}`,
+          { headers: { Authorization: `Bearer ${session.token}` } },
+        );
+        if (!response.ok) {
+          if (isMounted) setLightGbmPrediction(null);
+          return;
+        }
+        const result = (await response.json()) as {
+          success?: boolean;
+          data?: LightGbmPrediction;
+        };
+        const prediction = result.data;
+        if (isMounted) {
+          setLightGbmPrediction(
+            result.success && prediction && Array.isArray(prediction.forecasts)
+              ? prediction
+              : null,
+          );
+        }
+      } catch {
+        if (isMounted) setLightGbmPrediction(null);
+      }
+    };
+
+    void fetchLightGbmPrediction();
+    return () => {
+      isMounted = false;
+    };
+  }, [session, effectiveForecastMedicineId]);
 
   if (!session) {
     return (
       <main className="auth-shell min-h-screen">
         <div className="auth-card">
           <section className="auth-hero">
-            <div className="auth-brand">PHARMASENSE</div>
+            <div className="auth-brand-row">
+              <div className="auth-mark" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+              <div className="auth-brand">PHARMASENSE</div>
+            </div>
             <h1 className="auth-title mt-6">PharmaSense</h1>
             <p className="auth-description mt-3 max-w-md">
-              Medicine inventory, purchasing, and operational history.
+              A clearer way to manage medicine inventory, purchasing, and
+              operational history.
             </p>
 
             <div className="auth-feature-list mt-8">
@@ -1618,6 +1795,10 @@ function App() {
                 <div key={feature}>{feature}</div>
               ))}
             </div>
+            <div className="auth-hero-footer">
+              <span className="auth-status-dot" aria-hidden="true" />
+              Built for accountable pharmacy operations
+            </div>
           </section>
 
           <section className="auth-form-shell">
@@ -1625,60 +1806,64 @@ function App() {
               <p className="auth-eyebrow">Sign in</p>
               <h2 className="auth-heading mt-2">Welcome back</h2>
               <p className="auth-form-description mt-1">
-                Use your assigned account to continue.
+                Continue to your operational workspace.
               </p>
             </div>
 
-            <form onSubmit={handleLogin}>
-              {loginError && (
-                <p
-                  role="alert"
-                  className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                >
-                  {loginError}
-                </p>
-              )}
+            {loginError && (
+              <p role="alert" className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {loginError}
+              </p>
+            )}
 
-              <label
-                className="block text-sm font-medium text-slate-700"
-                htmlFor="email"
-              >
-                Email address
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="username"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100"
-                  required
-                />
-              </label>
-
-              <label
-                className="block text-sm font-medium text-slate-700"
-                htmlFor="password"
-              >
-                Password
-                <input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100"
-                  required
-                />
-              </label>
-
-              <button
-                type="submit"
-                disabled={loggingIn}
-                className="w-full rounded-xl bg-cyan-700 px-4 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {loggingIn ? "Signing in..." : "Sign in to dashboard"}
-              </button>
-            </form>
+            {mfaFlow?.stage === "recovery" ? (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-slate-900">Save your recovery codes</h3>
+                <p className="text-sm text-slate-600">Each code works once if you lose access to your authenticator. Store these somewhere private; they will not be shown again.</p>
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-4 font-mono text-sm" aria-label="One-time MFA recovery codes">
+                  {mfaFlow.recoveryCodes.map((code) => <span key={code}>{code}</span>)}
+                </div>
+                <label className="flex items-start gap-2 text-sm text-slate-700">
+                  <input type="checkbox" checked={recoveryCodesSaved} onChange={(event) => setRecoveryCodesSaved(event.target.checked)} className="mt-1" />
+                  I saved these recovery codes in a secure place.
+                </label>
+                <button type="button" disabled={!recoveryCodesSaved} onClick={() => startAuthenticatedSession(mfaFlow.session)} className="w-full rounded-xl bg-cyan-700 px-4 py-3 font-semibold text-white disabled:opacity-50">Continue to PharmaSense</button>
+              </div>
+            ) : mfaFlow ? (
+              <form onSubmit={handleMfaSubmit} className="space-y-4">
+                {mfaFlow.stage === "setup" ? (
+                  <>
+                    <h3 className="text-lg font-semibold text-slate-900">Set up an authenticator</h3>
+                    <p className="text-sm text-slate-600">Add this account in an authenticator app using the setup key below, then enter its current six-digit code.</p>
+                    <div className="break-all rounded-xl bg-slate-100 p-3 font-mono text-sm" aria-label="Authenticator setup key">{mfaFlow.secret}</div>
+                    <details className="text-xs text-slate-500"><summary className="cursor-pointer">Manual setup URI</summary><p className="mt-2 break-all">{mfaFlow.otpauthUrl}</p></details>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-semibold text-slate-900">Two-step verification</h3>
+                    <p className="text-sm text-slate-600">Enter the current code from your authenticator app or one of your unused recovery codes.</p>
+                  </>
+                )}
+                <label className="block text-sm font-medium text-slate-700" htmlFor="mfa-code">
+                  {mfaFlow.stage === "setup" ? "Authenticator code" : "Authenticator or recovery code"}
+                  <input id="mfa-code" inputMode={mfaFlow.stage === "setup" ? "numeric" : "text"} autoCapitalize="characters" autoCorrect="off" autoComplete="one-time-code" value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-mono text-slate-900 outline-none focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100" required />
+                </label>
+                <button type="submit" disabled={loggingIn} className="w-full rounded-xl bg-cyan-700 px-4 py-3 font-semibold text-white disabled:opacity-50">{loggingIn ? "Verifying..." : mfaFlow.stage === "setup" ? "Enable MFA" : "Verify and sign in"}</button>
+                <button type="button" onClick={() => { setMfaFlow(null); setMfaCode(""); setLoginError(""); }} className="w-full rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700">Back to sign in</button>
+              </form>
+            ) : (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <label className="block text-sm font-medium text-slate-700" htmlFor="email">
+                  Email address
+                  <input id="email" type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100" required />
+                </label>
+                <label className="block text-sm font-medium text-slate-700" htmlFor="password">
+                  Password
+                  <input id="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100" required />
+                </label>
+                <button type="submit" disabled={loggingIn} className="w-full rounded-xl bg-cyan-700 px-4 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 disabled:cursor-not-allowed disabled:opacity-70">{loggingIn ? "Signing in..." : "Sign in to dashboard"}</button>
+              </form>
+            )}
           </section>
         </div>
       </main>
@@ -1686,11 +1871,7 @@ function App() {
   }
 
   const lowStockCount = medicines.filter((medicine) => {
-    const quantity = medicine.batches.reduce(
-      (total, batch) => total + batch.quantity,
-      0,
-    );
-    return quantity <= medicine.reorderLevel;
+    return availableMedicineUnits(medicine) <= medicine.reorderLevel;
   }).length;
   const queuedRiskCount = forecastRisk.filter(
     (item) => item.riskLevel === "HIGH" || item.riskLevel === "MEDIUM",
@@ -1699,11 +1880,10 @@ function App() {
     (item) => item.status === "REPLENISH",
   );
   const pendingReviewCount = replenishmentQueue.filter(
-    (item) =>
-      (replenishmentDecisions[item.medicineId] ?? "PENDING") === "PENDING",
+    (item) => !item.review,
   ).length;
-  const approvedReviewCount = Object.values(replenishmentDecisions).filter(
-    (decision) => decision === "APPROVED",
+  const approvedReviewCount = replenishmentQueue.filter(
+    (item) => item.review?.decision === "APPROVED",
   ).length;
   const canWriteMedicines = [
     "Admin",
@@ -1726,6 +1906,11 @@ function App() {
     session.user.role,
   );
   const canManageUsers = session.user.role === "Admin";
+  const canReviewReplenishment = [
+    "Admin",
+    "Pharmacist",
+    "Inventory Manager",
+  ].includes(session.user.role);
   const filteredMedicines = medicines.filter((medicine) => {
     const search = medicineSearch.trim().toLowerCase();
     return (
@@ -1743,12 +1928,7 @@ function App() {
     medicineId: number,
     decision: Exclude<ReplenishmentDecision, "PENDING">,
   ) => {
-    const previousDecision = replenishmentDecisions[medicineId] ?? "PENDING";
-    setReplenishmentDecisions((current) => ({
-      ...current,
-      [medicineId]: decision,
-    }));
-
+    setSavingReplenishmentDecision(true);
     try {
       const response = await apiFetch(
         "/api/v1/reports/replenishment/decision",
@@ -1758,18 +1938,19 @@ function App() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.token}`,
           },
-          body: JSON.stringify({
-            medicineId,
-            decision,
-            notes: `${decision === "APPROVED" ? "Approved" : "Dismissed"} by ${session.user.name}`,
-          }),
+          body: JSON.stringify({ medicineId, decision }),
         },
       );
       const result = (await response.json()) as {
         success?: boolean;
+        data?: {
+          medicineId: number;
+          review: NonNullable<ReplenishmentRecommendation["review"]>;
+        };
         error?: string | ApiErrorPayload;
       };
-      if (!response.ok || !result.success) {
+      const savedReview = result.data?.review;
+      if (!response.ok || !result.success || !savedReview) {
         throw new Error(
           extractErrorMessage(
             result.error,
@@ -1777,16 +1958,21 @@ function App() {
           ),
         );
       }
+      setReplenishment((current) =>
+        current.map((item) =>
+          item.medicineId === medicineId
+            ? { ...item, review: savedReview }
+            : item,
+        ),
+      );
     } catch (requestError) {
-      setReplenishmentDecisions((current) => ({
-        ...current,
-        [medicineId]: previousDecision,
-      }));
       setError(
         requestError instanceof Error
           ? requestError.message
           : "Unable to save the replenishment decision.",
       );
+    } finally {
+      setSavingReplenishmentDecision(false);
     }
   };
 
@@ -1931,7 +2117,7 @@ function App() {
           </section>
         )}
 
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+        <div className="dashboard-actions mt-5 flex flex-wrap items-center gap-3">
           {canReceiveStock && (
             <button
               onClick={openCreatePurchaseForm}
@@ -1989,6 +2175,27 @@ function App() {
             </button>
           )}
         </div>
+
+        <section className="role-workspace-panel mt-6" aria-label="Role workspace">
+          <div>
+            <p className="role-workspace-eyebrow">Your workspace</p>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">
+              {roleMeta.workspace}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Your dashboard is organized around the work available to the{" "}
+              {session.user.role.toLowerCase()} role.
+            </p>
+          </div>
+          <ul className="role-priority-list" aria-label={`${session.user.role} priorities`}>
+            {roleMeta.priorities.map((priority) => (
+              <li key={priority}>
+                <span aria-hidden="true">✓</span>
+                {priority}
+              </li>
+            ))}
+          </ul>
+        </section>
       </header>
 
       {stockFormOpen && (
@@ -2076,7 +2283,7 @@ function App() {
         <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
           <form
             onSubmit={handlePurchaseSave}
-            className="w-full max-w-2xl bg-white rounded-xl shadow-xl p-6"
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-xl bg-white p-6 shadow-xl"
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">
@@ -2095,141 +2302,97 @@ function App() {
                 {formError}
               </p>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="text-sm font-medium text-gray-700">
-                Medicine
-                <select
-                  value={purchaseForm.medicineId}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      medicineId: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                >
-                  {medicines.map((medicine) => (
-                    <option key={medicine.id} value={medicine.id}>
-                      {medicine.genericName} ({medicine.brandName})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Supplier
-                <select
-                  value={purchaseForm.supplierId}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      supplierId: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                >
-                  {suppliers.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Batch number
-                <input
-                  value={purchaseForm.batchNumber}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      batchNumber: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Quantity received
-                <input
-                  type="number"
-                  min="1"
-                  value={purchaseForm.quantity}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      quantity: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Manufacturing date
-                <input
-                  type="date"
-                  value={purchaseForm.mfgDate}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      mfgDate: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Expiry date
-                <input
-                  type="date"
-                  value={purchaseForm.expiryDate}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      expiryDate: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Purchase price per unit
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={purchaseForm.purchasePrice}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      purchasePrice: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Selling price per unit
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={purchaseForm.sellingPrice}
-                  onChange={(event) =>
-                    setPurchaseForm({
-                      ...purchaseForm,
-                      sellingPrice: event.target.value,
-                    })
-                  }
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-              </label>
+            <label className="block text-sm font-medium text-gray-700">
+              Supplier
+              <select
+                value={purchaseForm.supplierId}
+                onChange={(event) =>
+                  setPurchaseForm({ ...purchaseForm, supplierId: event.target.value })
+                }
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                required
+              >
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="mt-5 space-y-4">
+              {purchaseForm.items.map((item, index) => (
+                <fieldset key={index} className="rounded-xl border border-gray-200 p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <legend className="font-semibold text-gray-900">Line item {index + 1}</legend>
+                    {purchaseForm.items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setPurchaseForm((current) => ({
+                          ...current,
+                          items: current.items.filter((_, itemIndex) => itemIndex !== index),
+                        }))}
+                        className="text-sm font-medium text-red-700 hover:text-red-900"
+                      >
+                        Remove item
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Medicine
+                      <select
+                        value={item.medicineId}
+                        onChange={(event) => updatePurchaseItem(index, "medicineId", event.target.value)}
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                        required
+                      >
+                        <option value="" disabled>Select medicine</option>
+                        {medicines.map((medicine) => (
+                          <option key={medicine.id} value={medicine.id}>
+                            {medicine.genericName} ({medicine.brandName})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Batch number
+                      <input value={item.batchNumber} onChange={(event) => updatePurchaseItem(index, "batchNumber", event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Quantity received
+                      <input type="number" min="1" value={item.quantity} onChange={(event) => updatePurchaseItem(index, "quantity", event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Manufacturing date
+                      <input type="date" value={item.mfgDate} onChange={(event) => updatePurchaseItem(index, "mfgDate", event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Expiry date
+                      <input type="date" value={item.expiryDate} onChange={(event) => updatePurchaseItem(index, "expiryDate", event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Purchase price per unit
+                      <input type="number" min="0" step="0.01" value={item.purchasePrice} onChange={(event) => updatePurchaseItem(index, "purchasePrice", event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Selling price per unit
+                      <input type="number" min="0" step="0.01" value={item.sellingPrice} onChange={(event) => updatePurchaseItem(index, "sellingPrice", event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+                    </label>
+                  </div>
+                </fieldset>
+              ))}
+              <button
+                type="button"
+                onClick={() => setPurchaseForm((current) => ({
+                  ...current,
+                  items: [...current.items, emptyPurchaseLine(medicines[0] ? String(medicines[0].id) : "")],
+                }))}
+                disabled={purchaseForm.items.length >= 100}
+                className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+              >
+                Add line item
+              </button>
             </div>
             <label className="block text-sm font-medium text-gray-700 mt-4">
               Purchase notes
@@ -2255,6 +2418,15 @@ function App() {
               </button>
               <button
                 type="submit"
+                value="draft"
+                disabled={saving}
+                className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save as draft"}
+              </button>
+              <button
+                type="submit"
+                value="receive"
                 disabled={saving}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
               >
@@ -2551,6 +2723,14 @@ function App() {
                     </span>
                   </span>
                 </label>
+              )}
+              {editingUser && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 text-sm">
+                  <span className="text-slate-700">Authenticator MFA: {editingUser.mfaEnabled ? "enabled" : "not enrolled"}</span>
+                  {editingUser.mfaEnabled && editingUser.id !== session.user.id && (
+                    <button type="button" onClick={() => void handleUserMfaReset()} disabled={saving} className="rounded-lg border border-amber-300 px-3 py-2 font-semibold text-amber-800 disabled:opacity-50">Reset MFA</button>
+                  )}
+                </div>
               )}
               <label className="block text-sm font-medium text-slate-700">
                 {editingUser
@@ -3108,7 +3288,7 @@ function App() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="dashboard-metric-grid grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 font-medium mb-2">
             Total Medicines (SKUs)
@@ -3142,7 +3322,7 @@ function App() {
         </div>
       </div>
 
-      <section className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <section className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">Forecast risk</h2>
           <p className="text-sm text-gray-500 mt-1">
@@ -3221,7 +3401,7 @@ function App() {
         )}
       </section>
 
-      <section className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <section className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">Inventory alerts</h2>
         </div>
@@ -3255,7 +3435,7 @@ function App() {
                   <span className="text-xs font-semibold uppercase text-gray-500">
                     {alert.type.replaceAll("_", " ")}
                   </span>
-                  {alert.status === "OPEN" && (
+                  {alert.status === "OPEN" && session.user.role !== "Management" && (
                     <button
                       onClick={() => void acknowledgeAlert(alert.id)}
                       className="text-blue-600 hover:text-blue-800 font-medium"
@@ -3270,7 +3450,7 @@ function App() {
         )}
       </section>
 
-      <section className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <section className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">
             Replenishment recommendations
@@ -3288,8 +3468,7 @@ function App() {
         ) : (
           <div className="divide-y divide-gray-100">
             {replenishmentQueue.map((item) => {
-              const decision =
-                replenishmentDecisions[item.medicineId] ?? "PENDING";
+              const decision = item.review?.decision ?? "PENDING";
               const decisionTone = {
                 PENDING: "text-slate-600 bg-slate-100 border-slate-200",
                 APPROVED: "text-emerald-700 bg-emerald-50 border-emerald-200",
@@ -3320,33 +3499,52 @@ function App() {
                       <p className="text-xs text-gray-500">units to review</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleReplenishmentDecision(
-                            item.medicineId,
-                            "APPROVED",
-                          )
-                        }
-                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={decision === "APPROVED"}
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleReplenishmentDecision(
-                            item.medicineId,
-                            "DISMISSED",
-                          )
-                        }
-                        className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={decision === "DISMISSED"}
-                      >
-                        Dismiss
-                      </button>
+                      {canReviewReplenishment && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleReplenishmentDecision(
+                                item.medicineId,
+                                "APPROVED",
+                              )
+                            }
+                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={
+                              savingReplenishmentDecision ||
+                              decision === "APPROVED"
+                            }
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleReplenishmentDecision(
+                                item.medicineId,
+                                "DISMISSED",
+                              )
+                            }
+                            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={
+                              savingReplenishmentDecision ||
+                              decision === "DISMISSED"
+                            }
+                          >
+                            Dismiss
+                          </button>
+                        </>
+                      )}
                     </div>
+                    {decision === "APPROVED" && canReceiveStock && (
+                      <button
+                        type="button"
+                        onClick={() => openPurchaseFormForReplenishment(item)}
+                        className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
+                      >
+                        Prepare purchase
+                      </button>
+                    )}
                     <span
                       className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${decisionTone}`}
                     >
@@ -3356,6 +3554,12 @@ function App() {
                           ? "Approved"
                           : "Dismissed"}
                     </span>
+                    {item.review && (
+                          <p className="text-xs text-gray-500">
+                            Reviewed by {item.review.reviewer.name} on{" "}
+                            {new Date(item.review.reviewedAt).toLocaleString()}
+                          </p>
+                    )}
                   </div>
                 </div>
               );
@@ -3438,6 +3642,39 @@ function App() {
             </div>
 
             <div className="mt-6 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-gray-900">Research model evaluation</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Synthetic research data only. These metrics are not production forecasts.
+              </p>
+              {!forecastMl?.available || !forecastMl.metrics ? (
+                <p className="mt-3 text-sm text-gray-500">
+                  No evaluated research model is currently available.
+                </p>
+              ) : (
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-xs text-gray-500">Model / dataset</p>
+                    <p className="mt-1 font-semibold text-gray-900">
+                      {forecastMl.metrics.model} / {forecastMl.metrics.dataset}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-xs text-gray-500">MAE (units)</p>
+                    <p className="mt-1 font-semibold text-gray-900">
+                      {forecastMl.metrics.metrics.mae.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-xs text-gray-500">Naive baseline MAE</p>
+                    <p className="mt-1 font-semibold text-gray-900">
+                      {forecastMl.metrics.metrics.baseline_naive_mae.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h3 className="font-bold text-gray-900">Forecast baseline</h3>
@@ -3448,7 +3685,7 @@ function App() {
                 <label className="text-sm text-gray-600">
                   <span className="sr-only">Select forecast medicine</span>
                   <select
-                    value={selectedForecastMedicineId ?? ""}
+                    value={effectiveForecastMedicineId ?? ""}
                     onChange={(event) =>
                       setSelectedForecastMedicineId(Number(event.target.value))
                     }
@@ -3500,6 +3737,43 @@ function App() {
                           : "Insufficient history"}
                       </p>
                     </div>
+                  </div>
+
+                  <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="font-semibold text-indigo-950">
+                        LightGBM next-day prediction
+                      </h4>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-indigo-800">
+                        {!effectiveLightGbmPrediction
+                          ? "Model unavailable"
+                          : effectiveLightGbmPrediction.trainingDataSource === "synthetic"
+                            ? "Synthetic training data"
+                            : "Operational training data"}
+                      </span>
+                    </div>
+                    {!selectedLightGbmForecast ? (
+                      <p className="mt-2 text-sm text-indigo-900">
+                        The model prediction is unavailable. Check the API model artifact and try again.
+                      </p>
+                    ) : selectedLightGbmForecast.status === "READY" ? (
+                      <p className="mt-2 text-sm text-indigo-950">
+                        Predicted demand for {selectedLightGbmForecast.forecastDate}: {" "}
+                        <strong>{selectedLightGbmForecast.predictedQuantity?.toFixed(2)} units</strong>
+                        <span className="ml-2 text-indigo-800">
+                          ({selectedLightGbmForecast.historyDays} history days)
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-sm text-indigo-900">
+                        Not enough recorded demand for this medicine. The model needs 30 days of history.
+                      </p>
+                    )}
+                    {effectiveLightGbmPrediction?.trainingDataSource === "synthetic" && (
+                      <p className="mt-2 text-xs text-indigo-800">
+                        Demo inference uses this medicine's recent stock issues, but the model was trained on synthetic data and is not production-calibrated.
+                      </p>
+                    )}
                   </div>
 
                   <div className="mt-6">
@@ -3596,10 +3870,7 @@ function App() {
                       {med.active ? "Active" : "Inactive"}
                     </td>
                     <td className="px-6 py-4 text-gray-600">
-                      {med.batches.reduce(
-                        (total, batch) => total + batch.quantity,
-                        0,
-                      )}{" "}
+                      {availableMedicineUnits(med)}{" "}
                       / {med.reorderLevel}
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -3921,7 +4192,10 @@ function App() {
                           {batch.supplier.name}
                         </td>
                         <td className="px-6 py-4 text-gray-600">
-                          {new Date(batch.expiryDate).toLocaleDateString()}
+                          <span className={isExpiryDatePast(batch.expiryDate) ? "text-red-700" : ""}>
+                            {new Date(batch.expiryDate).toLocaleDateString()}
+                            {isExpiryDatePast(batch.expiryDate) && " (expired)"}
+                          </span>
                         </td>
                         <td className="px-6 py-4 text-gray-600 text-right">
                           {batch.quantity}
@@ -3930,12 +4204,15 @@ function App() {
                           {canWriteStock && (
                             <>
                               <button
+                                type="button"
                                 onClick={() => openStockForm(batch, "OUT")}
-                                className="text-blue-600 hover:text-blue-800 font-medium mr-3"
+                                disabled={isExpiryDatePast(batch.expiryDate)}
+                                className="mr-3 font-medium text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 Issue
                               </button>
                               <button
+                                type="button"
                                 onClick={() => openStockForm(batch, "ADJ")}
                                 className="text-gray-600 hover:text-gray-900 font-medium"
                               >

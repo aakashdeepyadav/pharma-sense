@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { buildPaginationMeta, sendApiError } from '../lib/api';
 import { medicineQuerySchema, medicineSchema, medicineUpdateSchema } from '../validation/schemas';
@@ -34,7 +35,7 @@ router.get('/', async (req: Request, res: Response) => {
       prisma.medicine.findMany({
         where,
         include: { category: true, batches: true },
-        orderBy: { [query.data.sortBy]: query.data.sortOrder } as Record<string, 'asc' | 'desc'>,
+        orderBy: [{ [query.data.sortBy]: query.data.sortOrder }, { id: 'asc' }] as Prisma.MedicineOrderByWithRelationInput[],
         skip: (query.data.page - 1) * query.data.pageSize,
         take: query.data.pageSize,
       }),

@@ -152,6 +152,10 @@ export const forecastQuerySchema = z.object({
   path: ['from'],
 });
 
+export const forecastMlPredictionQuerySchema = z.object({
+  medicineId: z.coerce.number().int().positive().optional(),
+});
+
 const purchaseItemSchema = z.object({
   medicineId: z.coerce.number().int().positive(),
   batchNumber: z.string().trim().min(1).max(100),
@@ -169,6 +173,11 @@ export const purchaseSchema = z.object({
   supplierId: z.coerce.number().int().positive(),
   notes: z.string().trim().max(500).optional(),
   items: z.array(purchaseItemSchema).min(1).max(100),
+});
+
+export const purchaseListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 
 export const replenishmentQuerySchema = z.object({

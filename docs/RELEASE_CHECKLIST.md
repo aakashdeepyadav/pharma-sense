@@ -3,11 +3,12 @@
 ## Before Release
 
 - [ ] Confirm the release commit is reviewed and merged through the intended pull-request target.
-- [ ] Confirm CI passed migrations, seed, database quality, stock reconciliation, backend build/tests, research validation, frontend lint/build, browser smoke/live workflows, secret scanning, dependency audit, and dependency review where applicable.
+- [ ] Confirm CI passed migrations, seed, database quality, stock reconciliation, backend build/tests, research validation, frontend lint/build, browser smoke/live workflows, secret scanning, dependency audit, and dependency review where applicable. Local dependency audits passed with 0 vulnerabilities; hosted CI status is not verified here.
 - [ ] Review pull-request security impact, migration impact, environment changes, and known limitations.
 - [ ] Review [SECURITY_REVIEW.md](SECURITY_REVIEW.md) and assign owners/dates to unresolved risks.
 - [ ] Confirm `.env` files, credentials, database dumps, confidential exports, and sensitive test artifacts are not committed or attached.
 - [ ] Confirm the target environment injects unique secrets, restricts database/network access, and terminates HTTPS correctly.
+- [ ] Verify authenticator enrollment and recovery-code storage for every operational account; confirm login throttling and trusted client IP behavior at the deployed edge.
 - [ ] Capture and verify the target database backup/recovery point; confirm restore procedure and responsible operator.
 - [ ] Review migrations for backward compatibility and deployment order. Migrations have no automatic down path here.
 - [ ] Run the deployment rehearsal and smoke checks in [DEPLOYMENT_RUNBOOK.md](DEPLOYMENT_RUNBOOK.md) using a disposable environment.

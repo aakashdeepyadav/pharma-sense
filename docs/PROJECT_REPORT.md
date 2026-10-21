@@ -4,7 +4,7 @@
 
 PharmaSense is a medicine inventory and decision-support system designed for pharmacies and healthcare inventory teams. The project combines operational stock management, alerting, auditability, and a forecasting pipeline that can support replenishment planning without allowing model output to trigger purchases automatically.
 
-The project has reached a solid MVP stage with validated inventory management workflows, an alerting layer, and a working ML forecasting baseline. The current implementation is strongest in product operations and data governance. The remaining work is the operational bridge from forecast output to business-approved actions, which should remain human-reviewed and auditable.
+The project has a complete, locally verified inventory workflow spanning authentication, role-based access, medicine and supplier management, receiving and issuing, purchases, alerts, reporting, audit history, and human-reviewed replenishment decisions. Authenticator MFA is implemented and required by the Render Blueprint. Production hosting, deployed MFA recovery rehearsal, backup/restore, and forecasting validation with representative operational data remain open.
 
 ## 2. Project Objective
 
@@ -103,7 +103,8 @@ This is important because model output is treated as advisory evidence, not as a
 1. Estimate average demand from historical OUT transactions.
 2. Calculate reorder pressure using reorder level and current stock.
 3. Recommend replenishment only as a draft decision.
-4. Leave final purchase action to a human approver.
+4. Store the latest approval/dismissal decision per medicine so reviewers share the same status.
+5. Record each decision with its authenticated reviewer in the audit trail; decisions never create purchases or change stock.
 
 ## 6. Current Implementation Status
 
@@ -114,118 +115,65 @@ This is important because model output is treated as advisory evidence, not as a
 - stock transaction logic
 - alerts for stock and expiry risk
 - report APIs for forecast baseline and replenishment guidance
+- shared replenishment review state with reviewer attribution and transactional audit records
+- dashboard review status showing who made the latest decision
 - fleet of background validation and readiness checks
 - ML research pipeline and evaluation metrics
-- generated training dataset for full model training
 
-### In progress or not yet full production
+### Remaining before production use
 
-- real operational demand dataset from live business data
-- model-to-alert integration at the product level
-- forecast-driven alert rules
-- approval workflow for purchase actions
-- monitoring, drift checks, retraining, and governance workflow
+- business approval of production data use and forecasting claims
+- production hosting, backup ownership, and deployment/rollback rehearsal
+- ongoing ownership for forecast quality review and model retraining
 
 ## 7. Verified Results
 
-The following checks were run and passed in the current workspace:
+The latest local verification was recorded on 2026-10-21:
 
-### Backend validation
-
-Command:
-
-```bash
-cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\backend"
-npm test
-```
-
-Result:
-
-- 28 tests passed
-- 0 failed
-
-### Frontend build validation
-
-Command:
-
-```bash
-cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\frontend"
-npm run build
-```
-
-Result:
-
-- successful production build
-- Vite compile completed successfully
-
-### Forecast readiness validation
-
-Command:
-
-```bash
-cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\backend"
-npm run research:readiness
-```
-
-Result:
-
-- production_ready: true
-- dataset passed minimum data-quality and coverage gates
-
-### Forecast model validation
-
-Command:
-
-```bash
-cd "c:\Users\aakas\Documents\PlayGround 2.0\PharmaSense\backend"
-npm run research:ml
-```
-
-Result:
-
-- MAE: 1.3775
-- RMSE: 2.0038
-- model trained successfully on the full generated demand dataset
-- forecast output generated
+- Backend TypeScript build, Prisma schema validation, and all 46 tests passed.
+- Frontend lint and production build passed; all 15 mocked Playwright tests passed.
+- MFA migration, enrollment, replay rejection, and single-use recovery passed on a temporary PostgreSQL schema, which was removed afterward.
+- One live Playwright workflow passed against an isolated disposable PostgreSQL database; the temporary database was removed.
+- Database quality reported 0 errors and 0 warnings; stock reconciliation reported 0 discrepancies. Both checks were read-only.
+- Backend and frontend production dependency audits reported 0 vulnerabilities.
+- The Render Blueprint YAML syntax parses; Render CLI validation and hosted deployment remain unverified.
 
 ## 8. Result Interpretation
 
-The project is in a strong engineering state for:
+The local application and automated verification are complete for the tested scope. The project is prepared for a controlled Render pilot, while production use still depends on:
 
 - product operations
 - business inventory control
 - forecasting research
 - alert and replenishment support
 
-The project is not yet a fully autonomous, live, pharma-grade prediction system because the remaining gap is the operational decision loop:
+The system is deliberately not an autonomous prediction system. Its operational
+review loop is implemented, while production use still depends on:
 
-- approved live data feed
-- model-supported alerting
-- approval workflow
-- human-in-the-loop purchase decisions
-- formal monitoring and governance
+- explicit business approval of the data and forecasting claims
+- actual deployment, backup/restore, ownership, and rollback readiness
+- deployed MFA enrollment/recovery verification before operational inventory use
+- continued human review of all replenishment recommendations
 
 ## 9. Critical Risks and Gaps
 
 1. Forecast output is still advisory and cannot be treated as an automatic operational action.
 2. Real operational data must be approved before production claims are made.
-3. Forecast-based alerts need a governance layer before being used in critical decisions.
-4. The model needs monitoring for drift, lead-time changes, and new medicine behavior.
-5. Product-level workflow integration still needs to be completed for end-user forecasting dashboards.
+3. Forecast metrics require ongoing review against approved operational data.
+4. Model drift, lead-time changes, and new medicine behavior need assigned operational owners.
+5. Production rollout remains gated on the release checklist and business sign-off.
 
 ## 10. Recommended Next Phase
 
-The next working phase should focus on the operational decision loop:
+The remaining release work is deployment and handoff:
 
-1. connect forecast output to the operational API
-2. create forecast risk alert types
-3. add human-approved replenishment recommendations
-4. expose them in the UI
-5. add monitoring, versioning, and drift checks
-6. validate with production-style review before purchase automation is considered
+1. run the migration and full release checks in a disposable environment
+2. assign database, backup, secret, access-review, and rollback owners
+3. obtain explicit business approval for data usage and pilot claims
+4. keep forecast recommendations advisory and human-reviewed
 
 ## 11. Final Assessment
 
-PharmaSense is already a credible operational inventory platform with a strong early-stage forecasting and replenishment research layer. The project is no longer just a prototype; it is a functioning inventory system with a valid ML research pipeline. The remaining work is not about basic features anymore — it is about connecting the forecasting intelligence to a reviewable, safe, and production-ready operational workflow.
+PharmaSense has a functioning inventory system, forecasting and replenishment guidance, and a shared, auditable human review workflow. The remaining release work is organizational and operational: production data approval, hosting and recovery ownership, and a rehearsed deployment with explicit sign-off.
 
 This is the correct path for a responsible full system rollout: product first, forecasting second, governed action last.

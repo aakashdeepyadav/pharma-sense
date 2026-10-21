@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import json
+import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from lightgbm import LGBMRegressor
-from sklearn.compose import ColumnTransformer
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.ensemble import ExtraTreesRegressor, HistGradientBoostingRegressor, RandomForestRegressor
 
 REQUIRED_COLUMNS = {'date', 'medicine_id', 'quantity_issued'}
 OPTIONAL_FEATURE_COLUMNS = {
@@ -27,14 +27,86 @@ FEATURE_TABLE_PATH = ROOT / 'research' / 'results' / 'forecast_feature_table.csv
 OPERATIONAL_DATA_PATH = ROOT / 'research' / 'data' / 'operational_demand.csv'
 SYNTHETIC_DATA_PATH = ROOT / 'research' / 'data' / 'synthetic_demand.csv'
 RESULTS_DIR = ROOT / 'research' / 'results'
+MODEL_ARTIFACT_PATH = ROOT / 'backend' / 'ml-artifacts' / 'lightgbm_model.json'
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+MODEL_CANDIDATES = [
+    {
+        'name': 'lightgbm_conservative',
+        'n_estimators': 150,
+        'learning_rate': 0.03,
+        'num_leaves': 7,
+        'min_child_samples': 10,
+        'subsample': 0.9,
+        'colsample_bytree': 0.9,
+    },
+    {
+        'name': 'lightgbm_baseline',
+        'n_estimators': 250,
+        'learning_rate': 0.05,
+        'num_leaves': 15,
+        'min_child_samples': 10,
+        'subsample': 0.9,
+        'colsample_bytree': 0.9,
+    },
+    {
+        'name': 'lightgbm_regularized',
+        'n_estimators': 200,
+        'learning_rate': 0.04,
+        'num_leaves': 15,
+        'min_child_samples': 20,
+        'subsample': 0.8,
+        'colsample_bytree': 0.8,
+        'reg_lambda': 1.0,
+    },
+]
+BENCHMARK_MODEL_CANDIDATES = [
+    {
+        'name': 'random_forest',
+        'factory': lambda: RandomForestRegressor(
+            n_estimators=200, min_samples_leaf=2, max_features=0.8, random_state=42, n_jobs=-1,
+        ),
+    },
+    {
+        'name': 'extra_trees',
+        'factory': lambda: ExtraTreesRegressor(
+            n_estimators=200, min_samples_leaf=2, max_features=0.8, random_state=42, n_jobs=-1,
+        ),
+    },
+    {
+        'name': 'hist_gradient_boosting',
+        'factory': lambda: HistGradientBoostingRegressor(
+            max_iter=200, learning_rate=0.05, max_leaf_nodes=15, l2_regularization=1.0, random_state=42,
+        ),
+    },
+]
+FEATURE_NAMES = [
+    'day_of_week',
+    'month',
+    'week_of_year',
+    'is_weekend',
+    'lag_1',
+    'lag_7',
+    'lag_14',
+    'lag_30',
+    'rolling_mean_7',
+    'rolling_mean_14',
+    'rolling_mean_30',
+]
 
 
 def choose_data_source() -> tuple[Path, str]:
     if OPERATIONAL_DATA_PATH.exists():
-        operational_df = pd.read_csv(OPERATIONAL_DATA_PATH)
-        if {'date'}.issubset(operational_df.columns) and len(operational_df['date'].dropna()) >= 30:
-            return OPERATIONAL_DATA_PATH, 'operational'
+        try:
+            operational_df = pd.read_csv(OPERATIONAL_DATA_PATH)
+            if (
+                {'date', 'medicine_id', 'quantity_issued'}.issubset(operational_df.columns)
+                and operational_df['date'].nunique() >= 35
+                and operational_df.groupby('medicine_id')['date'].count().min() >= 35
+            ):
+                return OPERATIONAL_DATA_PATH, 'operational'
+        except Exception:
+            pass
     return SYNTHETIC_DATA_PATH, 'synthetic'
 
 
@@ -64,6 +136,36 @@ def validate_dataset(df: pd.DataFrame) -> dict:
         'medicines': int(df['medicine_id'].nunique()),
         'date_from': df['date'].min().isoformat(),
         'date_to': df['date'].max().isoformat(),
+    }
+
+
+def analyze_dataset(df: pd.DataFrame) -> dict:
+    coverage = (
+        df.groupby('medicine_id')
+        .agg(
+            observations=('quantity_issued', 'size'),
+            unique_days=('date', 'nunique'),
+            mean_demand=('quantity_issued', 'mean'),
+            zero_demand_rate=('quantity_issued', lambda values: float((values == 0).mean())),
+        )
+        .reset_index()
+    )
+    return {
+        'rows': int(len(df)),
+        'medicines': int(df['medicine_id'].nunique()),
+        'unique_days': int(df['date'].nunique()),
+        'date_from': df['date'].min().isoformat(),
+        'date_to': df['date'].max().isoformat(),
+        'mean_demand': float(df['quantity_issued'].mean()),
+        'zero_demand_rate': float((df['quantity_issued'] == 0).mean()),
+        'duplicate_medicine_dates': int(df.duplicated(subset=['date', 'medicine_id']).sum()),
+        'medicine_coverage': [
+            {
+                key: (float(value) if isinstance(value, (np.floating, float)) else int(value) if isinstance(value, (np.integer, int)) else str(value))
+                for key, value in row.items()
+            }
+            for row in coverage.to_dict(orient='records')
+        ],
     }
 
 
@@ -107,66 +209,35 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def train_model(train_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[Pipeline, pd.DataFrame, dict, list[str]]:
-    categorical = ['medicine_id']
-    if 'medicine_category' in train_df.columns:
-        categorical.append('medicine_category')
-    if 'organization_group' in train_df.columns:
-        categorical.append('organization_group')
-    if 'medicine_name' in train_df.columns:
-        categorical.append('medicine_name')
-
-    numeric = [
-        'day_of_week',
-        'month',
-        'week_of_year',
-        'is_weekend',
-        'lag_1',
-        'lag_7',
-        'lag_14',
-        'lag_30',
-        'rolling_mean_7',
-        'rolling_mean_14',
-        'rolling_mean_30',
-    ]
-    for column in ['is_stockout_censored', 'available_units_at_start', 'expiry_units_at_start', 'supplier_lead_days']:
-        if column in train_df.columns:
-            numeric.append(column)
-
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('cat', OneHotEncoder(handle_unknown='ignore'), categorical),
-            ('num', 'passthrough', numeric),
-        ]
+def train_model(
+    train_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    model_params: dict,
+) -> tuple[LGBMRegressor, pd.DataFrame, dict, list[str]]:
+    feature_names = FEATURE_NAMES
+    model = LGBMRegressor(
+        objective='regression',
+        random_state=42,
+        verbose=-1,
+        **{key: value for key, value in model_params.items() if key != 'name'},
     )
 
-    model = Pipeline(
-        steps=[
-            ('preprocessor', preprocessor),
-            ('model', LGBMRegressor(
-                objective='regression',
-                n_estimators=500,
-                learning_rate=0.05,
-                num_leaves=31,
-                subsample=0.9,
-                colsample_bytree=0.9,
-                random_state=42,
-                verbose=-1,
-            )),
-        ]
-    )
-
-    X_train = train_df[categorical + numeric]
+    X_train = train_df[feature_names]
     y_train = train_df['target']
-    X_test = test_df[categorical + numeric]
+    X_test = test_df[feature_names]
     y_test = test_df['target']
 
     model.fit(X_train, y_train)
     preds = model.predict(X_test)
     preds = np.clip(preds, 0, None)
+    result_df = pd.DataFrame({
+        'actual': y_test.reset_index(drop=True),
+        'predicted': preds,
+        'medicine_id': test_df['medicine_id'].reset_index(drop=True),
+        'date': test_df['date'].reset_index(drop=True),
+    })
 
-    feature_names = list(model.named_steps['preprocessor'].get_feature_names_out())
-    importances = model.named_steps['model'].feature_importances_
+    importances = model.feature_importances_
     ranked_features = sorted(
         zip(feature_names, importances.tolist()),
         key=lambda item: item[1],
@@ -178,21 +249,129 @@ def train_model(train_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[Pipeline
         'rmse': float(np.sqrt(mean_squared_error(y_test, preds))),
         'train_rows': int(len(train_df)),
         'test_rows': int(len(test_df)),
-        'baseline_naive_mae': float(np.mean(np.abs(y_test - y_test.shift(1).fillna(y_test.mean())))),
+        'baseline_naive_mae': float(np.mean(np.abs(y_test.to_numpy() - test_df['lag_1'].to_numpy()))),
+        'baseline_moving_average_7_mae': float(
+            mean_absolute_error(y_test, test_df['rolling_mean_7'])
+        ),
+        'metrics_by_medicine': [
+            {
+                'medicine_id': str(medicine_id),
+                'observations': int(len(group)),
+                'mae': float(mean_absolute_error(group['actual'], group['predicted'])),
+                'rmse': float(np.sqrt(mean_squared_error(group['actual'], group['predicted']))),
+            }
+            for medicine_id, group in result_df.groupby('medicine_id')
+        ],
         'top_feature_importance': [
             {'feature': feature, 'importance': float(score)}
             for feature, score in ranked_features
         ],
     }
 
-    result_df = pd.DataFrame({
-        'actual': y_test.reset_index(drop=True),
-        'predicted': preds,
-        'medicine_id': X_test['medicine_id'].reset_index(drop=True),
-        'date': test_df['date'].reset_index(drop=True),
-    })
-
     return model, result_df, metrics, feature_names
+
+
+def rolling_validation_splits(feature_df: pd.DataFrame, folds: int = 3) -> list[tuple[pd.DataFrame, pd.DataFrame]]:
+    dates = sorted(feature_df['date'].drop_duplicates())
+    if len(dates) < folds + 2:
+        raise ValueError('Insufficient dates for rolling time-series validation.')
+    validation_size = max(7, len(dates) // (folds + 2))
+    splits = []
+    for fold in range(folds):
+        validation_end = len(dates) - (folds - fold - 1) * validation_size
+        validation_start = validation_end - validation_size
+        train_dates = dates[:validation_start]
+        validation_dates = dates[validation_start:validation_end]
+        train = feature_df[feature_df['date'].isin(train_dates)].copy()
+        validation = feature_df[feature_df['date'].isin(validation_dates)].copy()
+        if len(train) >= 30 and not validation.empty:
+            splits.append((train, validation))
+    if len(splits) < 2:
+        raise ValueError('Insufficient rows for rolling time-series validation.')
+    return list(reversed(splits))
+
+
+def select_model(feature_df: pd.DataFrame, feature_names: list[str]) -> tuple[dict, list[dict]]:
+    scores = []
+    for candidate in MODEL_CANDIDATES:
+        fold_scores = []
+        for train_df, validation_df in rolling_validation_splits(feature_df):
+            model = LGBMRegressor(
+                objective='regression',
+                random_state=42,
+                verbose=-1,
+                **{key: value for key, value in candidate.items() if key != 'name'},
+            )
+            model.fit(train_df[feature_names], train_df['target'])
+            predictions = np.clip(model.predict(validation_df[feature_names]), 0, None)
+            fold_scores.append({
+                'mae': float(mean_absolute_error(validation_df['target'], predictions)),
+                'rmse': float(np.sqrt(mean_squared_error(validation_df['target'], predictions))),
+            })
+        scores.append({
+            'model': candidate['name'],
+            'mean_mae': float(np.mean([score['mae'] for score in fold_scores])),
+            'mean_rmse': float(np.mean([score['rmse'] for score in fold_scores])),
+            'folds': fold_scores,
+            'parameters': candidate,
+        })
+    scores.sort(key=lambda score: (score['mean_mae'], score['mean_rmse']))
+    return next(candidate for candidate in MODEL_CANDIDATES if candidate['name'] == scores[0]['model']), scores
+
+
+def benchmark_model_families(feature_df: pd.DataFrame, feature_names: list[str]) -> list[dict]:
+    scores = []
+    candidates = [
+        {
+            'name': candidate['name'],
+            'factory': lambda candidate=candidate: LGBMRegressor(
+                objective='regression',
+                random_state=42,
+                verbose=-1,
+                **{key: value for key, value in candidate.items() if key != 'name'},
+            ),
+            'deployable': True,
+        }
+        for candidate in MODEL_CANDIDATES
+    ] + [{**candidate, 'deployable': False} for candidate in BENCHMARK_MODEL_CANDIDATES]
+
+    for candidate in candidates:
+        fold_scores = []
+        for train_df, validation_df in rolling_validation_splits(feature_df):
+            model = candidate['factory']()
+            model.fit(train_df[feature_names], train_df['target'])
+            predictions = np.clip(model.predict(validation_df[feature_names]), 0, None)
+            fold_scores.append({
+                'mae': float(mean_absolute_error(validation_df['target'], predictions)),
+                'rmse': float(np.sqrt(mean_squared_error(validation_df['target'], predictions))),
+            })
+        scores.append({
+            'model': candidate['name'],
+            'deployable': candidate['deployable'],
+            'mean_mae': float(np.mean([score['mae'] for score in fold_scores])),
+            'mean_rmse': float(np.mean([score['rmse'] for score in fold_scores])),
+            'folds': fold_scores,
+        })
+    return sorted(scores, key=lambda score: (score['mean_mae'], score['mean_rmse']))
+
+
+def evaluate_baselines(feature_df: pd.DataFrame) -> list[dict]:
+    fold_scores = {'naive_last_value': [], 'moving_average_7': []}
+    for _, validation_df in rolling_validation_splits(feature_df):
+        fold_scores['naive_last_value'].append(
+            float(mean_absolute_error(validation_df['target'], validation_df['lag_1']))
+        )
+        fold_scores['moving_average_7'].append(
+            float(mean_absolute_error(validation_df['target'], validation_df['rolling_mean_7']))
+        )
+    return [
+        {
+            'model': model_name,
+            'mean_mae': float(np.mean(scores)),
+            'folds': scores,
+        }
+        for model_name, scores in fold_scores.items()
+    ]
 
 
 def recommend_replenishment(row: pd.Series) -> dict:
@@ -217,12 +396,14 @@ def recommend_replenishment(row: pd.Series) -> dict:
 
 
 def main() -> None:
+    export_operational_requested = '--export-operational' in sys.argv[1:]
     data_path, data_source = choose_data_source()
     if data_source == 'synthetic':
         print('Using synthetic fallback dataset because operational history is insufficient for a real production check.')
 
     df = pd.read_csv(data_path)
     validation = validate_dataset(df)
+    data_profile = analyze_dataset(df)
     df['date'] = pd.to_datetime(df['date'], utc=True)
     df = df.sort_values(['medicine_id', 'date']).reset_index(drop=True)
     feature_df = build_features(df)
@@ -247,13 +428,23 @@ def main() -> None:
     if train_df.empty or test_df.empty:
         raise ValueError('Insufficient data for a valid time-based train and test split.')
 
-    model, result_df, metrics, feature_names = train_model(train_df, test_df)
+    selected_params, cross_validation = select_model(feature_df, FEATURE_NAMES)
+    model_comparison = benchmark_model_families(feature_df, FEATURE_NAMES)
+    model, result_df, metrics, feature_names = train_model(train_df, test_df, selected_params)
+    final_model = LGBMRegressor(
+        objective='regression',
+        random_state=42,
+        verbose=-1,
+        **{key: value for key, value in selected_params.items() if key != 'name'},
+    )
+    final_model.fit(feature_df[FEATURE_NAMES], feature_df['target'])
 
     summary = {
-        'model': 'LightGBM baseline',
+        'model': selected_params['name'],
         'dataset': str(data_path.relative_to(ROOT)),
         'data_source': data_source,
-        'production_ready': data_source == 'operational',
+        'production_ready': False,
+        'production_readiness_reason': 'A research baseline requires approved data, representative evaluation, and human sign-off before production use.',
         'production_ready_structure': {
             'time_based_split': True,
             'feature_validation': True,
@@ -263,6 +454,16 @@ def main() -> None:
         'validation': validation,
         'forecast_horizon_days': 1,
         'metrics': metrics,
+        'model_selection': {
+            'selection_metric': 'mean_mae',
+            'selected_model': selected_params['name'],
+            'best_benchmark_model': model_comparison[0]['model'],
+            'deployable_model': selected_params['name'],
+            'comparison': model_comparison,
+            'candidates': cross_validation,
+            'baselines': evaluate_baselines(feature_df),
+        },
+        'data_profile': data_profile,
         'feature_names': feature_names,
         'notes': [
             'Operational data is preferred for production evaluation; a synthetic fallback is used only when operational history is insufficient.',
@@ -270,6 +471,27 @@ def main() -> None:
             'Operational production deployment requires an approved real or de-identified dataset and human sign-off.',
         ],
     }
+
+    export_model_artifact = data_source == 'synthetic' or (
+        data_source == 'operational' and export_operational_requested
+    )
+    if export_model_artifact:
+        MODEL_ARTIFACT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        artifact = {
+            'format': 'lightgbm-booster-json-v1',
+            'model': selected_params['name'],
+            'training_data_source': data_source,
+            'trained_at': datetime.now(timezone.utc).isoformat(),
+            'feature_names': feature_names,
+            'booster': final_model.booster_.dump_model(),
+        }
+        MODEL_ARTIFACT_PATH.write_text(json.dumps(artifact, separators=(',', ':')), encoding='utf-8')
+        print(f'Portable inference artifact written to {MODEL_ARTIFACT_PATH.relative_to(ROOT)}')
+    else:
+        print(
+            'Operational model artifact was not exported. Re-run with '
+            '--export-operational after approved model review and release authorization.'
+        )
 
     RESULTS_DIR.joinpath('lightgbm_forecast_metrics.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
     RESULTS_DIR.joinpath('lightgbm_predictions.csv').write_text(
@@ -289,6 +511,13 @@ def main() -> None:
         json.dumps(recommend_replenishment(pd.Series(example)), indent=2),
         encoding='utf-8',
     )
+    if export_model_artifact:
+        MODEL_ARTIFACT_PATH.parent.joinpath('lightgbm_forecast_metrics.json').write_text(
+            json.dumps(summary, indent=2), encoding='utf-8',
+        )
+        MODEL_ARTIFACT_PATH.parent.joinpath('lightgbm_replenishment_example.json').write_text(
+            json.dumps(recommend_replenishment(pd.Series(example)), indent=2), encoding='utf-8',
+        )
 
     print(json.dumps(summary, indent=2))
 

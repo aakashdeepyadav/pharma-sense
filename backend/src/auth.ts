@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import prisma from './lib/prisma';
+import { MFA_REQUIRED_ROLES } from './mfa';
 
 export type AuthenticatedRequest = Request & {
   user?: {
@@ -77,6 +78,10 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     res.status(401).json({ success: false, error: 'Invalid authentication token' });
     return;
   }
+  if (payload.tokenPurpose !== undefined) {
+    res.status(401).json({ success: false, error: 'Limited authentication tokens cannot access this resource' });
+    return;
+  }
 
   try {
     const tokenHash = tokenFingerprint(token);
@@ -93,11 +98,19 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       where: { id: payload.userId },
       include: { role: true },
     });
-    if (!user || (
+    if (!user || !user.active || (
       typeof payload.sessionVersion === 'number'
       && payload.sessionVersion !== user.sessionVersion
     )) {
       res.status(401).json({ success: false, error: 'Invalid or expired authentication token' });
+      return;
+    }
+    if (
+      process.env.REQUIRE_PRIVILEGED_MFA === 'true'
+      && MFA_REQUIRED_ROLES.has(user.role.name)
+      && !user.mfaEnabled
+    ) {
+      res.status(403).json({ success: false, error: 'MFA enrollment is required before using this account' });
       return;
     }
 
@@ -120,6 +133,34 @@ export function createAccessToken(user: { id: number; role: string; sessionVersi
     expiresIn: '2h',
     jwtid: crypto.randomUUID(),
   });
+}
+
+export type AuthenticationChallengePurpose = 'mfa-enrollment' | 'mfa-verification';
+
+export function createAuthenticationChallenge(
+  user: { id: number; sessionVersion: number },
+  purpose: AuthenticationChallengePurpose,
+) {
+  return jwt.sign({ userId: user.id, sessionVersion: user.sessionVersion, tokenPurpose: purpose }, getJwtSecret(), {
+    algorithm: JWT_ALGORITHM,
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
+    expiresIn: '10m',
+  });
+}
+
+export function readAuthenticationChallenge(token: string, purpose: AuthenticationChallengePurpose) {
+  const verified = jwt.verify(token, getJwtSecret(), tokenVerificationOptions);
+  if (typeof verified === 'string') throw new Error('Invalid authentication challenge');
+  const payload = verified as jwt.JwtPayload;
+  if (
+    payload.tokenPurpose !== purpose
+    || !Number.isSafeInteger(payload.userId)
+    || !Number.isSafeInteger(payload.sessionVersion)
+  ) {
+    throw new Error('Invalid authentication challenge');
+  }
+  return { userId: payload.userId as number, sessionVersion: payload.sessionVersion as number };
 }
 
 export function requireRoles(...allowedRoles: string[]) {

@@ -13,6 +13,7 @@ The backend HTTP test suite covers:
 | Staff account with an Admin role claim | `403` based on the current database role                                                                     |
 | Logout                                 | Revocation fingerprint is stored in PostgreSQL and the token is rejected afterward                           |
 | Weak or shipped-placeholder JWT secret | Token creation is rejected                                                                                   |
+| Privileged MFA enrollment and sign-in  | Enrollment challenge is limited; TOTP secrets are encrypted; replayed TOTP and recovery codes are rejected |
 | Authenticated inventory workflow       | Create category/supplier/medicine, receive a batch, issue five units, and verify remaining quantity is seven |
 
 The workflow uses unique records and removes them after the test. Run it with `cd backend; npm test` after applying migrations and running the development seed. CI performs those setup steps against its isolated PostgreSQL service.
@@ -20,8 +21,8 @@ The workflow uses unique records and removes them after the test. Run it with `c
 ## Execution Evidence
 
 - CI definition: `.github/workflows/ci.yml` (`backend` job: migration, seed, database quality, reconciliation, build, tests, and research validation).
-- Local validation environment: PostgreSQL through Docker Compose, Node.js 22-compatible toolchain, and dependencies installed with `npm ci`.
-- Passed: the merged migration, secure development seed, backend build, all 23 backend tests, `db:quality` with `status: PASS`, `db:reconcile` with zero discrepancies, frontend lint/build, and 9 mocked Playwright browser tests.
-- Passed: the live inventory workflow against local PostgreSQL with one Playwright test in 20 seconds, including real authentication, receiving, issuing, alerts, user management, and role restrictions.
-- Security audit: backend and frontend `npm audit --omit=dev --audit-level=high` report zero vulnerabilities. Prisma remains on 6.19.3 and the patched `deepmerge-ts` 8.0.2 override is locked and tested.
-- Remaining evidence gap: production-like deployment and backup/restore rehearsal must still run in an isolated environment before production release; CI remains the authoritative clean-environment live test.
+- Local verification recorded on 2026-10-21: backend build, schema validation, and all 46 tests passed; frontend lint/build and all 15 mocked browser tests passed. MFA integration used a disposable PostgreSQL schema that was removed afterward.
+- Database quality reported 0 errors and 0 warnings after the demo seed expiry was corrected; reconciliation reported 0 discrepancies and unsupported movements. Both checks were read-only.
+- One live inventory workflow passed against an isolated disposable PostgreSQL database; that temporary database was removed.
+- Backend and frontend production dependency audits reported 0 vulnerabilities.
+- Render deployment configuration is in `render.yaml`; only YAML syntax was parsed locally. Render CLI validation, hosted CI, deployment, and backup/restore rehearsal remain outstanding.

@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
-import { AuthenticatedRequest } from '../auth';
+import { AuthenticatedRequest, requireRoles } from '../auth';
 import { sendApiError } from '../lib/api';
+import { availableStock, isBatchExpired } from '../domain/stockRules';
 
 const router = Router();
 const EXPIRY_WARNING_DAYS = 30;
@@ -27,7 +28,7 @@ router.get('/', async (_req: Request, res: Response) => {
     }> = [];
 
     for (const medicine of medicines) {
-      const currentStock = medicine.batches.reduce((total, batch) => total + batch.quantity, 0);
+      const currentStock = availableStock(medicine.batches, now);
       if (currentStock === 0) {
         alerts.push({
           fingerprint: `OUT_OF_STOCK:${medicine.id}`,
@@ -50,7 +51,7 @@ router.get('/', async (_req: Request, res: Response) => {
 
       for (const batch of medicine.batches) {
         if (batch.quantity === 0) continue;
-        if (batch.expiryDate < now) {
+        if (isBatchExpired(batch.expiryDate, now)) {
           alerts.push({
             fingerprint: `EXPIRED:${medicine.id}:${batch.id}`,
             type: 'EXPIRED',
@@ -76,24 +77,40 @@ router.get('/', async (_req: Request, res: Response) => {
       }
     }
 
-    await prisma.alert.updateMany({
-      where: { status: 'OPEN' },
-      data: { status: 'RESOLVED' },
-    });
-    for (const alert of alerts) {
-      await prisma.alert.upsert({
-        where: { fingerprint: alert.fingerprint },
-        create: alert,
-        update: {
-          type: alert.type,
-          severity: alert.severity,
-          message: alert.message,
-          quantity: alert.quantity,
-          expiryDate: alert.expiryDate,
-          status: undefined,
+    await prisma.$transaction(async (database) => {
+      const activeFingerprints = alerts.map((alert) => alert.fingerprint);
+      const existingAlerts = activeFingerprints.length === 0
+        ? []
+        : await database.alert.findMany({
+            where: { fingerprint: { in: activeFingerprints } },
+            select: { fingerprint: true, status: true },
+          });
+      const existingStatus = new Map(existingAlerts.map((alert) => [alert.fingerprint, alert.status]));
+
+      await database.alert.updateMany({
+        where: {
+          status: { in: ['OPEN', 'ACKNOWLEDGED'] },
+          ...(activeFingerprints.length > 0 ? { fingerprint: { notIn: activeFingerprints } } : {}),
         },
+        data: { status: 'RESOLVED' },
       });
-    }
+
+      for (const alert of alerts) {
+        const wasResolved = existingStatus.get(alert.fingerprint) === 'RESOLVED';
+        await database.alert.upsert({
+          where: { fingerprint: alert.fingerprint },
+          create: alert,
+          update: {
+            type: alert.type,
+            severity: alert.severity,
+            message: alert.message,
+            quantity: alert.quantity,
+            expiryDate: alert.expiryDate,
+            ...(wasResolved ? { status: 'OPEN', acknowledgedAt: null, createdAt: now } : {}),
+          },
+        });
+      }
+    });
     const currentAlerts = await prisma.alert.findMany({
       where: { status: { in: ['OPEN', 'ACKNOWLEDGED'] } },
       orderBy: { createdAt: 'desc' },
@@ -104,7 +121,10 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-router.patch('/:id/acknowledge', async (req: AuthenticatedRequest, res: Response) => {
+router.patch(
+  '/:id/acknowledge',
+  requireRoles('Admin', 'Pharmacist', 'Inventory Manager', 'Staff'),
+  async (req: AuthenticatedRequest, res: Response) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) {
     sendApiError(res, 400, 'INVALID_ALERT_ID', 'Alert id must be a positive integer');
@@ -120,7 +140,8 @@ router.patch('/:id/acknowledge', async (req: AuthenticatedRequest, res: Response
       const updatedAlert = await database.alert.update({
         where: { id },
         data: { status: 'ACKNOWLEDGED', acknowledgedAt: new Date() },
-      });
+        },
+      );
       await database.auditLog.create({
         data: {
           userId: req.user!.id,

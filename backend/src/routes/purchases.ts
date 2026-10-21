@@ -2,23 +2,38 @@ import { Router, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthenticatedRequest, requireRoles } from '../auth';
-import { purchaseSchema } from '../validation/schemas';
-import { sendApiError } from '../lib/api';
+import { purchaseListQuerySchema, purchaseSchema } from '../validation/schemas';
+import { buildPaginationMeta, sendApiError } from '../lib/api';
 
 const router = Router();
 const receivingRoles = ['Admin', 'Pharmacist', 'Inventory Manager'];
 
-router.get('/', async (_req: AuthenticatedRequest, res: Response) => {
+router.get('/', async (req: AuthenticatedRequest, res: Response) => {
+  const result = purchaseListQuerySchema.safeParse(req.query);
+  if (!result.success) {
+    sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', result.error.issues);
+    return;
+  }
+
   try {
-    const purchases = await prisma.purchase.findMany({
-      include: {
-        supplier: true,
-        createdBy: { select: { name: true, email: true } },
-        items: { include: { medicine: true } },
-      },
-      orderBy: { createdAt: 'desc' },
+    const [total, purchases] = await Promise.all([
+      prisma.purchase.count(),
+      prisma.purchase.findMany({
+        include: {
+          supplier: true,
+          createdBy: { select: { name: true, email: true } },
+          items: { include: { medicine: true } },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (result.data.page - 1) * result.data.pageSize,
+        take: result.data.pageSize,
+      }),
+    ]);
+    res.json({
+      success: true,
+      data: purchases,
+      meta: buildPaginationMeta(total, result.data.page, result.data.pageSize, 'createdAt', 'desc'),
     });
-    res.json({ success: true, data: purchases });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch purchases' });
   }

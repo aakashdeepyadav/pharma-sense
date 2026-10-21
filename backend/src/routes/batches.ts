@@ -21,7 +21,9 @@ router.get('/', async (req: Request, res: Response) => {
       prisma.batch.count(),
       prisma.batch.findMany({
         include: { medicine: true, supplier: true },
-        orderBy: { [sortBy]: query.data.sortOrder } as Record<string, 'asc' | 'desc'>,
+        orderBy: (sortBy === 'id'
+          ? [{ id: query.data.sortOrder }]
+          : [{ [sortBy]: query.data.sortOrder }, { id: 'asc' }]) as Prisma.BatchOrderByWithRelationInput[],
         skip: (query.data.page - 1) * query.data.pageSize,
         take: query.data.pageSize,
       }),

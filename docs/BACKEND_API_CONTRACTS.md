@@ -8,10 +8,14 @@ inventory operations workstream. All protected endpoints require a bearer JWT.
 | `GET /api/v1/suppliers` | Any authenticated role | `200`, paginated `data` | `400 VALIDATION_ERROR`, `500 FETCH_SUPPLIERS_FAILED` | Read-only |
 | `POST /api/v1/suppliers` | Admin, Inventory Manager | `201` | `400 VALIDATION_ERROR`, `401 AUTHENTICATION_REQUIRED` | Supplier and audit event in one transaction |
 | `POST /api/v1/purchases` | Admin, Pharmacist, Inventory Manager | `201` | `400 VALIDATION_ERROR` | Purchase, items, and creation audit in one transaction |
+| `GET /api/v1/purchases?page=1&pageSize=25` | Any authenticated role | `200`, newest first with pagination metadata | `400 VALIDATION_ERROR` | Read-only purchase history |
 | `POST /api/v1/purchases/:id/receive` | Admin, Pharmacist, Inventory Manager | `200` | `404 PURCHASE_NOT_FOUND`, `409 PURCHASE_ALREADY_RECEIVED`, `409 DUPLICATE_BATCH` | Batch, stock-IN ledger, purchase status, and audit are atomic |
 | `POST /api/v1/batches` | Admin, Pharmacist, Inventory Manager | `201` | `400 VALIDATION_ERROR`, `409 DUPLICATE_BATCH` | Batch, stock-IN ledger, and audit are atomic |
 | `POST /api/v1/inventory/transactions` | Admin, Pharmacist, Inventory Manager, Staff | `201` | `400 VALIDATION_ERROR`, `404 BATCH_NOT_FOUND`, `409 INSUFFICIENT_STOCK`, `409 EXPIRED_BATCH` | Quantity update, ledger row, and audit are atomic |
-| `PATCH /api/v1/alerts/:id/acknowledge` | Any authenticated role | `200` | `400 INVALID_ALERT_ID`, `404 ALERT_NOT_FOUND` | Alert acknowledgement and audit are atomic |
+| `PATCH /api/v1/alerts/:id/acknowledge` | Admin, Pharmacist, Inventory Manager, Staff | `200` | `400 INVALID_ALERT_ID`, `403 FORBIDDEN`, `404 ALERT_NOT_FOUND` | Alert acknowledgement and audit are atomic |
+| `GET /api/v1/reports/replenishment` | Any authenticated role | `200`, recommendations with the latest persisted review and reviewer | `400 VALIDATION_ERROR` | Read-only; never creates purchases or stock movements |
+| `GET /api/v1/reports/forecast-ml/predictions?medicineId={id}` | Any authenticated role | `200`, one-day LightGBM estimate or `INSUFFICIENT_HISTORY` | `400 VALIDATION_ERROR`, `404 MEDICINE_NOT_FOUND`, `503 FORECAST_MODEL_UNAVAILABLE` | Read-only inference over recent stock OUT history; no inventory changes |
+| `POST /api/v1/reports/replenishment/decision` | Admin, Pharmacist, Inventory Manager | `200`, saved decision and reviewer | `400 VALIDATION_ERROR`, `404 MEDICINE_NOT_FOUND` | Latest review and audit event are written atomically; previous review history remains in the audit log |
 
 Errors use the following shape:
 
@@ -29,6 +33,17 @@ Errors use the following shape:
 Unauthenticated requests return `401`; authenticated users without the
 endpoint role return `403`. Invalid request data is rejected before a
 transaction starts.
+
+Replenishment review state is shared across users and stored per medicine.
+Submitting another decision updates the current review state while retaining
+each decision as an attributed audit event. Review decisions are advisory only
+and do not initiate a purchase or stock change.
+
+The LightGBM prediction endpoint uses the packaged `backend/ml-artifacts`
+artifact and the latest 30 full UTC calendar days of stock OUT transactions.
+It returns insufficient history unless demand exists throughout a complete
+30-day history window. The current artifact is trained on synthetic data, so
+live inference is a technical demonstration and is not production-calibrated.
 
 ## Session invalidation
 

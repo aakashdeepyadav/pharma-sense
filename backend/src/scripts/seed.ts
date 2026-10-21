@@ -15,6 +15,7 @@ async function seed() {
     { name: 'Pharmacist', permissions: 'medicine:write,stock:write' },
     { name: 'Inventory Manager', permissions: 'medicine:write,supplier:write,stock:write' },
     { name: 'Staff', permissions: 'inventory:read' },
+    { name: 'Management', permissions: 'reports:read,replenishment:read' },
   ];
   const savedRoles = await Promise.all(roles.map((role) => prisma.role.upsert({
     where: { name: role.name },
@@ -101,7 +102,7 @@ async function seed() {
                 medicineId: medicines[1].id,
                 batchNumber: 'DEMO-LOT-002',
                 mfgDate: new Date('2026-01-01T00:00:00.000Z'),
-                expiryDate: new Date('2026-10-20T00:00:00.000Z'),
+                expiryDate: new Date('2026-11-20T00:00:00.000Z'),
                 quantity: 8,
                 purchasePrice: 0.2,
                 sellingPrice: 0.4,
@@ -126,7 +127,7 @@ async function seed() {
         medicine: medicines[1],
         batchNumber: 'DEMO-LOT-002',
         mfgDate: new Date('2026-01-01T00:00:00.000Z'),
-        expiryDate: new Date('2026-10-20T00:00:00.000Z'),
+        expiryDate: new Date('2026-11-20T00:00:00.000Z'),
         quantity: 8,
         purchasePrice: 0.2,
         sellingPrice: 0.4,
@@ -141,7 +142,10 @@ async function seed() {
             batchNumber: demoBatch.batchNumber,
           },
         },
-        update: {},
+        update: {
+          expiryDate: demoBatch.expiryDate,
+          quantity: demoBatch.quantity,
+        },
         create: {
           medicineId: demoBatch.medicine.id,
           supplierId: supplier.id,
