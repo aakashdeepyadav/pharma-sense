@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const TOTP_STEP_SECONDS = 30;
-export const MFA_REQUIRED_ROLES = new Set(['Admin', 'Inventory Manager', 'Pharmacist', 'Staff']);
+export const MFA_REQUIRED_ROLES = new Set(['Admin', 'Inventory Manager', 'Pharmacist', 'Staff', 'Management']);
 
 export function encodeBase32(value: Buffer) {
   let bits = 0;

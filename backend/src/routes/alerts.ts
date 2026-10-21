@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
-import { AuthenticatedRequest } from '../auth';
+import { AuthenticatedRequest, requireRoles } from '../auth';
 import { sendApiError } from '../lib/api';
 import { availableStock, isBatchExpired } from '../domain/stockRules';
 
@@ -121,7 +121,10 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-router.patch('/:id/acknowledge', async (req: AuthenticatedRequest, res: Response) => {
+router.patch(
+  '/:id/acknowledge',
+  requireRoles('Admin', 'Pharmacist', 'Inventory Manager', 'Staff'),
+  async (req: AuthenticatedRequest, res: Response) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) {
     sendApiError(res, 400, 'INVALID_ALERT_ID', 'Alert id must be a positive integer');
@@ -137,7 +140,8 @@ router.patch('/:id/acknowledge', async (req: AuthenticatedRequest, res: Response
       const updatedAlert = await database.alert.update({
         where: { id },
         data: { status: 'ACKNOWLEDGED', acknowledgedAt: new Date() },
-      });
+        },
+      );
       await database.auditLog.create({
         data: {
           userId: req.user!.id,

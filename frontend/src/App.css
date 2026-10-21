@@ -225,21 +225,35 @@
   --muted: #647875;
   --brand: #0f6b70;
   --brand-dark: #0b565a;
+  position: relative;
+  isolation: isolate;
   background-color: #f3f6f5;
   background-image:
-    radial-gradient(circle at top right, rgba(85, 180, 170, 0.11), transparent 28rem),
-    linear-gradient(180deg, #f7faf9 0%, #eef4f2 100%);
+    radial-gradient(circle at 8% 2%, rgba(91, 190, 179, 0.14), transparent 25rem),
+    radial-gradient(circle at 92% 18%, rgba(104, 126, 224, 0.08), transparent 23rem),
+    linear-gradient(180deg, #f8fbfa 0%, #edf4f2 100%);
+}
+
+.dashboard-shell::before {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  background-image: linear-gradient(rgba(15, 107, 112, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 107, 112, 0.025) 1px, transparent 1px);
+  background-size: 42px 42px;
+  content: "";
+  pointer-events: none;
 }
 
 .dashboard-header {
   position: relative;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 20px;
   border-color: var(--line);
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.98), rgba(242, 250, 248, 0.96)),
     var(--surface);
-  box-shadow: 0 12px 28px rgba(29, 77, 69, 0.08);
+  box-shadow: 0 18px 44px rgba(29, 77, 69, 0.1);
 }
 
 .dashboard-header::after {
@@ -264,8 +278,9 @@
   align-items: center;
   padding: 16px 18px;
   border: 1px solid #d8e8e3;
-  border-radius: 14px;
-  background: rgba(248, 252, 250, 0.88);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(248, 252, 250, 0.94), rgba(235, 248, 244, 0.78));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
 .role-workspace-eyebrow {
@@ -313,14 +328,20 @@
 .dashboard-shell > details.workspace-disclosure,
 .dashboard-shell > .bg-white {
   border-color: var(--line);
-  border-radius: 14px;
-  box-shadow: 0 8px 20px rgba(29, 77, 69, 0.045);
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(29, 77, 69, 0.055);
 }
 
 .dashboard-shell > .grid > div {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(145deg, #ffffff, #f8fbfa);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(245, 251, 249, 0.96));
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.dashboard-shell > .grid > div:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 30px rgba(29, 77, 69, 0.1);
 }
 
 .dashboard-actions {
@@ -344,6 +365,10 @@
   gap: 18px;
 }
 
+.dashboard-metric-grid > div {
+  padding: 22px 22px 20px;
+}
+
 .dashboard-metric-grid h3 {
   color: #637873;
   font-size: 0.72rem;
@@ -354,10 +379,14 @@
 
 .dashboard-metric-grid p {
   letter-spacing: -0.04em;
+  color: #173330;
+  font-size: 2rem;
+  font-weight: 800;
 }
 
 .dashboard-section {
   position: relative;
+  box-shadow: 0 12px 28px rgba(29, 77, 69, 0.06) !important;
 }
 
 .dashboard-section > div:first-child {
@@ -377,6 +406,10 @@
   background: #2d9ca3;
   box-shadow: 0 0 0 5px rgba(45, 156, 163, 0.12);
   content: "";
+}
+
+.dashboard-section > div:first-child p {
+  color: #70827e;
 }
 
 .dashboard-section:nth-of-type(2) > div:first-child h2::before {
@@ -412,7 +445,7 @@
 }
 
 .dashboard-shell > section > div:first-child {
-  background: linear-gradient(180deg, #ffffff, #fbfdfc);
+  background: linear-gradient(135deg, #ffffff 0%, #f8fcfa 100%);
 }
 
 .dashboard-shell h2 {
@@ -445,6 +478,10 @@
   transform: translateY(-1px);
 }
 
+.dashboard-shell button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
 .dashboard-shell table {
   border-collapse: separate;
   border-spacing: 0;
@@ -463,7 +500,7 @@
 }
 
 .dashboard-shell tbody tr:hover {
-  background: #f7fbfa;
+  background: #eef9f5;
 }
 
 .dashboard-shell td,
@@ -475,6 +512,52 @@
   border: 1px solid var(--line);
   border-radius: 16px;
   box-shadow: 0 24px 60px rgba(20, 55, 50, 0.2);
+}
+
+.dashboard-shell details.workspace-disclosure {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
+}
+
+.dashboard-shell details.workspace-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(90deg, rgba(246, 251, 249, 0.9), rgba(255, 255, 255, 0.9));
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.dashboard-shell details.workspace-disclosure > summary:hover {
+  background: #eef9f5;
+  color: var(--brand-dark);
+}
+
+.dashboard-shell .dashboard-actions button {
+  box-shadow: 0 5px 12px rgba(29, 77, 69, 0.07);
+}
+
+.dashboard-shell .dashboard-actions button:first-child {
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.2);
+}
+
+.dashboard-shell .role-priority-list li {
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid rgba(216, 232, 227, 0.9);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-shell > .grid > div,
+  .dashboard-shell button {
+    transition: none;
+  }
+
+  .dashboard-shell > .grid > div:hover,
+  .dashboard-shell button:hover:not(:disabled) {
+    transform: none;
+  }
 }
 
 @media (max-width: 840px) {

@@ -175,6 +175,7 @@ async function mockDashboardApi(
           { id: 2, name: "Inventory Manager" },
           { id: 3, name: "Pharmacist" },
           { id: 4, name: "Staff" },
+          { id: 5, name: "Management" },
         ],
       };
     } else if (pathname.endsWith("/users")) {
@@ -541,6 +542,23 @@ test("hides management and receiving actions from Staff", async ({ page }) => {
   const batchRow = page.getByRole("row").filter({ hasText: "QA-BATCH-1" });
   await expect(batchRow.getByRole("button", { name: "Issue" })).toBeVisible();
   await expect(batchRow.getByRole("button", { name: "Adjust" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Audit log" })).toHaveCount(0);
+});
+
+test("provides read-only reporting access to Management", async ({ page }) => {
+  await mockDashboardApi(page, "Management");
+  await signIn(page);
+
+  await expect(page.getByText("Management", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ Supplier" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ User" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ Category" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ Add Medicine" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Receive purchase" })).toHaveCount(0);
+  await page.getByText("Management and history", { exact: true }).click();
+  const batchRow = page.getByRole("row").filter({ hasText: "QA-BATCH-1" });
+  await expect(batchRow.getByRole("button", { name: "Issue" })).toHaveCount(0);
+  await expect(batchRow.getByRole("button", { name: "Adjust" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Audit log" })).toHaveCount(0);
 });
 

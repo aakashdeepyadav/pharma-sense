@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from lightgbm import LGBMRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.ensemble import ExtraTreesRegressor, HistGradientBoostingRegressor, RandomForestRegressor
 
 REQUIRED_COLUMNS = {'date', 'medicine_id', 'quantity_issued'}
 OPTIONAL_FEATURE_COLUMNS = {
@@ -57,6 +58,26 @@ MODEL_CANDIDATES = [
         'subsample': 0.8,
         'colsample_bytree': 0.8,
         'reg_lambda': 1.0,
+    },
+]
+BENCHMARK_MODEL_CANDIDATES = [
+    {
+        'name': 'random_forest',
+        'factory': lambda: RandomForestRegressor(
+            n_estimators=200, min_samples_leaf=2, max_features=0.8, random_state=42, n_jobs=-1,
+        ),
+    },
+    {
+        'name': 'extra_trees',
+        'factory': lambda: ExtraTreesRegressor(
+            n_estimators=200, min_samples_leaf=2, max_features=0.8, random_state=42, n_jobs=-1,
+        ),
+    },
+    {
+        'name': 'hist_gradient_boosting',
+        'factory': lambda: HistGradientBoostingRegressor(
+            max_iter=200, learning_rate=0.05, max_leaf_nodes=15, l2_regularization=1.0, random_state=42,
+        ),
     },
 ]
 FEATURE_NAMES = [
@@ -298,6 +319,42 @@ def select_model(feature_df: pd.DataFrame, feature_names: list[str]) -> tuple[di
     return next(candidate for candidate in MODEL_CANDIDATES if candidate['name'] == scores[0]['model']), scores
 
 
+def benchmark_model_families(feature_df: pd.DataFrame, feature_names: list[str]) -> list[dict]:
+    scores = []
+    candidates = [
+        {
+            'name': candidate['name'],
+            'factory': lambda candidate=candidate: LGBMRegressor(
+                objective='regression',
+                random_state=42,
+                verbose=-1,
+                **{key: value for key, value in candidate.items() if key != 'name'},
+            ),
+            'deployable': True,
+        }
+        for candidate in MODEL_CANDIDATES
+    ] + [{**candidate, 'deployable': False} for candidate in BENCHMARK_MODEL_CANDIDATES]
+
+    for candidate in candidates:
+        fold_scores = []
+        for train_df, validation_df in rolling_validation_splits(feature_df):
+            model = candidate['factory']()
+            model.fit(train_df[feature_names], train_df['target'])
+            predictions = np.clip(model.predict(validation_df[feature_names]), 0, None)
+            fold_scores.append({
+                'mae': float(mean_absolute_error(validation_df['target'], predictions)),
+                'rmse': float(np.sqrt(mean_squared_error(validation_df['target'], predictions))),
+            })
+        scores.append({
+            'model': candidate['name'],
+            'deployable': candidate['deployable'],
+            'mean_mae': float(np.mean([score['mae'] for score in fold_scores])),
+            'mean_rmse': float(np.mean([score['rmse'] for score in fold_scores])),
+            'folds': fold_scores,
+        })
+    return sorted(scores, key=lambda score: (score['mean_mae'], score['mean_rmse']))
+
+
 def evaluate_baselines(feature_df: pd.DataFrame) -> list[dict]:
     fold_scores = {'naive_last_value': [], 'moving_average_7': []}
     for _, validation_df in rolling_validation_splits(feature_df):
@@ -372,6 +429,7 @@ def main() -> None:
         raise ValueError('Insufficient data for a valid time-based train and test split.')
 
     selected_params, cross_validation = select_model(feature_df, FEATURE_NAMES)
+    model_comparison = benchmark_model_families(feature_df, FEATURE_NAMES)
     model, result_df, metrics, feature_names = train_model(train_df, test_df, selected_params)
     final_model = LGBMRegressor(
         objective='regression',
@@ -399,6 +457,9 @@ def main() -> None:
         'model_selection': {
             'selection_metric': 'mean_mae',
             'selected_model': selected_params['name'],
+            'best_benchmark_model': model_comparison[0]['model'],
+            'deployable_model': selected_params['name'],
+            'comparison': model_comparison,
             'candidates': cross_validation,
             'baselines': evaluate_baselines(feature_df),
         },
@@ -418,7 +479,7 @@ def main() -> None:
         MODEL_ARTIFACT_PATH.parent.mkdir(parents=True, exist_ok=True)
         artifact = {
             'format': 'lightgbm-booster-json-v1',
-            'model': 'LightGBM baseline',
+            'model': selected_params['name'],
             'training_data_source': data_source,
             'trained_at': datetime.now(timezone.utc).isoformat(),
             'feature_names': feature_names,

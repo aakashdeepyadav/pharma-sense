@@ -27,6 +27,7 @@ async function bootstrapAdmin() {
       { name: 'Pharmacist', permissions: 'medicine:write,stock:write' },
       { name: 'Inventory Manager', permissions: 'medicine:write,supplier:write,stock:write' },
       { name: 'Staff', permissions: 'inventory:read' },
+      { name: 'Management', permissions: 'reports:read,replenishment:read' },
     ];
     const roles = await Promise.all(roleDefinitions.map((role) => database.role.upsert({
       where: { name: role.name },

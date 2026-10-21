@@ -65,7 +65,7 @@ The tenant boundary for the MVP is one organization per deployment. Multi-tenant
 ### MVP functional requirements
 
 - Authenticate users with login and logout behavior; issue short-lived JWT access tokens and support revocation/session invalidation.
-- Authorize actions for Admin, Pharmacist, Inventory Manager, and Staff roles.
+- Authorize actions for Admin, Pharmacist, Inventory Manager, Staff, and Management roles.
 - Allow Admins to list/create users, update names/emails/roles, reset managed passwords, and deactivate/reactivate accounts; allow users to change their own passwords; prevent self-demotion, self-deactivation, or removal of the last active Admin.
 - Create, read, update, search, and filter medicines.
 - Store generic name, brand name, category, manufacturer, dosage/form, unit, reorder level, barcode, and active status.

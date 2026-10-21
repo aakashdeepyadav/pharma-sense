@@ -15,6 +15,7 @@ async function seed() {
     { name: 'Pharmacist', permissions: 'medicine:write,stock:write' },
     { name: 'Inventory Manager', permissions: 'medicine:write,supplier:write,stock:write' },
     { name: 'Staff', permissions: 'inventory:read' },
+    { name: 'Management', permissions: 'reports:read,replenishment:read' },
   ];
   const savedRoles = await Promise.all(roles.map((role) => prisma.role.upsert({
     where: { name: role.name },

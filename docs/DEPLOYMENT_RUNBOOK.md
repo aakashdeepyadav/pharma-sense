@@ -1,8 +1,79 @@
 # Deployment and Rehearsal Runbook
 
-This runbook covers local rehearsal and the recommended résumé-demo deployment: Vercel for the static Vite frontend, plus a Render API and managed PostgreSQL database in the same Singapore region. The Render Blueprint in [`render.yaml`](../render.yaml) creates only the API and database; `frontend/vercel.json` sets frontend security headers and long-lived caching for Vite's content-hashed assets. Review provider pricing before creating paid resources.
+This runbook covers local rehearsal and a zero-cost résumé/demo deployment:
+Cloudflare Pages for the static Vite frontend, Render's free web service for
+the Node API, and Neon or Supabase's free PostgreSQL tier for the database.
+Free tiers change over time and may sleep, suspend, limit usage, or remove
+backups. This path is suitable for a demo or controlled pilot, not
+availability-critical production.
 
-## Recommended deployment: Vercel frontend + paid Render API/database
+The Render Blueprint in [`render.yaml`](../render.yaml) is configured for a
+managed Render database and should not be used unchanged if the goal is
+zero-cost hosting. Keep the API service configuration, but provide the
+external free PostgreSQL `DATABASE_URL` manually and do not create a paid
+Render database.
+
+The frontend can also be hosted on Vercel's free tier. Cloudflare Pages is
+recommended here because the frontend is a static Vite build and does not
+need a server runtime.
+
+## Zero-cost deployment
+
+1. Create a free PostgreSQL database on Neon or Supabase. Copy its pooled or
+   direct connection string as `DATABASE_URL`; never commit it.
+2. Create a free Render web service from the repository. Set the root
+   directory to `backend`, build command to
+   `npm ci && npx prisma generate && npm run build`, and start command to
+   `npm start`. Run `npx prisma migrate deploy` once from a trusted machine
+   against the hosted database before the first API start, or configure the
+   provider's pre-deploy command if available on the selected free plan.
+3. Configure the API variables:
+
+   ```text
+   NODE_ENV=production
+   DATABASE_URL=<free-provider-postgres-url>
+   JWT_SECRET=<unique-random-secret-at-least-32-characters>
+   MFA_ENCRYPTION_KEY=<unique-base64-encoded-32-byte-key>
+   REQUIRE_PRIVILEGED_MFA=true
+   FRONTEND_URLS=https://<your-pages-domain>
+   TRUST_PROXY_HOPS=1
+   ```
+
+   Generate secrets locally, for example:
+
+   ```powershell
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+   ```
+
+4. Confirm the API health endpoint returns database connectivity:
+
+   ```text
+   https://<your-render-domain>/health
+   ```
+
+5. Create the first administrator only for initial setup using the provider's
+   one-time environment variables or a controlled bootstrap process. Enroll
+   MFA, save recovery codes, change the password, and remove bootstrap
+   variables immediately afterward.
+6. Create a free Cloudflare Pages project from the repository with root
+   directory `frontend`, build command `npm run build`, and output directory
+   `dist`. Set:
+
+   ```text
+   VITE_API_URL=https://<your-render-domain>
+   ```
+
+7. Add the final Pages URL to `FRONTEND_URLS` on the API and redeploy the API.
+   Update the API origin in `frontend/vercel.json` if its CSP is used in the
+   deployed frontend.
+
+The packaged LightGBM model is deployed with the backend source at
+`backend/ml-artifacts/lightgbm_model.json`; no separate paid model-hosting
+service is needed. Train it locally with
+`npm run research:ml:operational`, review the metrics, and commit the approved
+artifact before deploying the API.
+
+## Paid deployment option: Vercel frontend + Render API/database
 
 1. Push this repository to a Git provider connected to Render and Vercel. Create a Render Blueprint from `render.yaml` on the intended branch and review the paid API/database plans before approving resource creation. Keep the API and database in Singapore so the API can use the database's private connection.
 2. During initial Blueprint creation, set `FRONTEND_URLS` to the production frontend origin(s) (for example, `https://example.com,https://www.example.com`) and set `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, and a unique `BOOTSTRAP_ADMIN_PASSWORD` of at least 16 characters. The one-time deploy hook creates the first administrator and application roles; it does not seed demo inventory.

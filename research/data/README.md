@@ -47,12 +47,15 @@ It is intentionally separate from `research:ml` so a synthetic fallback cannot
 silently replace an operational release. Confirm the readiness, governance,
 privacy, and model-review gates before running it for a deployed environment.
 
-This script trains and selects a LightGBM regressor using calendar, lag, and
-rolling-window features. It compares three regularized parameter sets with
-three rolling time-series validation folds, then evaluates the selected model
-on a final chronological holdout. It also reports naive and seven-day
-moving-average baselines, per-medicine metrics, feature importance, and a
-dataset coverage profile.
+This script benchmarks LightGBM, Extra Trees, Random Forest, and
+HistGradientBoosting using the same calendar, lag, and rolling-window
+features and three rolling time-series validation folds. It then selects the
+best LightGBM configuration for the portable TypeScript inference artifact,
+because the live API currently evaluates LightGBM tree exports directly. The
+results also identify the best benchmark model overall, including models that
+are not yet deployable through the live API. A final chronological holdout,
+naive and seven-day moving-average baselines, per-medicine metrics, feature
+importance, and dataset coverage profile are also reported.
 
 The current synthetic run selected `lightgbm_regularized`:
 
@@ -77,6 +80,23 @@ The current operational run selected `lightgbm_baseline`:
 - final holdout seven-day moving-average MAE: `1.834`
 - final holdout naive MAE: `2.001`
 
+The latest operational multi-model benchmark ranked the models as follows by
+rolling-validation MAE:
+
+- Extra Trees: `0.740` (best overall benchmark; not currently deployable by the
+  TypeScript runtime)
+- LightGBM baseline: `0.750` (best deployable model and currently exported)
+- HistGradientBoosting: `0.750` (not currently deployable by the TypeScript
+  runtime)
+- Random Forest: `0.757` (not currently deployable by the TypeScript runtime)
+- LightGBM regularized: `0.769`
+- LightGBM conservative: `1.004`
+
+These rankings are model-selection evidence on the current operational
+dataset, not a guarantee of future performance. Extra Trees should only
+replace the live artifact after a compatible inference implementation and
+the same governance/release checks are completed.
+
 The operational data contains no stockout-censored rows. That is a limitation
 for production demand interpretation: observed issues may not represent
 unmet demand during stockouts. The model artifact is therefore operationally
@@ -91,4 +111,4 @@ selection so the demonstration inference model uses the full development
 history. The API evaluates those exported trees directly in TypeScript; a
 separate Python inference server is not required.
 
-The live endpoint `GET /api/v1/reports/forecast-ml/predictions?medicineId={id}` applies the packaged model to 30 full UTC days of that medicine's stock OUT transactions. The current packaged model was trained on synthetic data and is only a working demonstration; its prediction is not production-calibrated. If operational data is selected, the script intentionally does not export a deployable model. Operational model release requires approved data, representative evaluation, and private governance.
+The live endpoint `GET /api/v1/reports/forecast-ml/predictions?medicineId={id}` applies the packaged model to 30 full UTC days of that medicine's stock OUT transactions. The packaged model is generated from whichever dataset passes the readiness gate. `npm run research:ml` exports a synthetic artifact for development when operational history is insufficient, while `npm run research:ml:operational` explicitly exports an operational artifact. The operational command must only be run after approved data, representative evaluation, privacy review, and model governance sign-off. Training success alone does not make a model production-calibrated.

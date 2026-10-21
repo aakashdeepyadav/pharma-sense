@@ -72,6 +72,20 @@ describe('LightGBM inference', () => {
     assert.throws(() => buildLightGbmFeatures([1, 2, 3], new Date()), /30 days/);
   });
 
+  it('rejects an artifact without any prediction trees', () => {
+    const features = Object.fromEntries(LIGHTGBM_FEATURE_NAMES.map((name) => [name, 0]));
+    const artifact: LightGbmArtifact = {
+      format: 'lightgbm-booster-json-v1',
+      model: 'test model',
+      training_data_source: 'synthetic',
+      trained_at: '2025-01-01T00:00:00.000Z',
+      feature_names: [...LIGHTGBM_FEATURE_NAMES],
+      booster: { tree_info: [] },
+    };
+
+    assert.throws(() => predictLightGbm(artifact, features), /artifact is invalid/);
+  });
+
   it('loads the packaged model and returns a finite inference result', async () => {
     const artifact = await loadLightGbmArtifact();
     const features = buildLightGbmFeatures(

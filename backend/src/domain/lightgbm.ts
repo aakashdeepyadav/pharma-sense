@@ -113,9 +113,11 @@ export function predictLightGbm(artifact: LightGbmArtifact, featureValues: Recor
   if (
     artifact.format !== 'lightgbm-booster-json-v1' ||
     artifact.feature_names.length !== LIGHTGBM_FEATURE_NAMES.length ||
-    !LIGHTGBM_FEATURE_NAMES.every((name, index) => artifact.feature_names[index] === name)
+    !LIGHTGBM_FEATURE_NAMES.every((name, index) => artifact.feature_names[index] === name) ||
+    !Array.isArray(artifact.booster.tree_info) ||
+    artifact.booster.tree_info.length === 0
   ) {
-    throw new Error('The LightGBM model artifact does not match the runtime feature schema.');
+    throw new Error('The LightGBM model artifact is invalid or does not match the runtime feature schema.');
   }
 
   const features = artifact.feature_names.map((name) => featureValues[name]);
@@ -129,4 +131,3 @@ export function predictLightGbm(artifact: LightGbmArtifact, featureValues: Recor
   );
   return Math.max(0, prediction);
 }
-

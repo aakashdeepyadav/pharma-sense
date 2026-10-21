@@ -434,6 +434,14 @@ const roleThemeMap: Record<
     workspace: "Daily stock movement",
     priorities: ["Issue and adjust stock", "Monitor alerts and coverage", "Escalate replenishment needs"],
   },
+  Management: {
+    tone: "bg-slate-100 text-slate-800 border-slate-200",
+    accent: "text-slate-700",
+    description:
+      "Read-only visibility into inventory health, demand risk, and reviewed recommendations.",
+    workspace: "Management reporting and oversight",
+    priorities: ["Review inventory health", "Monitor demand risk", "Track approved replenishment reviews"],
+  },
 };
 
 function App() {
@@ -1898,6 +1906,11 @@ function App() {
     session.user.role,
   );
   const canManageUsers = session.user.role === "Admin";
+  const canReviewReplenishment = [
+    "Admin",
+    "Pharmacist",
+    "Inventory Manager",
+  ].includes(session.user.role);
   const filteredMedicines = medicines.filter((medicine) => {
     const search = medicineSearch.trim().toLowerCase();
     return (
@@ -3422,7 +3435,7 @@ function App() {
                   <span className="text-xs font-semibold uppercase text-gray-500">
                     {alert.type.replaceAll("_", " ")}
                   </span>
-                  {alert.status === "OPEN" && (
+                  {alert.status === "OPEN" && session.user.role !== "Management" && (
                     <button
                       onClick={() => void acknowledgeAlert(alert.id)}
                       className="text-blue-600 hover:text-blue-800 font-medium"
@@ -3486,38 +3499,42 @@ function App() {
                       <p className="text-xs text-gray-500">units to review</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleReplenishmentDecision(
-                            item.medicineId,
-                            "APPROVED",
-                          )
-                        }
-                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={
-                          savingReplenishmentDecision ||
-                          decision === "APPROVED"
-                        }
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleReplenishmentDecision(
-                            item.medicineId,
-                            "DISMISSED",
-                          )
-                        }
-                        className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={
-                          savingReplenishmentDecision ||
-                          decision === "DISMISSED"
-                        }
-                      >
-                        Dismiss
-                      </button>
+                      {canReviewReplenishment && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleReplenishmentDecision(
+                                item.medicineId,
+                                "APPROVED",
+                              )
+                            }
+                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={
+                              savingReplenishmentDecision ||
+                              decision === "APPROVED"
+                            }
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleReplenishmentDecision(
+                                item.medicineId,
+                                "DISMISSED",
+                              )
+                            }
+                            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={
+                              savingReplenishmentDecision ||
+                              decision === "DISMISSED"
+                            }
+                          >
+                            Dismiss
+                          </button>
+                        </>
+                      )}
                     </div>
                     {decision === "APPROVED" && canReceiveStock && (
                       <button
