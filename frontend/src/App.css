@@ -208,6 +208,106 @@
   font-size: 0.8rem;
 }
 
+.scan-code-button {
+  min-height: 30px !important;
+  padding: 5px 10px;
+  border: 1px solid #a9d8ce;
+  border-radius: 8px !important;
+  background: #effaf7;
+  color: #11756f;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.scan-code-button:hover {
+  border-color: #66b9aa;
+  background: #dff5ee;
+}
+
+.barcode-scanner-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #b9dcd3;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #f2fbf8, #f7fbff);
+  box-shadow: 0 14px 28px rgba(29, 77, 69, 0.1);
+}
+
+.barcode-scanner-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.barcode-scanner-header h3 {
+  margin: 3px 0 0;
+  color: #153f3b;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.barcode-scanner-close {
+  min-height: 32px !important;
+  padding: 5px 9px;
+  border: 1px solid #d2e2de;
+  border-radius: 8px !important;
+  background: #fff;
+  color: #5d716c;
+  font-size: 0.75rem;
+}
+
+.barcode-scanner-viewport {
+  position: relative;
+  overflow: hidden;
+  min-height: 220px;
+  border: 1px solid #174f4d;
+  border-radius: 13px;
+  background: #102e30;
+}
+
+.barcode-scanner-viewport video {
+  display: block;
+  width: 100%;
+  min-height: 220px;
+  object-fit: cover;
+}
+
+.barcode-scanner-target {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 72%;
+  height: 42%;
+  border: 2px solid #8ce0c4;
+  border-radius: 12px;
+  box-shadow: 0 0 0 999px rgba(4, 24, 26, 0.3);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.barcode-scanner-help,
+.barcode-scanner-error {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.barcode-scanner-help {
+  color: #58716b;
+}
+
+.barcode-scanner-error {
+  padding: 9px 11px;
+  border: 1px solid #f0caca;
+  border-radius: 9px;
+  background: #fff6f6;
+  color: #a33a3a;
+}
+
 .workspace-disclosure {
   overflow: hidden;
   border: 1px solid #e2e8f0;

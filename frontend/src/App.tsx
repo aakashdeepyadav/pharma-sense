@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
 import QRCode from "qrcode";
 import { apiFetch, fetchAllPages, readAllPages } from "./api";
 import "./App.css";
@@ -339,6 +340,74 @@ function MfaQrCode({ value }: { value: string }) {
   );
 }
 
+function BarcodeScanner({
+  onDetected,
+  onClose,
+}: {
+  onDetected: (value: string) => void;
+  onClose: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const controlsRef = useRef<IScannerControls | null>(null);
+  const onDetectedRef = useRef(onDetected);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    onDetectedRef.current = onDetected;
+  }, [onDetected]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const reader = new BrowserMultiFormatReader();
+    let active = true;
+
+    reader
+      .decodeFromVideoDevice(undefined, video, (result) => {
+        if (active && result) {
+          onDetectedRef.current(result.getText());
+        }
+      })
+      .then((controls) => {
+        if (active) {
+          controlsRef.current = controls;
+        } else {
+          controls.stop();
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setError("Camera access was unavailable. Allow camera access or enter the code manually.");
+        }
+      });
+
+    return () => {
+      active = false;
+      controlsRef.current?.stop();
+      controlsRef.current = null;
+    };
+  }, []);
+
+  return (
+    <div className="barcode-scanner-panel" role="dialog" aria-modal="true" aria-labelledby="barcode-scanner-title">
+      <div className="barcode-scanner-header">
+        <div>
+          <p className="auth-eyebrow">Medicine identification</p>
+          <h3 id="barcode-scanner-title">Scan barcode or QR code</h3>
+        </div>
+        <button type="button" onClick={onClose} className="barcode-scanner-close">Close</button>
+      </div>
+      <div className="barcode-scanner-viewport">
+        <video ref={videoRef} muted playsInline autoPlay aria-label="Barcode scanner camera" />
+        <span className="barcode-scanner-target" aria-hidden="true" />
+      </div>
+      <p className="barcode-scanner-help">Hold the code inside the frame. The value will be added to the medicine barcode field.</p>
+      {error && <p className="barcode-scanner-error" role="status">{error}</p>}
+    </div>
+  );
+}
+
 type ApiErrorPayload = {
   code?: string;
   message?: string;
@@ -519,6 +588,7 @@ function App() {
   const [medicineSearch, setMedicineSearch] = useState("");
   const [supplierSearch, setSupplierSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
   const medicineNameInputRef = useRef<HTMLInputElement>(null);
   const medicineReturnFocusRef = useRef<HTMLElement | null>(null);
@@ -3240,12 +3310,22 @@ function App() {
                 />
               </label>
               <label className="text-sm font-medium text-gray-700">
-                Barcode
+                <span className="flex items-center justify-between gap-3">
+                  Barcode
+                  <button
+                    type="button"
+                    onClick={() => setBarcodeScannerOpen(true)}
+                    className="scan-code-button"
+                  >
+                    Scan code
+                  </button>
+                </span>
                 <input
                   value={form.barcode}
                   onChange={(event) =>
                     setForm({ ...form, barcode: event.target.value })
                   }
+                  placeholder="Scan or enter a barcode"
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
                 />
               </label>
@@ -3305,6 +3385,15 @@ function App() {
                 Active medicine
               </label>
             </div>
+            {barcodeScannerOpen && (
+              <BarcodeScanner
+                onDetected={(value) => {
+                  setForm((current) => ({ ...current, barcode: value }));
+                  setBarcodeScannerOpen(false);
+                }}
+                onClose={() => setBarcodeScannerOpen(false)}
+              />
+            )}
             <div className="flex justify-end gap-3 mt-6">
               <button
                 type="button"
