@@ -2292,9 +2292,10 @@ function App() {
             <button
               onClick={openCreateUserForm}
               disabled={managedRoles.length === 0}
+              aria-label="Add a new user"
               className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              + User
+              Add user
             </button>
           )}
         </div>

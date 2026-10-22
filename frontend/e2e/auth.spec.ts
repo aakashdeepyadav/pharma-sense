@@ -330,6 +330,18 @@ test("loads replenishment review decisions from the shared API", async ({
   ).toBeDisabled();
 });
 
+test("shows admin user creation without opening management history", async ({
+  page,
+}) => {
+  await mockDashboardApi(page, "Admin");
+  await signIn(page);
+
+  const addUserButton = page.getByRole("button", { name: "Add a new user" });
+  await expect(addUserButton).toBeVisible();
+  await addUserButton.click();
+  await expect(page.getByRole("heading", { name: "Add user" })).toBeVisible();
+});
+
 test("loads medicines beyond the first API page", async ({ page }) => {
   await mockDashboardApi(page, "Admin", false, true);
   await signIn(page);
