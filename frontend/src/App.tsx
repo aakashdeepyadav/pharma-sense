@@ -378,7 +378,7 @@ async function fetchUserAdministration(token: string) {
 
 function readStoredSession(): Session | null {
   try {
-    const storedSession = sessionStorage.getItem("pharmasense-session");
+    const storedSession = localStorage.getItem("pharmasense-session");
     if (!storedSession) return null;
 
     const parsed = JSON.parse(storedSession) as Partial<Session>;
@@ -387,13 +387,13 @@ function readStoredSession(): Session | null {
       typeof parsed.user?.name !== "string" ||
       typeof parsed.user?.role !== "string"
     ) {
-      sessionStorage.removeItem("pharmasense-session");
+      localStorage.removeItem("pharmasense-session");
       return null;
     }
 
     return parsed as Session;
   } catch {
-    sessionStorage.removeItem("pharmasense-session");
+    localStorage.removeItem("pharmasense-session");
     return null;
   }
 }
@@ -784,7 +784,7 @@ function App() {
   };
 
   const startAuthenticatedSession = (nextSession: Session) => {
-    sessionStorage.setItem("pharmasense-session", JSON.stringify(nextSession));
+    localStorage.setItem("pharmasense-session", JSON.stringify(nextSession));
     setLoading(true);
     setMfaFlow(null);
     setSession(nextSession);
@@ -1559,7 +1559,7 @@ function App() {
         "Signed out on this device, but server revocation could not be confirmed.",
       );
     } finally {
-      sessionStorage.removeItem("pharmasense-session");
+      localStorage.removeItem("pharmasense-session");
       setSession(null);
       setForecastBaseline(null);
       setForecastMl(null);
@@ -1598,7 +1598,7 @@ function App() {
         );
       }
 
-      sessionStorage.removeItem("pharmasense-session");
+      localStorage.removeItem("pharmasense-session");
       setPasswordChangeOpen(false);
       setPasswordChangeForm({
         currentPassword: "",
@@ -1653,7 +1653,7 @@ function App() {
           role: result.data.role,
         },
       };
-      sessionStorage.setItem(
+      localStorage.setItem(
         "pharmasense-session",
         JSON.stringify(updatedSession),
       );
