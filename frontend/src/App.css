@@ -179,6 +179,35 @@
   border-radius: 6px;
 }
 
+.mfa-qr-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  margin: 4px auto 0;
+  padding: 13px;
+  border: 1px solid #cde2dc;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(24, 84, 73, 0.12);
+}
+
+.mfa-qr-frame canvas {
+  display: block;
+  width: 208px;
+  height: 208px;
+  image-rendering: pixelated;
+}
+
+.mfa-qr-error {
+  padding: 12px;
+  border: 1px solid #f2c7c7;
+  border-radius: 12px;
+  background: #fff5f5;
+  color: #a33a3a;
+  font-size: 0.8rem;
+}
+
 .workspace-disclosure {
   overflow: hidden;
   border: 1px solid #e2e8f0;

@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
 } from "react";
+import QRCode from "qrcode";
 import { apiFetch, fetchAllPages, readAllPages } from "./api";
 import "./App.css";
 
@@ -303,6 +304,40 @@ type MfaFlow =
   | { stage: "verify"; challengeToken: string }
   | { stage: "setup"; challengeToken: string; secret: string; otpauthUrl: string }
   | { stage: "recovery"; session: Session; recoveryCodes: string[] };
+
+function MfaQrCode({ value }: { value: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let active = true;
+    QRCode.toCanvas(canvas, value, {
+      width: 208,
+      margin: 2,
+      errorCorrectionLevel: "M",
+      color: { dark: "#123f3b", light: "#ffffff" },
+    }).catch(() => {
+      if (active) setError("The QR code could not be generated. Use the manual setup key below.");
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [value]);
+
+  if (error) {
+    return <p role="alert" className="mfa-qr-error">{error}</p>;
+  }
+
+  return (
+    <div className="mfa-qr-frame">
+      <canvas ref={canvasRef} aria-label="Authenticator QR code" />
+    </div>
+  );
+}
 
 type ApiErrorPayload = {
   code?: string;
@@ -1834,7 +1869,9 @@ function App() {
                 {mfaFlow.stage === "setup" ? (
                   <>
                     <h3 className="text-lg font-semibold text-slate-900">Set up an authenticator</h3>
-                    <p className="text-sm text-slate-600">Add this account in an authenticator app using the setup key below, then enter its current six-digit code.</p>
+                    <p className="text-sm text-slate-600">Scan this QR code with your authenticator app, then enter its current six-digit code.</p>
+                    <MfaQrCode value={mfaFlow.otpauthUrl} />
+                    <p className="text-center text-xs font-medium text-slate-500">Can’t scan? Use the manual setup key below.</p>
                     <div className="break-all rounded-xl bg-slate-100 p-3 font-mono text-sm" aria-label="Authenticator setup key">{mfaFlow.secret}</div>
                     <details className="text-xs text-slate-500"><summary className="cursor-pointer">Manual setup URI</summary><p className="mt-2 break-all">{mfaFlow.otpauthUrl}</p></details>
                   </>
