@@ -227,11 +227,11 @@
   --brand-dark: #0b565a;
   position: relative;
   isolation: isolate;
-  background-color: #f3f6f5;
+  background-color: #eef5f3;
   background-image:
     radial-gradient(circle at 8% 2%, rgba(91, 190, 179, 0.14), transparent 25rem),
     radial-gradient(circle at 92% 18%, rgba(104, 126, 224, 0.08), transparent 23rem),
-    linear-gradient(180deg, #f8fbfa 0%, #edf4f2 100%);
+    linear-gradient(180deg, #f7fbfa 0%, #e8f1ef 100%);
 }
 
 .dashboard-shell::before {
@@ -248,12 +248,12 @@
 .dashboard-header {
   position: relative;
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: 24px;
   border-color: var(--line);
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.98), rgba(242, 250, 248, 0.96)),
     var(--surface);
-  box-shadow: 0 18px 44px rgba(29, 77, 69, 0.1);
+  box-shadow: 0 24px 60px rgba(29, 77, 69, 0.12), 0 2px 4px rgba(29, 77, 69, 0.04);
 }
 
 .dashboard-header::after {
@@ -267,6 +267,16 @@
   box-shadow: 0 0 0 2rem rgba(15, 107, 112, 0.025), 0 0 0 4rem rgba(15, 107, 112, 0.018);
   content: "";
   pointer-events: none;
+}
+
+.dashboard-header::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, #0f6b70, #2d9ca3 46%, #79c9ad);
+  content: "";
 }
 
 .role-workspace-panel {
@@ -366,7 +376,36 @@
 }
 
 .dashboard-metric-grid > div {
+  min-height: 142px;
   padding: 22px 22px 20px;
+}
+
+.dashboard-metric-grid > div::after {
+  position: absolute;
+  right: -18px;
+  bottom: -28px;
+  width: 92px;
+  height: 92px;
+  border: 1px solid rgba(15, 107, 112, 0.1);
+  border-radius: 999px;
+  box-shadow: 0 0 0 12px rgba(15, 107, 112, 0.025);
+  content: "";
+  pointer-events: none;
+}
+
+.dashboard-metric-grid > div:nth-child(2)::after {
+  border-color: rgba(220, 90, 90, 0.13);
+  box-shadow: 0 0 0 12px rgba(220, 90, 90, 0.025);
+}
+
+.dashboard-metric-grid > div:nth-child(3)::after {
+  border-color: rgba(121, 103, 199, 0.13);
+  box-shadow: 0 0 0 12px rgba(121, 103, 199, 0.025);
+}
+
+.dashboard-metric-grid > div:nth-child(4)::after {
+  border-color: rgba(45, 156, 163, 0.13);
+  box-shadow: 0 0 0 12px rgba(45, 156, 163, 0.025);
 }
 
 .dashboard-metric-grid h3 {
@@ -386,7 +425,7 @@
 
 .dashboard-section {
   position: relative;
-  box-shadow: 0 12px 28px rgba(29, 77, 69, 0.06) !important;
+  box-shadow: 0 16px 34px rgba(29, 77, 69, 0.075) !important;
 }
 
 .dashboard-section > div:first-child {
@@ -540,6 +579,42 @@
   box-shadow: 0 8px 16px rgba(37, 99, 235, 0.2);
 }
 
+.dashboard-shell .dashboard-actions {
+  gap: 10px;
+}
+
+.dashboard-shell .dashboard-actions::before {
+  flex: 0 0 100%;
+  color: #6d817c;
+  content: "Quick actions";
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .role-workspace-panel {
+  border-color: rgba(15, 107, 112, 0.16);
+  background:
+    linear-gradient(135deg, rgba(238, 250, 246, 0.95), rgba(245, 249, 255, 0.9)),
+    #f8fbfb;
+  box-shadow: 0 12px 24px rgba(29, 77, 69, 0.06);
+}
+
+.dashboard-shell .role-workspace-panel h2 {
+  color: #123f3d;
+  font-size: 1.12rem;
+}
+
+.dashboard-shell .dashboard-section > div:first-child {
+  min-height: 82px;
+}
+
+.dashboard-shell .dashboard-section > div:first-child h2 {
+  color: #163b38;
+  font-size: 1.08rem;
+}
+
 .dashboard-shell .role-priority-list li {
   min-height: 44px;
   padding: 9px 10px;
@@ -571,6 +646,14 @@
 
   .role-workspace-panel {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-header {
+    border-radius: 18px;
+  }
+
+  .dashboard-shell .dashboard-actions::before {
+    flex-basis: 100%;
   }
 
   .auth-shell {
