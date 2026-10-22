@@ -291,6 +291,8 @@
 
 .barcode-scanner-help,
 .barcode-scanner-error {
+  display: grid;
+  gap: 3px;
   margin: 0;
   font-size: 0.78rem;
   line-height: 1.45;
@@ -300,12 +302,21 @@
   color: #58716b;
 }
 
+.barcode-scanner-help strong {
+  color: #315d57;
+  font-size: 0.82rem;
+}
+
 .barcode-scanner-error {
   padding: 9px 11px;
   border: 1px solid #f0caca;
   border-radius: 9px;
   background: #fff6f6;
   color: #a33a3a;
+}
+
+.barcode-scanner-error strong {
+  color: #8f2f2f;
 }
 
 .workspace-disclosure {

@@ -350,6 +350,7 @@ function BarcodeScanner({
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const onDetectedRef = useRef(onDetected);
+  const detectedRef = useRef(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -365,8 +366,12 @@ function BarcodeScanner({
 
     reader
       .decodeFromVideoDevice(undefined, video, (result) => {
-        if (active && result) {
-          onDetectedRef.current(result.getText());
+        if (active && result && !detectedRef.current) {
+          const value = result.getText().trim();
+          if (value) {
+            detectedRef.current = true;
+            onDetectedRef.current(value);
+          }
         }
       })
       .then((controls) => {
@@ -402,8 +407,19 @@ function BarcodeScanner({
         <video ref={videoRef} muted playsInline autoPlay aria-label="Barcode scanner camera" />
         <span className="barcode-scanner-target" aria-hidden="true" />
       </div>
-      <p className="barcode-scanner-help">Hold the code inside the frame. The value will be added to the medicine barcode field.</p>
-      {error && <p className="barcode-scanner-error" role="status">{error}</p>}
+      {error ? (
+        <div className="barcode-scanner-error" role="alert">
+          <strong>Camera unavailable</strong>
+          <span>{error}</span>
+          <span>Allow camera access in your browser settings, or close this panel and enter the code manually.</span>
+        </div>
+      ) : (
+        <div className="barcode-scanner-help">
+          <strong>How to scan</strong>
+          <span>Hold the barcode or QR code inside the frame. Keep it steady and well lit.</span>
+          <span>After a successful scan, the value will be added automatically.</span>
+        </div>
+      )}
     </div>
   );
 }
