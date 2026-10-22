@@ -3293,11 +3293,11 @@ function App() {
           <h3 className="text-gray-500 font-medium mb-2">
             Total Medicines (SKUs)
           </h3>
-          <p className="text-3xl font-bold text-gray-900">{medicines.length}</p>
+          <p className="metric-value text-3xl font-bold text-gray-900">{medicines.length}</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 font-medium mb-2">Low Stock Alerts</h3>
-          <p className="text-3xl font-bold text-red-600">
+          <p className="metric-value text-3xl font-bold text-red-600">
             {alerts.filter(
               (alert) =>
                 alert.type === "LOW_STOCK" || alert.type === "OUT_OF_STOCK",
@@ -3306,17 +3306,17 @@ function App() {
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 font-medium mb-2">Forecast watchlist</h3>
-          <p className="text-3xl font-bold text-violet-600">
+          <p className="metric-value text-3xl font-bold text-violet-600">
             {queuedRiskCount}
           </p>
-          <p className="text-gray-500 text-sm mt-1">Medium + high risk</p>
+          <p className="metric-caption text-gray-500 text-sm mt-1">Medium + high risk</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 font-medium mb-2">Review queue</h3>
-          <p className="text-3xl font-bold text-cyan-600">
+          <p className="metric-value text-3xl font-bold text-cyan-600">
             {pendingReviewCount}
           </p>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="metric-caption text-gray-500 text-sm mt-1">
             Pending · {approvedReviewCount} approved
           </p>
         </div>
@@ -3331,9 +3331,13 @@ function App() {
           </p>
         </div>
         {forecastRisk.length === 0 ? (
-          <p className="p-6 text-gray-500">
-            No forecast risk data is available yet.
-          </p>
+          <div className="dashboard-empty-state">
+            <span className="dashboard-empty-icon" aria-hidden="true">◌</span>
+            <div>
+              <p className="dashboard-empty-title">Forecasting is ready for data</p>
+              <p>Issue stock over time to build demand history and surface risk signals here.</p>
+            </div>
+          </div>
         ) : (
           <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
             {forecastRisk.map((item) => {
@@ -3406,9 +3410,13 @@ function App() {
           <h2 className="text-xl font-bold text-gray-900">Inventory alerts</h2>
         </div>
         {alerts.length === 0 ? (
-          <p className="p-6 text-gray-500">
-            No stock or expiry alerts right now.
-          </p>
+          <div className="dashboard-empty-state">
+            <span className="dashboard-empty-icon dashboard-empty-icon-success" aria-hidden="true">✓</span>
+            <div>
+              <p className="dashboard-empty-title">Inventory is clear</p>
+              <p>No stock or expiry alerts need attention right now.</p>
+            </div>
+          </div>
         ) : (
           <div className="divide-y divide-gray-100">
             {alerts.map((alert) => (
@@ -3462,9 +3470,13 @@ function App() {
           </p>
         </div>
         {replenishmentQueue.length === 0 ? (
-          <p className="p-6 text-gray-500">
-            No replenishment review is suggested right now.
-          </p>
+          <div className="dashboard-empty-state">
+            <span className="dashboard-empty-icon dashboard-empty-icon-purple" aria-hidden="true">↗</span>
+            <div>
+              <p className="dashboard-empty-title">No review actions yet</p>
+              <p>Replenishment suggestions will appear when recent demand indicates a stock risk.</p>
+            </div>
+          </div>
         ) : (
           <div className="divide-y divide-gray-100">
             {replenishmentQueue.map((item) => {
@@ -3839,7 +3851,7 @@ function App() {
                 <tr>
                   <td
                     colSpan={7}
-                    className="px-6 py-8 text-center text-gray-500"
+                    className="inventory-empty-cell"
                   >
                     Loading inventory data...
                   </td>
@@ -3847,8 +3859,8 @@ function App() {
               ) : filteredMedicines.length === 0 && !error ? (
                 <tr>
                   <td
-                    colSpan={5}
-                    className="px-6 py-8 text-center text-gray-500"
+                    colSpan={7}
+                    className="inventory-empty-cell"
                   >
                     {medicines.length === 0
                       ? "No medicines have been added yet."
