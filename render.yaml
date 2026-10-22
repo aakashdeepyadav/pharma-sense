@@ -16,7 +16,7 @@ services:
     rootDir: backend
     buildCommand: npm ci --include=dev && npx prisma generate && npm run build
     preDeployCommand: npx prisma migrate deploy
-    startCommand: npm start
+    startCommand: npx prisma migrate deploy && npm start
     healthCheckPath: /health
     initialDeployHook: npm run bootstrap:admin
     maxShutdownDelaySeconds: 60

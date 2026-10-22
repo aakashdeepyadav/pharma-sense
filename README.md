@@ -211,7 +211,7 @@ Set these deployment values:
 | Vercel | Root directory | `frontend` |
 | Vercel | Build command | `npm run build` |
 | Vercel | Output directory | `dist` |
-| Vercel | `VITE_API_URL` | `https://pharmasense-api.onrender.com` |
+| Vercel | `VITE_API_URL` | `https://pharmasense-api-mtei.onrender.com` |
 | Render | `FRONTEND_URLS` | Comma-separated production frontend origins, such as `https://example.com,https://www.example.com` |
 | Render | Bootstrap admin values | Set once during initial setup; remove after the first admin is secured |
 
