@@ -85,7 +85,7 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
   ).toBeVisible();
 
   const restrictedToken = await page.evaluate(() => {
-    const storedSession = sessionStorage.getItem("pharmasense-session");
+    const storedSession = localStorage.getItem("pharmasense-session");
     return storedSession
       ? (JSON.parse(storedSession) as { token: string }).token
       : "";
