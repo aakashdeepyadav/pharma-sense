@@ -28,7 +28,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "cd ../backend && npx prisma migrate deploy && " +
+        "cd ../backend && npx prisma generate && npx prisma migrate deploy && " +
         "npx tsx src/scripts/seed.ts && " +
         "npx tsx src/server.ts",
       url: "http://127.0.0.1:5101/health",

@@ -42,7 +42,7 @@ test("creates medicine and supplier, receives a batch, and issues stock", async 
     page.getByRole("heading", { name: "Inventory command center" }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "+ User" }).click();
+  await page.getByRole("button", { name: "Add a new user" }).click();
   await page.getByLabel("Name", { exact: true }).fill(`Browser User ${suffix}`);
   await page.getByLabel("Email", { exact: true }).fill(managedUserEmail);
   await page
