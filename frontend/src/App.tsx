@@ -97,6 +97,27 @@ type ReportSummary = {
   }[];
 };
 
+type AdminStatistics = {
+  generatedAt: string;
+  users: number;
+  activeUsers: number;
+  medicines: number;
+  activeMedicines: number;
+  suppliers: number;
+  batches: number;
+  transactions: number;
+  alerts: number;
+  openAlerts: number;
+  purchases: number;
+  replenishmentReviews: number;
+  last30Days: {
+    transactionCount: number;
+    unitsReceived: number;
+    unitsIssued: number;
+    adjustedUnits: number;
+  };
+};
+
 type ReplenishmentRecommendation = {
   medicineId: number;
   medicineName: string;
@@ -581,6 +602,7 @@ function App() {
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [report, setReport] = useState<ReportSummary | null>(null);
+  const [adminStatistics, setAdminStatistics] = useState<AdminStatistics | null>(null);
   const [forecastRisk, setForecastRisk] = useState<ForecastRisk[]>([]);
   const [forecastBaseline, setForecastBaseline] =
     useState<ForecastBaseline | null>(null);
@@ -730,6 +752,9 @@ function App() {
           apiFetch("/api/v1/reports/forecast-risk", { headers }),
           apiFetch("/api/v1/reports/replenishment", { headers }),
         ]);
+        const adminStatisticsResponse = session.user.role === "Admin"
+          ? await apiFetch("/api/v1/reports/admin-statistics", { headers })
+          : null;
         if (
           !medicineResponse.ok ||
           !categoryResponse.ok ||
@@ -741,6 +766,7 @@ function App() {
           !reportResponse.ok ||
           !forecastRiskResponse.ok ||
           !replenishmentResponse.ok
+          || (adminStatisticsResponse !== null && !adminStatisticsResponse.ok)
         ) {
           throw new Error("The inventory service returned an error.");
         }
@@ -773,19 +799,28 @@ function App() {
           data?: ReplenishmentRecommendation[];
           error?: string | ApiErrorPayload;
         };
+        const adminStatisticsResult = adminStatisticsResponse
+          ? (await adminStatisticsResponse.json()) as {
+              success?: boolean;
+              data?: AdminStatistics;
+              error?: string | ApiErrorPayload;
+            }
+          : null;
 
         if (
           !alertResult.success ||
           !reportResult.success ||
           !forecastRiskResult.success ||
           !replenishmentResult.success
+          || (adminStatisticsResult !== null && !adminStatisticsResult.success)
         ) {
           throw new Error(
             extractErrorMessage(
                 alertResult.error ??
                 reportResult.error ??
                 forecastRiskResult.error ??
-                replenishmentResult.error,
+              replenishmentResult.error ??
+                adminStatisticsResult?.error,
               "Unable to load inventory.",
             ),
           );
@@ -801,6 +836,7 @@ function App() {
         setReport(reportResult.data ?? null);
         setForecastRisk(forecastRiskResult.data ?? []);
         setReplenishment(replenishmentResult.data ?? []);
+        setAdminStatistics(adminStatisticsResult?.data ?? null);
         void apiFetch("/api/v1/reports/forecast-ml", { headers })
           .then(async (res) => {
             if (res.ok) {
@@ -826,6 +862,7 @@ function App() {
         } else {
           setManagedUsers([]);
           setManagedRoles([]);
+          setAdminStatistics(null);
         }
         setError("");
       } catch (requestError) {
@@ -3726,6 +3763,57 @@ function App() {
       {report && (
         <details className="workspace-disclosure mb-8">
           <summary>Reports and analytics</summary>
+          {session.user.role === "Admin" && adminStatistics && (
+            <section className="mb-8 rounded-xl border border-blue-100 bg-blue-50/60 p-6">
+              <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Admin inventory statistics</h2>
+                  <p className="text-sm text-gray-600">
+                    Full operational totals and recent stock movement, visible only to Admin.
+                  </p>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Updated {new Date(adminStatistics.generatedAt).toLocaleString()}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+                {[
+                  ["Users", `${adminStatistics.activeUsers} active / ${adminStatistics.users} total`],
+                  ["Medicines", `${adminStatistics.activeMedicines} active / ${adminStatistics.medicines} total`],
+                  ["Suppliers", adminStatistics.suppliers],
+                  ["Batches", adminStatistics.batches],
+                  ["Open alerts", `${adminStatistics.openAlerts} / ${adminStatistics.alerts}`],
+                  ["Reviews", adminStatistics.replenishmentReviews],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-blue-100 bg-white p-3">
+                    <p className="text-xs text-gray-500">{label}</p>
+                    <p className="mt-1 text-lg font-bold text-gray-900">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 rounded-lg border border-blue-100 bg-white p-4">
+                <h3 className="font-semibold text-gray-900">Last 30 days</h3>
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Transactions</p>
+                    <p className="font-semibold text-gray-900">{adminStatistics.last30Days?.transactionCount ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Units received</p>
+                    <p className="font-semibold text-emerald-700">{adminStatistics.last30Days?.unitsReceived ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Units issued</p>
+                    <p className="font-semibold text-blue-700">{adminStatistics.last30Days?.unitsIssued ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Adjusted units</p>
+                    <p className="font-semibold text-amber-700">{adminStatistics.last30Days?.adjustedUnits ?? 0}</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
           <section className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <div>

@@ -12,6 +12,63 @@ import { sendApiError } from '../lib/api';
 
 const router = Router();
 
+router.get('/admin-statistics', requireRoles('Admin'), async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [users, activeUsers, medicines, activeMedicines, suppliers, batches, transactions, recentTransactions, alerts, openAlerts, purchases, reviews] =
+      await Promise.all([
+        prisma.user.count(),
+        prisma.user.count({ where: { active: true } }),
+        prisma.medicine.count(),
+        prisma.medicine.count({ where: { active: true } }),
+        prisma.supplier.count(),
+        prisma.batch.count(),
+        prisma.stockTransaction.count(),
+        prisma.stockTransaction.findMany({
+          where: { timestamp: { gte: since } },
+          select: { type: true, quantity: true },
+        }),
+        prisma.alert.count(),
+        prisma.alert.count({ where: { status: 'OPEN' } }),
+        prisma.purchase.count(),
+        prisma.replenishmentReview.count(),
+      ]);
+
+    const movementSummary = { in: 0, out: 0, adjustment: 0 };
+    for (const transaction of recentTransactions) {
+      if (transaction.type === 'IN') movementSummary.in += transaction.quantity;
+      if (transaction.type === 'OUT') movementSummary.out += transaction.quantity;
+      if (transaction.type === 'ADJ') movementSummary.adjustment += Math.abs(transaction.quantity);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        generatedAt: new Date().toISOString(),
+        users,
+        activeUsers,
+        medicines,
+        activeMedicines,
+        suppliers,
+        batches,
+        transactions,
+        alerts,
+        openAlerts,
+        purchases,
+        replenishmentReviews: reviews,
+        last30Days: {
+          transactionCount: recentTransactions.length,
+          unitsReceived: movementSummary.in,
+          unitsIssued: movementSummary.out,
+          adjustedUnits: movementSummary.adjustment,
+        },
+      },
+    });
+  } catch {
+    sendApiError(res, 500, 'CALCULATE_ADMIN_STATISTICS_FAILED', 'Failed to calculate admin statistics');
+  }
+});
+
 router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
   try {
     const [medicines, suppliers, batches, transactions] = await Promise.all([
@@ -428,7 +485,6 @@ router.get('/forecast-ml/predictions', async (req: AuthenticatedRequest, res: Re
         });
 
     const demandByMedicine = new Map<number, number[]>(medicineIds.map((id) => [id, Array(30).fill(0)]));
-    const firstDemandDay = new Map<number, number>();
     const activeDemandDays = new Map<number, Set<number>>();
     for (const transaction of transactions) {
       const dayIndex = Math.floor((Date.UTC(
@@ -441,7 +497,6 @@ router.get('/forecast-ml/predictions', async (req: AuthenticatedRequest, res: Re
       const dailyValues = demandByMedicine.get(medicineId);
       if (!dailyValues) continue;
       dailyValues[dayIndex] += transaction.quantity;
-      firstDemandDay.set(medicineId, Math.min(firstDemandDay.get(medicineId) ?? dayIndex, dayIndex));
       const activeDays = activeDemandDays.get(medicineId) ?? new Set<number>();
       activeDays.add(dayIndex);
       activeDemandDays.set(medicineId, activeDays);
@@ -449,9 +504,8 @@ router.get('/forecast-ml/predictions', async (req: AuthenticatedRequest, res: Re
 
     const forecasts = medicines.map((medicine) => {
       const dailyDemand = demandByMedicine.get(medicine.id) ?? Array(30).fill(0);
-      const firstDay = firstDemandDay.get(medicine.id);
-      const historyDays = firstDay === undefined ? 0 : 30 - firstDay;
       const demandDays = activeDemandDays.get(medicine.id)?.size ?? 0;
+      const historyDays = demandDays > 0 ? dailyDemand.length : 0;
       if (historyDays < 30 || demandDays === 0) {
         return {
           medicineId: medicine.id,

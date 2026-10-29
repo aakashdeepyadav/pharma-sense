@@ -15,6 +15,7 @@ inventory operations workstream. All protected endpoints require a bearer JWT.
 | `PATCH /api/v1/alerts/:id/acknowledge` | Admin, Pharmacist, Inventory Manager, Staff | `200` | `400 INVALID_ALERT_ID`, `403 FORBIDDEN`, `404 ALERT_NOT_FOUND` | Alert acknowledgement and audit are atomic |
 | `GET /api/v1/reports/replenishment` | Any authenticated role | `200`, recommendations with the latest persisted review and reviewer | `400 VALIDATION_ERROR` | Read-only; never creates purchases or stock movements |
 | `GET /api/v1/reports/forecast-ml/predictions?medicineId={id}` | Any authenticated role | `200`, one-day LightGBM estimate or `INSUFFICIENT_HISTORY` | `400 VALIDATION_ERROR`, `404 MEDICINE_NOT_FOUND`, `503 FORECAST_MODEL_UNAVAILABLE` | Read-only inference over recent stock OUT history; no inventory changes |
+| `GET /api/v1/reports/admin-statistics` | Admin | `200`, inventory and 30-day movement statistics | `401 AUTHENTICATION_REQUIRED`, `403 FORBIDDEN`, `500 CALCULATE_ADMIN_STATISTICS_FAILED` | Read-only administrative statistics |
 | `POST /api/v1/reports/replenishment/decision` | Admin, Pharmacist, Inventory Manager | `200`, saved decision and reviewer | `400 VALIDATION_ERROR`, `404 MEDICINE_NOT_FOUND` | Latest review and audit event are written atomically; previous review history remains in the audit log |
 
 Errors use the following shape:
@@ -41,9 +42,10 @@ and do not initiate a purchase or stock change.
 
 The LightGBM prediction endpoint uses the packaged `backend/ml-artifacts`
 artifact and the latest 30 full UTC calendar days of stock OUT transactions.
-It returns insufficient history unless demand exists throughout a complete
-30-day history window. The current artifact is trained on synthetic data, so
-live inference is a technical demonstration and is not production-calibrated.
+Zero-demand days are valid history; it returns insufficient history when the
+window has no demand activity. The current artifact remains advisory and is
+not production-approved until representative data and governance sign-off are
+complete.
 
 ## Session invalidation
 
