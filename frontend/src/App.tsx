@@ -2466,7 +2466,11 @@ function App() {
       </header>
 
       {stockFormOpen && (
-        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setStockFormOpen(false);
+          }}
+        >
           <form
             onSubmit={handleStockSave}
             className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
@@ -2547,7 +2551,11 @@ function App() {
       )}
 
       {purchaseFormOpen && (
-        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPurchaseFormOpen(false);
+          }}
+        >
           <form
             onSubmit={handlePurchaseSave}
             className="max-h-[90vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-xl bg-white p-6 shadow-xl"
@@ -2705,7 +2713,11 @@ function App() {
       )}
 
       {batchFormOpen && (
-        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setBatchFormOpen(false);
+          }}
+        >
           <form
             onSubmit={handleBatchSave}
             className="w-full max-w-2xl bg-white rounded-xl shadow-xl p-6"
@@ -2887,9 +2899,19 @@ function App() {
         <div
           className="fixed inset-0 z-20 flex items-center justify-center bg-slate-950/40 p-4"
           role="presentation"
+        
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setUserFormOpen(false);
+          }}
         >
           <form
             onSubmit={handleUserSave}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setUserFormOpen(false);
+              }
+            }}
             aria-labelledby="user-form-title"
             aria-modal="true"
             role="dialog"
@@ -3047,7 +3069,11 @@ function App() {
       )}
 
       {passwordChangeOpen && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-950/40 p-4">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-950/40 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPasswordChangeOpen(false);
+          }}
+        >
           <form
             onSubmit={handlePasswordChange}
             aria-labelledby="password-change-title"
@@ -3151,7 +3177,11 @@ function App() {
       )}
 
       {profileEditOpen && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-950/40 p-4">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-950/40 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setProfileEditOpen(false);
+          }}
+        >
           <form
             onSubmit={handleProfileSave}
             aria-labelledby="profile-edit-title"
@@ -3231,7 +3261,11 @@ function App() {
       )}
 
       {supplierFormOpen && (
-        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSupplierFormOpen(false);
+          }}
+        >
           <form
             onSubmit={handleSupplierSave}
             className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
@@ -3299,7 +3333,11 @@ function App() {
       )}
 
       {categoryFormOpen && (
-        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-10 bg-gray-900/40 flex items-center justify-center p-6"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setCategoryFormOpen(false);
+          }}
+        >
           <form
             onSubmit={handleCategorySave}
             className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6"
@@ -3370,6 +3408,10 @@ function App() {
         <div
           className="fixed inset-0 z-10 overflow-y-auto bg-gray-900/40 flex items-start justify-center p-6"
           role="presentation"
+        
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setFormOpen(false);
+          }}
         >
           <form
             onSubmit={handleMedicineSave}
