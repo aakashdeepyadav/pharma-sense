@@ -2165,14 +2165,14 @@ function App() {
       {/* Top Clinical Telemetry Status Bar */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1 py-1">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30">
-            <span className="w-2 h-2 rounded-full bg-teal-400 pulse-dot"></span>
-            <span className="text-[11px] font-mono font-semibold tracking-wider text-teal-300 uppercase">
-              Live Telemetry Online
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span className="text-[11px] font-medium tracking-wide text-emerald-300">
+              Dispensary Active
             </span>
           </div>
           <span className="text-xs font-mono text-slate-400 hidden md:inline">
-            Facility: Main Cryo-Hub 01 / Controlled Dispensary
+            Central Pharmacy Dispensary • Real-Time Inventory Control
           </span>
         </div>
 
@@ -2203,7 +2203,7 @@ function App() {
           >
             <span>📷</span>
             <span className="hidden sm:inline">Scan Barcode</span>
-            <span className="text-[9px] font-mono px-1 rounded bg-teal-900/40 border border-teal-500/30">⌘B</span>
+            <span className="text-[9px] font-mono px-1 rounded bg-slate-800 border border-slate-700 text-slate-400">⌘B</span>
           </button>
         </div>
       </div>
@@ -2211,14 +2211,14 @@ function App() {
       <header className="dashboard-header mb-6 border border-slate-700/60 bg-slate-900/90 p-5 shadow-xl md:p-6 backdrop-blur-xl">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-[11px] font-mono font-semibold uppercase tracking-[0.25em] text-teal-300">
-              PharmaSense Telemetry OS
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-slate-700/80 bg-slate-800/80 px-3 py-0.5 text-[11px] font-medium tracking-wide text-slate-300">
+              PharmaSense Enterprise
             </div>
             <h1 className="text-2xl font-black text-white md:text-3xl tracking-tight">
               Inventory command center
             </h1>
             <p className="mt-1 text-sm text-slate-400">
-              Agent-based medicine stock, predictive telemetry, and replenishment operations
+              Formulary stock control, batch lot tracking, and demand replenishment forecasting
             </p>
             <p
               className={`mt-3 max-w-2xl text-sm font-medium ${roleMeta.accent}`}
@@ -2351,7 +2351,7 @@ function App() {
           {canWriteMedicines && (
             <button
               onClick={openCreateForm}
-              className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-500/25 transition hover:from-teal-400 hover:to-emerald-500 border border-teal-400/40"
+              className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition border border-emerald-500/50"
             >
               + Add Medicine
             </button>
@@ -2360,7 +2360,7 @@ function App() {
             <button
               onClick={openCreatePurchaseForm}
               disabled={medicines.length === 0 || suppliers.length === 0}
-              className="rounded-xl bg-slate-800/90 border border-teal-500/40 px-4 py-2.5 text-sm font-semibold text-teal-300 shadow-sm transition hover:bg-teal-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-xl border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700 hover:text-white px-4 py-2.5 text-sm font-semibold text-slate-200 transition disabled:cursor-not-allowed disabled:opacity-40"
             >
               Receive purchase
             </button>
@@ -2409,7 +2409,7 @@ function App() {
 
         <section className="role-workspace-panel mt-6 border border-slate-700/60 bg-slate-950/60 rounded-xl" aria-label="Role workspace">
           <div>
-            <p className="role-workspace-eyebrow">Your workspace</p>
+            <p className="role-workspace-eyebrow">Operational scope</p>
             <h2 className="mt-1 text-lg font-bold text-white">
               {roleMeta.workspace}
             </h2>
@@ -2421,7 +2421,7 @@ function App() {
           <ul className="role-priority-list" aria-label={`${session.user.role} priorities`}>
             {roleMeta.priorities.map((priority) => (
               <li key={priority} className="flex gap-2 items-center text-xs text-slate-300 px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700/60">
-                <span aria-hidden="true" className="text-teal-400">✓</span>
+                <span aria-hidden="true" className="text-emerald-400 font-bold">✓</span>
                 {priority}
               </li>
             ))}
@@ -2431,17 +2431,17 @@ function App() {
         {/* Workspace Navigation Quick Jump Strip */}
         <nav aria-label="Workspace navigation" className="mt-5 flex items-center gap-2 overflow-x-auto pt-4 border-t border-slate-700/50">
           {[
-            { id: "all", label: "Overview Stream", icon: "📊" },
-            { id: "section-forecast", label: "Demand Risk & AI", icon: "🧠", badge: queuedRiskCount > 0 ? `${queuedRiskCount}` : undefined },
-            { id: "section-alerts", label: "Alerts", icon: "⚠️", badge: alerts.length > 0 ? `${alerts.length}` : undefined },
-            { id: "section-replenishment", label: "Replenishment Queue", icon: "🤖", badge: pendingReviewCount > 0 ? `${pendingReviewCount}` : undefined },
-            { id: "section-medicines", label: "Medicines Catalog", icon: "💊", badge: `${medicines.length}` },
-            { id: "section-analytics", label: "Analytics & Telemetry", icon: "📊", badge: adminStatistics ? "Live" : undefined, inside: true },
-            { id: "section-batches", label: "Batches & Expiry", icon: "📦", inside: true },
-            { id: "section-purchases", label: "Purchase Orders", icon: "🛒", inside: true },
-            { id: "section-transactions", label: "Stock Movements", icon: "🔄", inside: true },
-            ...(canViewAudit ? [{ id: "section-audit", label: "Audit Trail", icon: "📋", inside: true }] : []),
-            ...(canManageUsers ? [{ id: "section-users", label: "User Access", icon: "👥", inside: true }] : []),
+            { id: "all", label: "Overview", icon: "•" },
+            { id: "section-forecast", label: "Demand Forecast", icon: "•", badge: queuedRiskCount > 0 ? `${queuedRiskCount}` : undefined },
+            { id: "section-alerts", label: "Alerts", icon: "•", badge: alerts.length > 0 ? `${alerts.length}` : undefined },
+            { id: "section-replenishment", label: "Replenishment Queue", icon: "•", badge: pendingReviewCount > 0 ? `${pendingReviewCount}` : undefined },
+            { id: "section-medicines", label: "Formulary Catalog", icon: "•", badge: `${medicines.length}` },
+            { id: "section-analytics", label: "Inventory Analytics", icon: "•", badge: adminStatistics ? "Live" : undefined, inside: true },
+            { id: "section-batches", label: "Batches & Expiry", icon: "•", inside: true },
+            { id: "section-purchases", label: "Purchase Orders", icon: "•", inside: true },
+            { id: "section-transactions", label: "Stock Movements", icon: "•", inside: true },
+            ...(canViewAudit ? [{ id: "section-audit", label: "Audit Trail", icon: "•", inside: true }] : []),
+            ...(canManageUsers ? [{ id: "section-users", label: "User Management", icon: "•", inside: true }] : []),
           ].map((tab) => (
             <button
               key={tab.id}
@@ -3617,21 +3617,20 @@ function App() {
       )}
 
       {medicines.length === 0 && !loading && (
-        <div className="mb-8 rounded-2xl border border-teal-500/40 bg-gradient-to-r from-teal-950/40 via-slate-900/90 to-indigo-950/40 p-6 shadow-2xl backdrop-blur-xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-indigo-500 to-cyan-400 animate-pulse" />
+        <div className="mb-8 rounded-2xl border border-slate-800 bg-slate-900/95 p-6 shadow-xl backdrop-blur-xl relative overflow-hidden">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-teal-400 pulse-dot" />
-                <span className="text-xs font-mono font-semibold uppercase tracking-wider text-teal-300">
-                  Operational Dispensary Online
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                  Formulary Setup
                 </span>
               </div>
               <h3 className="text-lg font-bold text-white tracking-tight">
-                Facility Initialized • Ready for Formulary & Purchase Records
+                Set up your medicine inventory
               </h3>
               <p className="text-sm text-slate-300 max-w-2xl">
-                Real-time telemetry and demand analytics engine active. Add your first formulation or receive incoming purchase orders to begin automated inventory tracking, AI forecasting, and reorder dispatch.
+                Add your active pharmaceutical formulations or record an incoming purchase batch to begin tracking stock levels, automated reorder thresholds, and demand forecasts.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -3639,7 +3638,7 @@ function App() {
                 <button
                   type="button"
                   onClick={openCreateForm}
-                  className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-teal-500/25 hover:from-teal-400 hover:to-emerald-500 border border-teal-400/40"
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition border border-emerald-500/50"
                 >
                   Quick Add Formulation
                 </button>
@@ -3648,7 +3647,7 @@ function App() {
                 <button
                   type="button"
                   onClick={openCreatePurchaseForm}
-                  className="rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-2 text-sm font-semibold text-teal-300 hover:bg-teal-500/20"
+                  className="rounded-xl border border-slate-700 bg-slate-800/90 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition"
                 >
                   Initiate Receipt
                 </button>
@@ -3658,93 +3657,144 @@ function App() {
         </div>
       )}
 
-      <div id="section-metrics" className="dashboard-metric-grid grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative group overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-gray-500 font-medium mb-2">
-              Total Medicines (SKUs)
-            </h3>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/30 font-semibold">
-              +4.2% MoM
+      <div id="section-metrics" className="dashboard-metric-grid grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-lg backdrop-blur-md transition hover:border-slate-700">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+              Formulary (SKUs)
+            </span>
+            <span className="rounded-md border border-slate-700/70 bg-slate-800/80 px-2 py-0.5 text-[11px] font-mono text-slate-300">
+              {medicines.filter((m) => m.active).length} Active
             </span>
           </div>
-          <p className="metric-value text-3xl font-bold text-gray-900 font-mono tracking-tight">{medicines.length}</p>
-          <p className="metric-caption text-gray-500 text-xs mt-1">98.4% target stock compliance</p>
-          <div className="mt-3 pt-2 border-t border-slate-700/40 flex items-center justify-between">
-            <div className="h-5 w-28">
-              <svg className="w-full h-full stroke-teal-400 fill-none stroke-[1.8]" viewBox="0 0 144 24">
-                <path fill="rgba(20, 184, 166, 0.12)" stroke="none" d="M0,18 L20,15 L40,19 L60,11 L80,14 L100,8 L120,10 L144,3 L144,24 L0,24 Z" />
-                <polyline points="0,18 20,15 40,19 60,11 80,14 100,8 120,10 144,3" />
-              </svg>
-            </div>
-            <span className="text-[10px] font-mono text-teal-400 font-medium">Optimal</span>
+          <p className="metric-value mt-3 font-mono text-3xl font-bold tracking-tight text-white">
+            {medicines.length}
+          </p>
+          <p className="metric-caption mt-1 text-xs text-slate-400">
+            {categories.length} formulary categories configured
+          </p>
+          <div className="mt-4 flex items-center justify-between border-t border-slate-800/80 pt-3 text-[11px] text-slate-400">
+            <span>Formulary status:</span>
+            <span className={medicines.length > 0 ? "font-medium text-emerald-400" : "text-slate-500"}>
+              {medicines.length > 0 ? "Operational" : "Awaiting input"}
+            </span>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative group overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-gray-500 font-medium mb-2">Low Stock Alerts</h3>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30 font-semibold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 pulse-dot"></span>
-              &lt; 30 DAYS
-            </span>
-          </div>
-          <p className="metric-value text-3xl font-bold text-red-600 font-mono tracking-tight">
-            {alerts.filter(
+        {(() => {
+          const criticalAlertCount =
+            alerts.filter(
               (alert) =>
                 alert.type === "LOW_STOCK" || alert.type === "OUT_OF_STOCK",
-            ).length || lowStockCount}
-          </p>
-          <p className="metric-caption text-gray-500 text-xs mt-1">Critical buffer threshold</p>
-          <div className="mt-3 pt-2 border-t border-slate-700/40 flex flex-col gap-1">
-            <div className="flex justify-between text-[10px] font-mono text-slate-400">
-              <span>Safety runway</span>
-              <span className="text-rose-400 font-semibold">Action Required</span>
+            ).length || lowStockCount;
+          const hasCriticalAlerts = criticalAlertCount > 0;
+          return (
+            <div className="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-lg backdrop-blur-md transition hover:border-slate-700">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                  Stock Alerts
+                </span>
+                <span
+                  className={`rounded-md border px-2 py-0.5 text-[11px] font-mono font-medium ${
+                    hasCriticalAlerts
+                      ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
+                      : "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                  }`}
+                >
+                  {hasCriticalAlerts ? "Attention Needed" : "Optimal"}
+                </span>
+              </div>
+              <p
+                className={`metric-value mt-3 font-mono text-3xl font-bold tracking-tight ${
+                  hasCriticalAlerts ? "text-rose-400" : "text-white"
+                }`}
+              >
+                {criticalAlertCount}
+              </p>
+              <p className="metric-caption mt-1 text-xs text-slate-400">
+                {hasCriticalAlerts
+                  ? "Items below minimum reorder thresholds"
+                  : "All formulations within safety buffers"}
+              </p>
+              <div className="mt-4 flex items-center justify-between border-t border-slate-800/80 pt-3 text-[11px] text-slate-400">
+                <span>Safety buffer:</span>
+                <span
+                  className={
+                    hasCriticalAlerts
+                      ? "font-medium text-rose-400"
+                      : "font-medium text-emerald-400"
+                  }
+                >
+                  {hasCriticalAlerts ? "Reorder recommended" : "Buffers verified"}
+                </span>
+              </div>
             </div>
-            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-              <div className="bg-rose-500 h-1.5 rounded-full w-[78%]"></div>
-            </div>
-          </div>
-        </div>
+          );
+        })()}
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative group overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-gray-500 font-medium mb-2">Forecast watchlist</h3>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 font-semibold">
-              AI TELEMETRY
+        <div className="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-lg backdrop-blur-md transition hover:border-slate-700">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+              Forecast Watchlist
+            </span>
+            <span
+              className={`rounded-md border px-2 py-0.5 text-[11px] font-mono font-medium ${
+                queuedRiskCount > 0
+                  ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+                  : "border-slate-700/70 bg-slate-800/80 text-slate-300"
+              }`}
+            >
+              {queuedRiskCount > 0 ? "Elevated Risk" : "Low Risk"}
             </span>
           </div>
-          <p className="metric-value text-3xl font-bold text-violet-600 font-mono tracking-tight">
+          <p className="metric-value mt-3 font-mono text-3xl font-bold tracking-tight text-white">
             {queuedRiskCount}
           </p>
-          <p className="metric-caption text-gray-500 text-sm mt-1">Medium + high risk</p>
-          <div className="mt-3 pt-2 border-t border-slate-700/40 flex items-center justify-between">
-            <div className="h-5 w-28">
-              <svg className="w-full h-full stroke-indigo-400 fill-none stroke-[1.8]" viewBox="0 0 144 24">
-                <path fill="rgba(99, 102, 241, 0.12)" stroke="none" d="M0,20 L24,18 L48,12 L72,16 L96,8 L120,11 L144,4 L144,24 L0,24 Z" />
-                <polyline points="0,20 24,18 48,12 72,16 96,8 120,11 144,4" />
-              </svg>
-            </div>
-            <span className="text-[10px] font-mono text-indigo-400 font-medium">Monitoring</span>
+          <p className="metric-caption mt-1 text-xs text-slate-400">
+            Run-rate stockout risk (7-30 day window)
+          </p>
+          <div className="mt-4 flex items-center justify-between border-t border-slate-800/80 pt-3 text-[11px] text-slate-400">
+            <span>Demand projection:</span>
+            <span
+              className={
+                queuedRiskCount > 0
+                  ? "font-medium text-amber-400"
+                  : "text-slate-400"
+              }
+            >
+              {queuedRiskCount > 0
+                ? `${queuedRiskCount} items flagged`
+                : "Steady run-rate"}
+            </span>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative group overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-gray-500 font-medium mb-2">Review queue</h3>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-semibold">
-              AUTO-DISPATCH
+        <div className="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-lg backdrop-blur-md transition hover:border-slate-700">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+              Review Queue
+            </span>
+            <span
+              className={`rounded-md border px-2 py-0.5 text-[11px] font-mono font-medium ${
+                pendingReviewCount > 0
+                  ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-300"
+                  : "border-slate-700/70 bg-slate-800/80 text-slate-300"
+              }`}
+            >
+              {pendingReviewCount > 0 ? "Pending Action" : "Clear"}
             </span>
           </div>
-          <p className="metric-value text-3xl font-bold text-cyan-600 font-mono tracking-tight">
+          <p className="metric-value mt-3 font-mono text-3xl font-bold tracking-tight text-white">
             {pendingReviewCount}
           </p>
-          <p className="metric-caption text-gray-500 text-sm mt-1">
-            Pending · {approvedReviewCount} approved
+          <p className="metric-caption mt-1 text-xs text-slate-400">
+            Pending replenishment decisions
           </p>
-          <div className="mt-3 pt-2 border-t border-slate-700/40 flex items-center justify-between text-[11px] font-mono text-slate-400">
-            <span>Projected savings:</span>
-            <span className="text-teal-400 font-semibold">+$14,200</span>
+          <div className="mt-4 flex items-center justify-between border-t border-slate-800/80 pt-3 text-[11px] text-slate-400">
+            <span>Decisions finalized:</span>
+            <span className="font-mono font-medium text-cyan-400">
+              {approvedReviewCount} approved
+            </span>
           </div>
         </div>
       </div>
@@ -3850,7 +3900,7 @@ function App() {
           <h2 className="text-xl font-bold text-white tracking-tight">Inventory alerts</h2>
           {alerts.length > 0 && (
             <span className="px-2 py-0.5 rounded-full text-xs font-mono font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 pulse-dot"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
               {alerts.length} Action Required
             </span>
           )}
@@ -4047,14 +4097,13 @@ function App() {
             const adjustedPct = Math.max(0, 100 - receivedPct - issuedPct);
 
             return (
-            <section className="mb-8 rounded-2xl border border-teal-500/30 bg-slate-900/90 p-6 shadow-xl backdrop-blur-xl relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-indigo-500 to-cyan-400" />
+            <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl backdrop-blur-xl relative overflow-hidden">
               <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider bg-teal-500/20 text-teal-300 border border-teal-500/40 flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-teal-400 pulse-dot" />
-                      Live Command Telemetry
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      Operational Oversight
                     </span>
                   </div>
                   <h2 className="text-xl font-bold text-white tracking-tight">Admin inventory statistics</h2>
@@ -4229,7 +4278,7 @@ function App() {
                 </div>
                 {forecastMl?.available && (
                   <span className="px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 self-start sm:self-center">
-                    Offline ML Benchmark
+                    Research Model Evaluation
                   </span>
                 )}
               </div>
@@ -4333,7 +4382,7 @@ function App() {
                         Status
                       </p>
                       <p className="mt-1 text-lg font-bold text-teal-400 font-mono flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-teal-400 pulse-dot" />
+                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
                         {forecastBaseline.evaluation?.readiness?.status ===
                         "READY_FOR_BASELINE"
                           ? "Ready"
