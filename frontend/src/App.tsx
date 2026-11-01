@@ -669,11 +669,21 @@ function App() {
   const [activeNavTab, setActiveNavTab] = useState<string>("all");
   const navigateToSection = (sectionId: string, insideDisclosure = false) => {
     setActiveNavTab(sectionId);
-    if (insideDisclosure) {
-      const disclosure = document.querySelector("details.workspace-disclosure") as HTMLDetailsElement | null;
-      if (disclosure && !disclosure.open) {
-        disclosure.open = true;
+    if (insideDisclosure || sectionId === "section-analytics") {
+      const el = document.getElementById(sectionId);
+      if (el) {
+        const parentDisclosure = el.closest("details.workspace-disclosure") as HTMLDetailsElement | null;
+        if (parentDisclosure && !parentDisclosure.open) {
+          parentDisclosure.open = true;
+        }
       }
+      const allDisclosures = document.querySelectorAll("details.workspace-disclosure");
+      allDisclosures.forEach((d) => {
+        const htmlD = d as HTMLDetailsElement;
+        if (el && htmlD.contains(el)) {
+          htmlD.open = true;
+        }
+      });
     }
     const el = document.getElementById(sectionId);
     if (el) {
@@ -2198,17 +2208,17 @@ function App() {
         </div>
       </div>
 
-      <header className="dashboard-header mb-6 border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+      <header className="dashboard-header mb-6 border border-slate-700/60 bg-slate-900/90 p-5 shadow-xl md:p-6 backdrop-blur-xl">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-cyan-700">
-              PharmaSense
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-[11px] font-mono font-semibold uppercase tracking-[0.25em] text-teal-300">
+              PharmaSense Telemetry OS
             </div>
-            <h1 className="text-2xl font-black text-slate-900 md:text-3xl">
+            <h1 className="text-2xl font-black text-white md:text-3xl tracking-tight">
               Inventory command center
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Agent-based medicine stock and replenishment operations
+            <p className="mt-1 text-sm text-slate-400">
+              Agent-based medicine stock, predictive telemetry, and replenishment operations
             </p>
             <p
               className={`mt-3 max-w-2xl text-sm font-medium ${roleMeta.accent}`}
@@ -2218,12 +2228,12 @@ function App() {
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-700 font-bold text-white">
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-700/80 bg-slate-800/80 px-3 py-2 shadow-sm">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-indigo-600 font-bold text-white shadow-md shadow-teal-500/20">
                 {session.user.name.charAt(0).toUpperCase()}
               </div>
               <div className="text-left">
-                <p className="text-sm font-semibold text-slate-900">
+                <p className="text-sm font-semibold text-white">
                   {session.user.name}
                 </p>
                 <span
@@ -2237,7 +2247,7 @@ function App() {
             <button
               onClick={() => setAccountSettingsOpen((isOpen) => !isOpen)}
               aria-expanded={accountSettingsOpen}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              className="rounded-xl border border-slate-700/80 bg-slate-800/80 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-700/80 hover:text-white"
             >
               Account settings
             </button>
@@ -2251,13 +2261,13 @@ function App() {
                 });
                 setPasswordChangeOpen(true);
               }}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              className="rounded-xl border border-slate-700/80 bg-slate-800/80 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-700/80 hover:text-white"
             >
               Change password
             </button>
             <button
               onClick={() => void handleLogout()}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              className="rounded-xl border border-slate-700/80 bg-slate-800/80 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-700/80 hover:text-white"
             >
               Sign out
             </button>
@@ -2397,21 +2407,21 @@ function App() {
           )}
         </div>
 
-        <section className="role-workspace-panel mt-6" aria-label="Role workspace">
+        <section className="role-workspace-panel mt-6 border border-slate-700/60 bg-slate-950/60 rounded-xl" aria-label="Role workspace">
           <div>
             <p className="role-workspace-eyebrow">Your workspace</p>
-            <h2 className="mt-1 text-lg font-bold text-slate-900">
+            <h2 className="mt-1 text-lg font-bold text-white">
               {roleMeta.workspace}
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-400">
               Your dashboard is organized around the work available to the{" "}
               {session.user.role.toLowerCase()} role.
             </p>
           </div>
           <ul className="role-priority-list" aria-label={`${session.user.role} priorities`}>
             {roleMeta.priorities.map((priority) => (
-              <li key={priority}>
-                <span aria-hidden="true">✓</span>
+              <li key={priority} className="flex gap-2 items-center text-xs text-slate-300 px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700/60">
+                <span aria-hidden="true" className="text-teal-400">✓</span>
                 {priority}
               </li>
             ))}
@@ -2426,6 +2436,7 @@ function App() {
             { id: "section-alerts", label: "Alerts", icon: "⚠️", badge: alerts.length > 0 ? `${alerts.length}` : undefined },
             { id: "section-replenishment", label: "Replenishment Queue", icon: "🤖", badge: pendingReviewCount > 0 ? `${pendingReviewCount}` : undefined },
             { id: "section-medicines", label: "Medicines Catalog", icon: "💊", badge: `${medicines.length}` },
+            { id: "section-analytics", label: "Analytics & Telemetry", icon: "📊", badge: adminStatistics ? "Live" : undefined, inside: true },
             { id: "section-batches", label: "Batches & Expiry", icon: "📦", inside: true },
             { id: "section-purchases", label: "Purchase Orders", icon: "🛒", inside: true },
             { id: "section-transactions", label: "Stock Movements", icon: "🔄", inside: true },
@@ -2477,7 +2488,7 @@ function App() {
                 {formError}
               </p>
             )}
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-slate-300 font-mono text-sm mb-4">
               {
                 batches.find((batch) => String(batch.id) === stockForm.batchId)
                   ?.medicine.genericName
@@ -2519,7 +2530,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setStockFormOpen(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900"
+                className="px-4 py-2 text-slate-300 font-mono text-sm hover:text-gray-900"
               >
                 Cancel
               </button>
@@ -2668,7 +2679,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setPurchaseFormOpen(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900"
+                className="px-4 py-2 text-slate-300 font-mono text-sm hover:text-gray-900"
               >
                 Cancel
               </button>
@@ -2856,7 +2867,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setBatchFormOpen(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900"
+                className="px-4 py-2 text-slate-300 font-mono text-sm hover:text-gray-900"
               >
                 Cancel
               </button>
@@ -3271,7 +3282,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setSupplierFormOpen(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900"
+                className="px-4 py-2 text-slate-300 font-mono text-sm hover:text-gray-900"
               >
                 Cancel
               </button>
@@ -3339,7 +3350,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setCategoryFormOpen(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900"
+                className="px-4 py-2 text-slate-300 font-mono text-sm hover:text-gray-900"
               >
                 Cancel
               </button>
@@ -3547,7 +3558,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setFormOpen(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900"
+                className="px-4 py-2 text-slate-300 font-mono text-sm hover:text-gray-900"
               >
                 Cancel
               </button>
@@ -3654,11 +3665,11 @@ function App() {
         </div>
       </div>
 
-      <section id="section-forecast" className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <section id="section-forecast" className="dashboard-section mb-8 bg-slate-900/80 rounded-2xl shadow-xl border border-slate-700/60 overflow-hidden backdrop-blur-md">
+        <div className="p-6 border-b border-slate-800 bg-slate-950/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Forecast risk</h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <h2 className="text-xl font-bold text-white tracking-tight">Forecast risk</h2>
+            <p className="text-sm text-slate-400 mt-1">
               Read-only demand-risk overview based on recent stock OUT history and
               stock cover.
             </p>
@@ -3687,29 +3698,29 @@ function App() {
           <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
             {forecastRisk.map((item) => {
               const riskTone = {
-                LOW: "bg-emerald-50 text-emerald-700 border-emerald-200",
-                MEDIUM: "bg-amber-50 text-amber-700 border-amber-200",
-                HIGH: "bg-red-50 text-red-700 border-red-200",
+                LOW: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+                MEDIUM: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+                HIGH: "bg-rose-500/15 text-rose-300 border-rose-500/30",
                 INSUFFICIENT_DATA:
-                  "bg-slate-100 text-slate-700 border-slate-200",
+                  "bg-slate-700/50 text-slate-300 border-slate-600",
               }[item.riskLevel];
               const monitoringTone = {
-                OK: "bg-emerald-50 text-emerald-700 border-emerald-200",
-                WATCH: "bg-amber-50 text-amber-700 border-amber-200",
+                OK: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+                WATCH: "bg-amber-500/15 text-amber-300 border-amber-500/30",
                 INSUFFICIENT_DATA:
-                  "bg-slate-100 text-slate-700 border-slate-200",
+                  "bg-slate-700/50 text-slate-300 border-slate-600",
               }[item.monitoringStatus ?? "OK"];
               return (
                 <div
                   key={item.medicineId}
-                  className="rounded-xl border border-gray-200 bg-gray-50 p-4"
+                  className="rounded-xl border border-slate-700/60 bg-slate-800/60 p-4 hover:border-slate-600 transition-all shadow-md"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-gray-900">
+                      <p className="font-semibold text-white">
                         {item.medicineName}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-slate-400 font-mono">
                         Current stock: {item.currentStock}
                       </p>
                     </div>
@@ -3726,7 +3737,7 @@ function App() {
                       </span>
                     </div>
                   </div>
-                  <div className="mt-3 space-y-2 text-sm text-gray-600">
+                  <div className="mt-3 space-y-2 text-sm text-slate-300 font-mono">
                     <p>
                       Projected daily demand:{" "}
                       {item.predictedDailyDemand.toFixed(2)}
@@ -3742,7 +3753,7 @@ function App() {
                       {item.projectedStockAfter7Days.toFixed(2)}
                     </p>
                   </div>
-                  <p className="mt-3 text-xs text-gray-600">{item.message}</p>
+                  <p className="mt-3 text-xs text-slate-400 pt-2 border-t border-slate-700/50">{item.message}</p>
                 </div>
               );
             })}
@@ -3750,9 +3761,9 @@ function App() {
         )}
       </section>
 
-      <section id="section-alerts" className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">Inventory alerts</h2>
+      <section id="section-alerts" className="dashboard-section mb-8 bg-slate-900/80 rounded-2xl shadow-xl border border-slate-700/60 overflow-hidden backdrop-blur-md">
+        <div className="p-6 border-b border-slate-800 bg-slate-950/40 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-white tracking-tight">Inventory alerts</h2>
           {alerts.length > 0 && (
             <span className="px-2 py-0.5 rounded-full text-xs font-mono font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 pulse-dot"></span>
@@ -3769,35 +3780,35 @@ function App() {
             </div>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-slate-800/60">
             {alerts.map((alert) => (
               <div
                 key={alert.id}
-                className="p-4 flex items-center justify-between gap-4"
+                className="p-4 flex items-center justify-between gap-4 hover:bg-slate-800/30 transition"
               >
                 <div>
                   <p
                     className={
                       alert.severity === "critical"
-                        ? "font-medium text-red-700"
-                        : "font-medium text-orange-700"
+                        ? "font-medium text-rose-400"
+                        : "font-medium text-amber-400"
                     }
                   >
                     {alert.message}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-slate-400 font-mono">
                     Quantity affected: {alert.quantity} | Status:{" "}
                     {alert.status.toLowerCase()}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-semibold uppercase text-gray-500">
+                  <span className="text-xs font-mono font-semibold uppercase text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
                     {alert.type.replaceAll("_", " ")}
                   </span>
                   {alert.status === "OPEN" && session.user.role !== "Management" && (
                     <button
                       onClick={() => void acknowledgeAlert(alert.id)}
-                      className="text-blue-600 hover:text-blue-800 font-medium"
+                      className="px-3 py-1 rounded-lg border border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20 text-xs font-semibold font-mono transition"
                     >
                       Acknowledge
                     </button>
@@ -3809,13 +3820,13 @@ function App() {
         )}
       </section>
 
-      <section id="section-replenishment" className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <section id="section-replenishment" className="dashboard-section mb-8 bg-slate-900/80 rounded-2xl shadow-xl border border-slate-700/60 overflow-hidden backdrop-blur-md">
+        <div className="p-6 border-b border-slate-800 bg-slate-950/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 className="text-xl font-bold text-white tracking-tight">
               Replenishment recommendations
             </h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-slate-400 mt-1">
               Read-only estimates based on recent stock OUT activity and reorder
               levels. Each item can be approved or dismissed by the human
               reviewer.
@@ -3850,7 +3861,7 @@ function App() {
                   className="p-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
                 >
                   <div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-semibold text-white">
                       {item.medicineName}
                     </p>
                     <p className="text-sm text-gray-500">
@@ -3939,18 +3950,35 @@ function App() {
       </section>
 
       {report && (
-        <details className="workspace-disclosure mb-8">
-          <summary>Reports and analytics</summary>
-          {session.user.role === "Admin" && adminStatistics && (
-            <section className="mb-8 rounded-xl border border-blue-100 bg-blue-50/60 p-6">
-              <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <details id="section-analytics" className="workspace-disclosure mb-8" open={true}>
+          <summary className="cursor-pointer">Reports and analytics</summary>
+          <div className="workspace-disclosure-content p-6 space-y-8">
+          {session.user.role === "Admin" && adminStatistics && (() => {
+            const received = adminStatistics.last30Days?.unitsReceived ?? 0;
+            const issued = adminStatistics.last30Days?.unitsIssued ?? 0;
+            const adjusted = adminStatistics.last30Days?.adjustedUnits ?? 0;
+            const totalMovement = Math.max(1, received + issued + adjusted);
+            const receivedPct = Math.round((received / totalMovement) * 100);
+            const issuedPct = Math.round((issued / totalMovement) * 100);
+            const adjustedPct = Math.max(0, 100 - receivedPct - issuedPct);
+
+            return (
+            <section className="mb-8 rounded-2xl border border-teal-500/30 bg-slate-900/90 p-6 shadow-xl backdrop-blur-xl relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-indigo-500 to-cyan-400" />
+              <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">Admin inventory statistics</h2>
-                  <p className="text-sm text-gray-600">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider bg-teal-500/20 text-teal-300 border border-teal-500/40 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-teal-400 pulse-dot" />
+                      Live Command Telemetry
+                    </span>
+                  </div>
+                  <h2 className="text-xl font-bold text-white tracking-tight">Admin inventory statistics</h2>
+                  <p className="text-sm text-slate-400">
                     Full operational totals and recent stock movement, visible only to Admin.
                   </p>
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-slate-400 font-mono flex items-center gap-1.5 self-start sm:self-end">
                   Updated {new Date(adminStatistics.generatedAt).toLocaleString()}
                 </p>
               </div>
@@ -3963,154 +3991,223 @@ function App() {
                   ["Open alerts", `${adminStatistics.openAlerts} / ${adminStatistics.alerts}`],
                   ["Reviews", adminStatistics.replenishmentReviews],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-blue-100 bg-white p-3">
-                    <p className="text-xs text-gray-500">{label}</p>
-                    <p className="mt-1 text-lg font-bold text-gray-900">{value}</p>
+                  <div key={label} className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 shadow-sm hover:border-teal-500/40 transition-all">
+                    <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">{label}</p>
+                    <p className="mt-1 text-lg font-bold text-white font-mono">{value}</p>
                   </div>
                 ))}
               </div>
-              <div className="mt-4 rounded-lg border border-blue-100 bg-white p-4">
-                <h3 className="font-semibold text-gray-900">Last 30 days</h3>
-                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div>
-                    <p className="text-xs text-gray-500">Transactions</p>
-                    <p className="font-semibold text-gray-900">{adminStatistics.last30Days?.transactionCount ?? 0}</p>
+
+              <div className="mt-6 rounded-xl border border-slate-700/60 bg-slate-800/50 p-5 shadow-inner">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-white flex items-center gap-2">
+                    <span>Last 30 days</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-700/80 text-slate-300">Throughput Velocity</span>
+                  </h3>
+                  <span className="text-xs font-mono text-slate-400 hidden sm:inline">Movement Aggregates</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div className="rounded-lg bg-slate-900/60 p-3 border border-slate-800">
+                    <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">Transactions</p>
+                    <p className="mt-1 text-xl font-bold text-white font-mono">{adminStatistics.last30Days?.transactionCount ?? 0}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Units received</p>
-                    <p className="font-semibold text-emerald-700">{adminStatistics.last30Days?.unitsReceived ?? 0}</p>
+                  <div className="rounded-lg bg-slate-900/60 p-3 border border-slate-800">
+                    <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">Units received</p>
+                    <p className="mt-1 text-xl font-bold text-emerald-400 font-mono">{adminStatistics.last30Days?.unitsReceived ?? 0}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Units issued</p>
-                    <p className="font-semibold text-blue-700">{adminStatistics.last30Days?.unitsIssued ?? 0}</p>
+                  <div className="rounded-lg bg-slate-900/60 p-3 border border-slate-800">
+                    <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">Units issued</p>
+                    <p className="mt-1 text-xl font-bold text-cyan-400 font-mono">{adminStatistics.last30Days?.unitsIssued ?? 0}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Adjusted units</p>
-                    <p className="font-semibold text-amber-700">{adminStatistics.last30Days?.adjustedUnits ?? 0}</p>
+                  <div className="rounded-lg bg-slate-900/60 p-3 border border-slate-800">
+                    <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">Adjusted units</p>
+                    <p className="mt-1 text-xl font-bold text-amber-400 font-mono">{adminStatistics.last30Days?.adjustedUnits ?? 0}</p>
+                  </div>
+                </div>
+
+                {/* Visual Proportional Flow Bar */}
+                <div className="mt-4 pt-3 border-t border-slate-700/50">
+                  <div className="flex items-center justify-between text-xs font-mono text-slate-400 mb-2">
+                    <span>Stock Movement Ratio</span>
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400"></span> Received ({receivedPct}%)</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-cyan-400"></span> Issued ({issuedPct}%)</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400"></span> Adjusted ({adjustedPct}%)</span>
+                    </div>
+                  </div>
+                  <div className="w-full h-2.5 rounded-full bg-slate-900 overflow-hidden flex">
+                    <div style={{ width: `${receivedPct}%` }} className="bg-emerald-500 transition-all" title="Received" />
+                    <div style={{ width: `${issuedPct}%` }} className="bg-cyan-500 transition-all" title="Issued" />
+                    <div style={{ width: `${adjustedPct}%` }} className="bg-amber-500 transition-all" title="Adjusted" />
                   </div>
                 </div>
               </div>
             </section>
-          )}
-          <section className="mb-8">
+          );})()}
+          <section className="mb-8 rounded-2xl border border-slate-700/60 bg-slate-900/90 p-6 shadow-xl backdrop-blur-xl">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-white tracking-tight">
                   Inventory analytics
                 </h2>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-slate-400">
                   Operational metrics from recorded inventory activity.
                 </p>
               </div>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-                <p className="text-sm text-gray-500">Suppliers</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
+              <div className="bg-slate-800/70 p-5 rounded-xl border border-slate-700/70 hover:border-teal-500/40 transition-all shadow-sm">
+                <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Suppliers</p>
+                <p className="text-2xl font-bold text-white font-mono mt-1">
                   {report.supplierCount}
                 </p>
               </div>
-              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-                <p className="text-sm text-gray-500">Batches</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
+              <div className="bg-slate-800/70 p-5 rounded-xl border border-slate-700/70 hover:border-teal-500/40 transition-all shadow-sm">
+                <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Batches</p>
+                <p className="text-2xl font-bold text-white font-mono mt-1">
                   {report.batchCount}
                 </p>
               </div>
-              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-                <p className="text-sm text-gray-500">Units available</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
+              <div className="bg-slate-800/70 p-5 rounded-xl border border-slate-700/70 hover:border-teal-500/40 transition-all shadow-sm">
+                <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Units available</p>
+                <p className="text-2xl font-bold text-emerald-400 font-mono mt-1">
                   {report.totalUnits}
                 </p>
               </div>
-              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-                <p className="text-sm text-gray-500">Units issued</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
+              <div className="bg-slate-800/70 p-5 rounded-xl border border-slate-700/70 hover:border-teal-500/40 transition-all shadow-sm">
+                <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Units issued</p>
+                <p className="text-2xl font-bold text-cyan-400 font-mono mt-1">
                   {report.issuedUnits}
                 </p>
               </div>
-              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-                <p className="text-sm text-gray-500">Inventory cost</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
+              <div className="bg-slate-800/70 p-5 rounded-xl border border-slate-700/70 hover:border-teal-500/40 transition-all shadow-sm">
+                <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Inventory cost</p>
+                <p className="text-2xl font-bold text-indigo-300 font-mono mt-1">
                   {report.inventoryCost.toFixed(2)}
                 </p>
               </div>
             </div>
-            <div className="mt-4 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-              <h3 className="font-bold text-gray-900 mb-4">
-                Most issued medicines
-              </h3>
+
+            <div className="mt-6 bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 shadow-md">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-white">
+                  Most issued medicines
+                </h3>
+                <span className="text-xs font-mono text-teal-400">High Turnover Dispensary Queue</span>
+              </div>
               {report.topIssuedMedicines.length === 0 ? (
-                <p className="text-gray-500">
+                <p className="text-slate-400 text-sm font-mono">
                   No stock-out activity has been recorded yet.
                 </p>
-              ) : (
+              ) : (() => {
+                const maxIssued = Math.max(1, ...report.topIssuedMedicines.map(m => m.quantityIssued));
+                return (
                 <div className="space-y-3">
-                  {report.topIssuedMedicines.map((medicine) => (
+                  {report.topIssuedMedicines.map((medicine, idx) => {
+                    const pct = Math.round((medicine.quantityIssued / maxIssued) * 100);
+                    return (
                     <div
                       key={medicine.medicineId}
-                      className="flex items-center justify-between text-sm"
+                      className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition"
                     >
-                      <span className="font-medium text-gray-700">
-                        {medicine.medicineName}
-                      </span>
-                      <span className="text-gray-500">
-                        {medicine.quantityIssued} units issued
-                      </span>
+                      <div className="flex items-center justify-between text-sm mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                            #{idx + 1}
+                          </span>
+                          <span className="font-medium text-white">
+                            {medicine.medicineName}
+                          </span>
+                        </div>
+                        <span className="text-slate-300 font-mono text-xs">
+                          {medicine.quantityIssued} units issued
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                        <div
+                          style={{ width: `${pct}%` }}
+                          className="h-full rounded-full bg-gradient-to-r from-teal-500 to-indigo-500 transition-all"
+                        />
+                      </div>
                     </div>
-                  ))}
+                  );})}
                 </div>
-              )}
+              );})()}
             </div>
 
-            <div className="mt-6 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-              <h3 className="font-bold text-gray-900">Research model evaluation</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Synthetic research data only. These metrics are not production forecasts.
-              </p>
+            <div className="mt-6 bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 shadow-md">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <h3 className="font-bold text-white">Research model evaluation</h3>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Synthetic research data only. These metrics are not production forecasts.
+                  </p>
+                </div>
+                {forecastMl?.available && (
+                  <span className="px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 self-start sm:self-center">
+                    Offline ML Benchmark
+                  </span>
+                )}
+              </div>
               {!forecastMl?.available || !forecastMl.metrics ? (
-                <p className="mt-3 text-sm text-gray-500">
+                <p className="mt-3 text-sm text-slate-400 font-mono">
                   No evaluated research model is currently available.
                 </p>
-              ) : (
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-xs text-gray-500">Model / dataset</p>
-                    <p className="mt-1 font-semibold text-gray-900">
-                      {forecastMl.metrics.model} / {forecastMl.metrics.dataset}
-                    </p>
+              ) : (() => {
+                const mae = forecastMl.metrics.metrics.mae;
+                const baseline = forecastMl.metrics.metrics.baseline_naive_mae;
+                const improvement = baseline > 0 ? (((baseline - mae) / baseline) * 100).toFixed(1) : "0.0";
+
+                return (
+                <div className="mt-4 space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
+                      <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Model / dataset</p>
+                      <p className="mt-1 font-semibold text-white font-mono text-sm">
+                        {forecastMl.metrics.model} / {forecastMl.metrics.dataset}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
+                      <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">MAE (units)</p>
+                      <p className="mt-1 text-2xl font-bold text-teal-400 font-mono">
+                        {forecastMl.metrics.metrics.mae.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
+                      <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Naive baseline MAE</p>
+                      <p className="mt-1 text-2xl font-bold text-slate-400 font-mono">
+                        {forecastMl.metrics.metrics.baseline_naive_mae.toFixed(2)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-xs text-gray-500">MAE (units)</p>
-                    <p className="mt-1 font-semibold text-gray-900">
-                      {forecastMl.metrics.metrics.mae.toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-xs text-gray-500">Naive baseline MAE</p>
-                    <p className="mt-1 font-semibold text-gray-900">
-                      {forecastMl.metrics.metrics.baseline_naive_mae.toFixed(2)}
-                    </p>
+
+                  <div className="rounded-xl border border-teal-500/30 bg-teal-500/10 p-3.5 flex items-center justify-between text-xs font-mono text-teal-300">
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-emerald-400">⚡</span>
+                      Research Model Error Gain: <strong>{improvement}% lower error</strong> vs naive baseline
+                    </span>
+                    <span className="text-slate-400 hidden sm:inline">Calibrated on synthetic series</span>
                   </div>
                 </div>
-              )}
+              );})()}
             </div>
 
-            <div className="mt-6 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <div className="mt-6 bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 shadow-md">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h3 className="font-bold text-gray-900">Forecast baseline</h3>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <h3 className="font-bold text-white">Forecast baseline</h3>
+                  <p className="text-sm text-slate-400 mt-1">
                     Model evaluation and next-period demand outlook.
                   </p>
                 </div>
-                <label className="text-sm text-gray-600">
-                  <span className="sr-only">Select forecast medicine</span>
+                <label className="text-sm text-slate-300">
+                  <span className="sr-only">Select forecast item</span>
                   <select
                     value={effectiveForecastMedicineId ?? ""}
                     onChange={(event) =>
                       setSelectedForecastMedicineId(Number(event.target.value))
                     }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 md:w-64"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 text-slate-100 px-3 py-2 md:w-64 focus:border-teal-400 focus:outline-none"
                     disabled={medicines.length === 0}
                   >
                     {medicines.map((medicine) => (
@@ -4123,35 +4220,36 @@ function App() {
               </div>
 
               {!forecastBaseline ? (
-                <p className="mt-4 text-gray-500">
+                <p className="mt-4 text-slate-400 font-mono text-sm">
                   Forecast baseline is unavailable for the selected medicine.
                 </p>
               ) : (
                 <>
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                      <p className="text-xs uppercase tracking-[0.16em] text-gray-500">
+                    <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-mono">
                         MAE
                       </p>
-                      <p className="mt-1 text-2xl font-bold text-gray-900">
+                      <p className="mt-1 text-2xl font-bold text-white font-mono">
                         {forecastBaseline.evaluation?.mae == null
                           ? "n/a"
                           : Number(forecastBaseline.evaluation.mae).toFixed(2)}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                      <p className="text-xs uppercase tracking-[0.16em] text-gray-500">
+                    <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-mono">
                         Observations
                       </p>
-                      <p className="mt-1 text-2xl font-bold text-gray-900">
+                      <p className="mt-1 text-2xl font-bold text-white font-mono">
                         {forecastBaseline.evaluation?.observations ?? 0}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                      <p className="text-xs uppercase tracking-[0.16em] text-gray-500">
+                    <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-mono">
                         Status
                       </p>
-                      <p className="mt-1 text-lg font-bold text-gray-900">
+                      <p className="mt-1 text-lg font-bold text-teal-400 font-mono flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-teal-400 pulse-dot" />
                         {forecastBaseline.evaluation?.readiness?.status ===
                         "READY_FOR_BASELINE"
                           ? "Ready"
@@ -4160,12 +4258,12 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+                  <div className="mt-5 rounded-xl border border-indigo-500/30 bg-indigo-950/40 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h4 className="font-semibold text-indigo-950">
+                      <h4 className="font-semibold text-white">
                         LightGBM next-day prediction
                       </h4>
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-indigo-800">
+                      <span className="rounded-full bg-indigo-500/20 border border-indigo-500/40 px-3 py-1 text-xs font-mono font-medium text-indigo-300">
                         {!effectiveLightGbmPrediction
                           ? "Model unavailable"
                           : effectiveLightGbmPrediction.trainingDataSource === "synthetic"
@@ -4174,43 +4272,44 @@ function App() {
                       </span>
                     </div>
                     {!selectedLightGbmForecast ? (
-                      <p className="mt-2 text-sm text-indigo-900">
+                      <p className="mt-2 text-sm text-slate-300 font-mono">
                         The model prediction is unavailable. Check the API model artifact and try again.
                       </p>
                     ) : selectedLightGbmForecast.status === "READY" ? (
-                      <p className="mt-2 text-sm text-indigo-950">
+                      <p className="mt-2 text-sm text-slate-200 font-mono">
                         Predicted demand for {selectedLightGbmForecast.forecastDate}: {" "}
-                        <strong>{selectedLightGbmForecast.predictedQuantity?.toFixed(2)} units</strong>
-                        <span className="ml-2 text-indigo-800">
+                        <strong className="text-teal-300">{selectedLightGbmForecast.predictedQuantity?.toFixed(2)} units</strong>
+                        <span className="ml-2 text-indigo-300">
                           ({selectedLightGbmForecast.historyDays} history days)
                         </span>
                       </p>
                     ) : (
-                      <p className="mt-2 text-sm text-indigo-900">
+                      <p className="mt-2 text-sm text-slate-400 font-mono">
                         Not enough recorded demand for this medicine. The model needs 30 days of history.
                       </p>
                     )}
                     {effectiveLightGbmPrediction?.trainingDataSource === "synthetic" && (
-                      <p className="mt-2 text-xs text-indigo-800">
+                      <p className="mt-2 text-xs text-indigo-300/80">
                         Demo inference uses this medicine's recent stock issues, but the model was trained on synthetic data and is not production-calibrated.
                       </p>
                     )}
                   </div>
 
                   <div className="mt-6">
-                    <h4 className="font-semibold text-gray-900 mb-3">
-                      Next {forecastBaseline.forecast.length} day forecast
+                    <h4 className="font-semibold text-white mb-3 flex items-center justify-between">
+                      <span>Next {forecastBaseline.forecast.length} day forecast</span>
+                      <span className="text-xs font-mono text-slate-400">Predicted daily requirements</span>
                     </h4>
                     <div className="space-y-2">
                       {forecastBaseline.forecast.map((point) => (
                         <div
                           key={`${forecastBaseline.medicineId}-${point.date}`}
-                          className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+                          className="flex items-center justify-between rounded-lg border border-slate-700/70 bg-slate-900/60 px-3 py-2 text-sm"
                         >
-                          <span className="font-medium text-gray-700">
+                          <span className="font-medium text-slate-200 font-mono">
                             {new Date(point.date).toLocaleDateString()}
                           </span>
-                          <span className="text-gray-900">
+                          <span className="text-teal-300 font-mono font-semibold">
                             {Number(point.predictedQuantity ?? 0).toFixed(2)}{" "}
                             units
                           </span>
@@ -4222,34 +4321,35 @@ function App() {
               )}
             </div>
           </section>
+        </div>
         </details>
       )}
 
-      <div id="section-medicines" className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
-        <div className="p-6 border-b border-gray-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div id="section-medicines" className="bg-slate-900/80 rounded-2xl shadow-xl border border-slate-700/60 overflow-hidden mb-8 backdrop-blur-md">
+        <div className="p-6 border-b border-slate-800 bg-slate-950/40 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 className="text-xl font-bold text-white tracking-tight">
               Inventory Overview
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5">
               Comprehensive catalog of pharmaceutical formulations and current stock levels
             </p>
           </div>
-          <label className="text-sm text-gray-600">
+          <label className="text-sm text-slate-300">
             <span className="sr-only">Search medicines</span>
             <input
               type="search"
               value={medicineSearch}
               onChange={(event) => setMedicineSearch(event.target.value)}
               placeholder="Search by name or barcode"
-              className="w-full md:w-80 border border-gray-300 rounded-lg px-3 py-2"
+              className="w-full md:w-80 border border-slate-700 bg-slate-950/80 text-slate-100 rounded-lg px-3 py-2 text-sm focus:border-teal-400 focus:outline-none"
             />
           </label>
         </div>
-        {error && <p className="p-6 text-red-700 bg-red-50">{error}</p>}
+        {error && <p className="p-6 text-red-400 bg-red-950/40 border-b border-red-800/40">{error}</p>}
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+            <thead className="bg-slate-950/70 text-slate-400 font-mono text-xs uppercase tracking-wider border-b border-slate-800">
               <tr>
                 <th className="px-6 py-4">Generic Name</th>
                 <th className="px-6 py-4">Brand Name</th>
@@ -4260,7 +4360,7 @@ function App() {
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-800/60">
               {loading ? (
                 <tr>
                   <td
@@ -4283,27 +4383,56 @@ function App() {
                 </tr>
               ) : (
                 filteredMedicines.map((med) => (
-                  <tr key={med.id} className="hover:bg-gray-50 transition">
-                    <td className="px-6 py-4 font-medium text-gray-900">
+                  <tr key={med.id} className="hover:bg-slate-800/40 transition">
+                    <td className="px-6 py-4 font-semibold text-white">
                       {med.genericName}
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{med.brandName}</td>
-                    <td className="px-6 py-4 text-gray-600">
+                    <td className="px-6 py-4 text-slate-300 font-mono text-sm">{med.brandName}</td>
+                    <td className="px-6 py-4 text-slate-400 text-sm">
                       {med.manufacturer || "-"}
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{med.unit}</td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {med.active ? "Active" : "Inactive"}
+                    <td className="px-6 py-4 text-slate-300 font-mono text-sm">{med.unit}</td>
+                    <td className="px-6 py-4">
+                      {med.active ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                          Inactive
+                        </span>
+                      )}
                     </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {availableMedicineUnits(med)}{" "}
-                      / {med.reorderLevel}
+                    <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className={availableMedicineUnits(med) <= med.reorderLevel ? "text-rose-400 font-bold" : availableMedicineUnits(med) <= med.reorderLevel * 2 ? "text-amber-400 font-semibold" : "text-teal-400 font-semibold"}>
+                            {availableMedicineUnits(med)}
+                          </span>
+                          <span className="text-slate-500">/</span>
+                          <span className="text-slate-400">{med.reorderLevel}</span>
+                        </div>
+                        <div className="w-20 h-1 rounded-full bg-slate-800 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              availableMedicineUnits(med) <= med.reorderLevel
+                                ? "bg-rose-500"
+                                : availableMedicineUnits(med) <= med.reorderLevel * 2
+                                ? "bg-amber-400"
+                                : "bg-teal-400"
+                            }`}
+                            style={{
+                              width: `${Math.min(100, (availableMedicineUnits(med) / Math.max(med.reorderLevel * 2.5, 1)) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       {canWriteMedicines && (
                         <button
                           onClick={() => openEditForm(med)}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
+                          className="text-teal-400 hover:text-teal-300 font-medium"
                         >
                           Edit
                         </button>
@@ -4322,20 +4451,20 @@ function App() {
           Management and history
         </summary>
         <div className="workspace-disclosure-content">
-          <section id="section-categories" className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900">Categories</h2>
+          <section id="section-categories" className="mt-8 bg-slate-900/80 rounded-2xl shadow-xl border border-slate-700/60 overflow-hidden backdrop-blur-md">
+            <div className="p-6 border-b border-slate-800 bg-slate-950/40">
+              <h2 className="text-xl font-bold text-white tracking-tight">Categories</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                <thead className="bg-slate-950/70 text-slate-400 font-mono text-xs uppercase tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="px-6 py-4">Category</th>
                     <th className="px-6 py-4">Description</th>
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-800/60">
                   {categories.length === 0 ? (
                     <tr>
                       <td
@@ -4348,17 +4477,17 @@ function App() {
                   ) : (
                     categories.map((category) => (
                       <tr key={category.id}>
-                        <td className="px-6 py-4 font-medium text-gray-900">
+                        <td className="px-6 py-4 font-semibold text-white">
                           {category.name}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {category.description || "-"}
                         </td>
                         <td className="px-6 py-4 text-right">
                           {canWriteMedicines && (
                             <button
                               onClick={() => openEditCategoryForm(category)}
-                              className="text-blue-600 hover:text-blue-800 font-medium"
+                              className="text-teal-400 hover:text-teal-300 font-medium"
                             >
                               Edit
                             </button>
@@ -4373,27 +4502,27 @@ function App() {
           </section>
 
           {canManageUsers && (
-            <section id="section-users" className="mt-8 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
-              <div className="flex flex-col gap-3 border-b border-gray-100 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <section id="section-users" className="mt-8 overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-900/80 shadow-xl backdrop-blur-md">
+              <div className="flex flex-col gap-3 border-b border-slate-800 bg-slate-950/40 p-6 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">
+                  <h2 className="text-xl font-bold text-white tracking-tight">
                     User access
                   </h2>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-slate-400">
                     Manage account details and assigned roles.
                   </p>
                 </div>
                 <button
                   onClick={openCreateUserForm}
                   disabled={managedRoles.length === 0}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 px-4 py-2 text-sm font-semibold text-white hover:from-teal-400 hover:to-teal-500 shadow-md shadow-teal-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Add user
                 </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="border-b border-gray-100 bg-gray-50 font-medium text-gray-600">
+                  <thead className="border-b border-slate-800 bg-slate-950/70 font-mono text-xs uppercase tracking-wider text-slate-400">
                     <tr>
                       <th className="px-6 py-4">Name</th>
                       <th className="px-6 py-4">Email</th>
@@ -4402,7 +4531,7 @@ function App() {
                       <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-slate-800/60">
                     {managedUsers.length === 0 ? (
                       <tr>
                         <td
@@ -4415,22 +4544,22 @@ function App() {
                     ) : (
                       managedUsers.map((user) => (
                         <tr key={user.id}>
-                          <td className="px-6 py-4 font-medium text-gray-900">
+                          <td className="px-6 py-4 font-semibold text-white">
                             {user.name}
                           </td>
-                          <td className="px-6 py-4 text-gray-600">
+                          <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                             {user.email}
                           </td>
-                          <td className="px-6 py-4 text-gray-600">
+                          <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                             {user.role.name}
                           </td>
-                          <td className="px-6 py-4 text-gray-600">
+                          <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                             {user.active ? "Active" : "Deactivated"}
                           </td>
                           <td className="px-6 py-4 text-right">
                             <button
                               onClick={() => openEditUserForm(user)}
-                              className="font-medium text-blue-700 hover:text-blue-900"
+                              className="font-medium text-teal-400 hover:text-teal-300"
                             >
                               Edit
                             </button>
@@ -4444,9 +4573,9 @@ function App() {
             </section>
           )}
 
-          <section id="section-suppliers" className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Suppliers</h2>
+          <section id="section-suppliers" className="mt-8 bg-slate-900/80 rounded-2xl shadow-xl border border-slate-700/60 overflow-hidden backdrop-blur-md">
+            <div className="p-6 border-b border-slate-800 bg-slate-950/40 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <h2 className="text-xl font-bold text-white tracking-tight">Suppliers</h2>
               <label>
                 <span className="sr-only">Search suppliers</span>
                 <input
@@ -4454,13 +4583,13 @@ function App() {
                   value={supplierSearch}
                   onChange={(event) => setSupplierSearch(event.target.value)}
                   placeholder="Search suppliers"
-                  className="w-full md:w-72 border border-gray-300 rounded-lg px-3 py-2"
+                  className="w-full md:w-72 border border-slate-700 bg-slate-950/80 text-slate-100 rounded-lg px-3 py-2 text-sm focus:border-teal-400 focus:outline-none"
                 />
               </label>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                <thead className="bg-slate-950/70 text-slate-400 font-mono text-xs uppercase tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="px-6 py-4">Supplier</th>
                     <th className="px-6 py-4">Contact</th>
@@ -4468,7 +4597,7 @@ function App() {
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-800/60">
                   {filteredSuppliers.length === 0 ? (
                     <tr>
                       <td
@@ -4483,20 +4612,20 @@ function App() {
                   ) : (
                     filteredSuppliers.map((supplier) => (
                       <tr key={supplier.id}>
-                        <td className="px-6 py-4 font-medium text-gray-900">
+                        <td className="px-6 py-4 font-semibold text-white">
                           {supplier.name}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {supplier.contactInfo || "-"}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {supplier._count?.batches ?? 0}
                         </td>
                         <td className="px-6 py-4 text-right">
                           {canManageSuppliers && (
                             <button
                               onClick={() => openEditSupplierForm(supplier)}
-                              className="text-blue-600 hover:text-blue-800 font-medium"
+                              className="text-teal-400 hover:text-teal-300 font-medium"
                             >
                               Edit
                             </button>
@@ -4510,15 +4639,15 @@ function App() {
             </div>
           </section>
 
-          <section id="section-purchases" className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900">
+          <section id="section-purchases" className="mt-8 bg-slate-900/80 rounded-2xl shadow-xl border border-slate-700/60 overflow-hidden backdrop-blur-md">
+            <div className="p-6 border-b border-slate-800 bg-slate-950/40">
+              <h2 className="text-xl font-bold text-white tracking-tight">
                 Purchase history
               </h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                <thead className="bg-slate-950/70 text-slate-400 font-mono text-xs uppercase tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="px-6 py-4">Purchase</th>
                     <th className="px-6 py-4">Supplier</th>
@@ -4528,7 +4657,7 @@ function App() {
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-800/60">
                   {purchases.length === 0 ? (
                     <tr>
                       <td
@@ -4541,13 +4670,13 @@ function App() {
                   ) : (
                     purchases.map((purchase) => (
                       <tr key={purchase.id}>
-                        <td className="px-6 py-4 font-medium text-gray-900">
+                        <td className="px-6 py-4 font-semibold text-white">
                           #{purchase.id}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {purchase.supplier.name}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {purchase.items
                             .map(
                               (item) =>
@@ -4555,17 +4684,17 @@ function App() {
                             )
                             .join(", ")}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {new Date(purchase.createdAt).toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {purchase.status}
                         </td>
                         <td className="px-6 py-4 text-right">
                           {purchase.status === "DRAFT" && canReceiveStock && (
                             <button
                               onClick={() => void receivePurchase(purchase.id)}
-                              className="text-blue-600 hover:text-blue-800 font-medium"
+                              className="text-teal-400 hover:text-teal-300 font-medium"
                             >
                               Receive
                             </button>
@@ -4579,15 +4708,15 @@ function App() {
             </div>
           </section>
 
-          <section id="section-batches" className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900">
+          <section id="section-batches" className="mt-8 bg-slate-900/80 rounded-2xl shadow-xl border border-slate-700/60 overflow-hidden backdrop-blur-md">
+            <div className="p-6 border-b border-slate-800 bg-slate-950/40">
+              <h2 className="text-xl font-bold text-white tracking-tight">
                 Received batches
               </h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                <thead className="bg-slate-950/70 text-slate-400 font-mono text-xs uppercase tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="px-6 py-4">Batch</th>
                     <th className="px-6 py-4">Medicine</th>
@@ -4597,7 +4726,7 @@ function App() {
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-800/60">
                   {batches.length === 0 ? (
                     <tr>
                       <td
@@ -4610,22 +4739,22 @@ function App() {
                   ) : (
                     batches.map((batch) => (
                       <tr key={batch.id}>
-                        <td className="px-6 py-4 font-medium text-gray-900">
+                        <td className="px-6 py-4 font-semibold text-white">
                           {batch.batchNumber}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {batch.medicine.genericName}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {batch.supplier.name}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           <span className={isExpiryDatePast(batch.expiryDate) ? "text-red-700" : ""}>
                             {new Date(batch.expiryDate).toLocaleDateString()}
                             {isExpiryDatePast(batch.expiryDate) && " (expired)"}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-gray-600 text-right">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm text-right">
                           {batch.quantity}
                         </td>
                         <td className="px-6 py-4 text-right whitespace-nowrap">
@@ -4635,14 +4764,14 @@ function App() {
                                 type="button"
                                 onClick={() => openStockForm(batch, "OUT")}
                                 disabled={isExpiryDatePast(batch.expiryDate)}
-                                className="mr-3 font-medium text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="mr-3 font-medium text-teal-400 hover:text-teal-300 disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 Issue
                               </button>
                               <button
                                 type="button"
                                 onClick={() => openStockForm(batch, "ADJ")}
-                                className="text-gray-600 hover:text-gray-900 font-medium"
+                                className="text-slate-300 font-mono text-sm hover:text-gray-900 font-medium"
                               >
                                 Adjust
                               </button>
@@ -4657,15 +4786,15 @@ function App() {
             </div>
           </section>
 
-          <section id="section-transactions" className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900">
+          <section id="section-transactions" className="mt-8 bg-slate-900/80 rounded-2xl shadow-xl border border-slate-700/60 overflow-hidden backdrop-blur-md">
+            <div className="p-6 border-b border-slate-800 bg-slate-950/40">
+              <h2 className="text-xl font-bold text-white tracking-tight">
                 Stock transaction history
               </h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                <thead className="bg-slate-950/70 text-slate-400 font-mono text-xs uppercase tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="px-6 py-4">Time</th>
                     <th className="px-6 py-4">Medicine</th>
@@ -4675,7 +4804,7 @@ function App() {
                     <th className="px-6 py-4">Recorded by</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-800/60">
                   {transactions.length === 0 ? (
                     <tr>
                       <td
@@ -4688,22 +4817,22 @@ function App() {
                   ) : (
                     transactions.map((transaction) => (
                       <tr key={transaction.id}>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {new Date(transaction.timestamp).toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 font-medium text-gray-900">
+                        <td className="px-6 py-4 font-semibold text-white">
                           {transaction.batch.medicine.genericName}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {transaction.batch.batchNumber}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {transaction.type}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {transaction.quantity}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                           {transaction.user.name}
                         </td>
                       </tr>
@@ -4715,14 +4844,14 @@ function App() {
           </section>
 
           {canViewAudit && (
-            <section id="section-audit" className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-6 border-b border-gray-100">
+            <section id="section-audit" className="mt-8 bg-slate-900/80 rounded-2xl shadow-xl border border-slate-700/60 overflow-hidden backdrop-blur-md">
+              <div className="p-6 border-b border-slate-800 bg-slate-950/40">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">
+                    <h2 className="text-xl font-bold text-white tracking-tight">
                       Audit log
                     </h2>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-sm text-slate-400 mt-1">
                       Recent operational changes recorded by the system.
                     </p>
                   </div>
@@ -4737,13 +4866,13 @@ function App() {
                           if (event.key === "Enter") void refreshAuditLogs();
                         }}
                         placeholder="Search audit events"
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm md:w-64"
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950/80 text-slate-100 placeholder-slate-500 px-3 py-2 text-sm focus:border-teal-400 focus:outline-none md:w-64"
                       />
                     </label>
                     <button
                       type="button"
                       onClick={() => void refreshAuditLogs()}
-                      className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                      className="rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 px-3 py-2 text-sm font-semibold text-white hover:from-teal-400 hover:to-teal-500 shadow-md shadow-teal-500/20"
                     >
                       Search
                     </button>
@@ -4751,7 +4880,7 @@ function App() {
                       type="button"
                       onClick={exportAuditLogs}
                       disabled={auditLogs.length === 0}
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-xl border border-slate-700/80 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-700/80 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Export CSV
                     </button>
@@ -4772,7 +4901,7 @@ function App() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                  <thead className="bg-gray-50 text-slate-300 font-mono text-sm font-medium border-b border-gray-100">
                     <tr>
                       <th className="px-6 py-4">Time</th>
                       <th className="px-6 py-4">Action</th>
@@ -4781,7 +4910,7 @@ function App() {
                       <th className="px-6 py-4">Details</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-slate-800/60">
                     {auditLogs.length === 0 ? (
                       <tr>
                         <td
@@ -4794,20 +4923,20 @@ function App() {
                     ) : (
                       auditLogs.map((log) => (
                         <tr key={log.id}>
-                          <td className="px-6 py-4 text-gray-600">
+                          <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                             {new Date(log.createdAt).toLocaleString()}
                           </td>
-                          <td className="px-6 py-4 font-medium text-gray-900">
+                          <td className="px-6 py-4 font-semibold text-white">
                             {log.action.replaceAll("_", " ")}
                           </td>
-                          <td className="px-6 py-4 text-gray-600">
+                          <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                             {log.entity}
                             {log.entityId === null ? "" : ` #${log.entityId}`}
                           </td>
-                          <td className="px-6 py-4 text-gray-600">
+                          <td className="px-6 py-4 text-slate-300 font-mono text-sm">
                             {log.user.name} ({log.user.role.name})
                           </td>
-                          <td className="px-6 py-4 text-gray-600 max-w-sm truncate">
+                          <td className="px-6 py-4 text-slate-300 font-mono text-sm max-w-sm truncate">
                             {log.details ?? "-"}
                           </td>
                         </tr>
