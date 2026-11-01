@@ -4,6 +4,16 @@
    Generated with Google Stitch Design Framework
    ========================================================================== */
 
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: #0a0f1d !important;
+  color: #f1f5f9;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 :root {
   --canvas-bg: #0b1326;
   --surface: #101c33;

@@ -2277,14 +2277,14 @@ function App() {
         {accountSettingsOpen && (
           <section
             aria-label="Account settings"
-            className="mt-5 border-t border-slate-200 pt-5"
+            className="mt-5 border-t border-slate-700/60 pt-5"
           >
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">
+                <h2 className="text-lg font-bold text-white tracking-tight">
                   Account settings
                 </h2>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-slate-400">
                   Review the identity and permissions attached to this session.
                 </p>
               </div>
@@ -2298,7 +2298,7 @@ function App() {
                     });
                     setProfileEditOpen(true);
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                  className="rounded-xl border border-slate-700/80 bg-slate-800/80 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-700/80 hover:text-white"
                 >
                   Edit profile
                 </button>
@@ -2312,34 +2312,34 @@ function App() {
                     });
                     setPasswordChangeOpen(true);
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                  className="rounded-xl border border-slate-700/80 bg-slate-800/80 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-700/80 hover:text-white"
                 >
                   Change password
                 </button>
               </div>
             </div>
             <dl className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="border border-slate-200 bg-slate-50 p-4">
-                <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 shadow-sm">
+                <dt className="text-xs font-mono font-semibold uppercase tracking-[0.16em] text-slate-400">
                   Name
                 </dt>
-                <dd className="mt-1 font-semibold text-slate-900">
+                <dd className="mt-1 font-semibold text-white font-mono">
                   {session.user.name}
                 </dd>
               </div>
-              <div className="border border-slate-200 bg-slate-50 p-4">
-                <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 shadow-sm">
+                <dt className="text-xs font-mono font-semibold uppercase tracking-[0.16em] text-slate-400">
                   Email
                 </dt>
-                <dd className="mt-1 break-words font-semibold text-slate-900">
+                <dd className="mt-1 break-words font-semibold text-white font-mono">
                   {session.user.email ?? "Not provided by the API"}
                 </dd>
               </div>
-              <div className="border border-slate-200 bg-slate-50 p-4">
-                <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 shadow-sm">
+                <dt className="text-xs font-mono font-semibold uppercase tracking-[0.16em] text-slate-400">
                   Role and access
                 </dt>
-                <dd className="mt-1 font-semibold text-slate-900">
+                <dd className="mt-1 font-semibold text-teal-300 font-mono">
                   {session.user.role}
                 </dd>
               </div>
@@ -2348,11 +2348,19 @@ function App() {
         )}
 
         <div className="dashboard-actions mt-5 flex flex-wrap items-center gap-3">
+          {canWriteMedicines && (
+            <button
+              onClick={openCreateForm}
+              className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-500/25 transition hover:from-teal-400 hover:to-emerald-500 border border-teal-400/40"
+            >
+              + Add Medicine
+            </button>
+          )}
           {canReceiveStock && (
             <button
               onClick={openCreatePurchaseForm}
               disabled={medicines.length === 0 || suppliers.length === 0}
-              className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl bg-slate-800/90 border border-teal-500/40 px-4 py-2.5 text-sm font-semibold text-teal-300 shadow-sm transition hover:bg-teal-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Receive purchase
             </button>
@@ -2361,7 +2369,7 @@ function App() {
             <button
               onClick={openCreateBatchForm}
               disabled={medicines.length === 0 || suppliers.length === 0}
-              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl border border-slate-700/80 bg-slate-800/80 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-700/80 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               Receive stock
             </button>
@@ -2369,7 +2377,7 @@ function App() {
           {canManageSuppliers && (
             <button
               onClick={openCreateSupplierForm}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="rounded-xl border border-slate-700/80 bg-slate-800/80 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-700/80 hover:text-white"
             >
               + Supplier
             </button>
@@ -2382,17 +2390,9 @@ function App() {
                 setFormError("");
                 setCategoryFormOpen(true);
               }}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="rounded-xl border border-slate-700/80 bg-slate-800/80 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-700/80 hover:text-white"
             >
               + Category
-            </button>
-          )}
-          {canWriteMedicines && (
-            <button
-              onClick={openCreateForm}
-              className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              + Add Medicine
             </button>
           )}
           {canManageUsers && (
@@ -2400,7 +2400,7 @@ function App() {
               onClick={openCreateUserForm}
               disabled={managedRoles.length === 0}
               aria-label="Add a new user"
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl border border-slate-700/80 bg-slate-800/80 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-700/80 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               Add user
             </button>
@@ -3571,6 +3571,48 @@ function App() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {medicines.length === 0 && !loading && (
+        <div className="mb-8 rounded-2xl border border-teal-500/40 bg-gradient-to-r from-teal-950/40 via-slate-900/90 to-indigo-950/40 p-6 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-indigo-500 to-cyan-400 animate-pulse" />
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-teal-400 pulse-dot" />
+                <span className="text-xs font-mono font-semibold uppercase tracking-wider text-teal-300">
+                  Operational Dispensary Online
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-white tracking-tight">
+                Facility Initialized • Ready for Formulary & Purchase Records
+              </h3>
+              <p className="text-sm text-slate-300 max-w-2xl">
+                Real-time telemetry and demand analytics engine active. Add your first formulation or receive incoming purchase orders to begin automated inventory tracking, AI forecasting, and reorder dispatch.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {canWriteMedicines && (
+                <button
+                  type="button"
+                  onClick={openCreateForm}
+                  className="rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-teal-500/25 hover:from-teal-400 hover:to-emerald-500 border border-teal-400/40"
+                >
+                  Quick Add Formulation
+                </button>
+              )}
+              {canReceiveStock && (
+                <button
+                  type="button"
+                  onClick={openCreatePurchaseForm}
+                  className="rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 py-2 text-sm font-semibold text-teal-300 hover:bg-teal-500/20"
+                >
+                  Initiate Receipt
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
