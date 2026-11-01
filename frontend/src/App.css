@@ -406,7 +406,7 @@ html, body {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, #14b8a6, #6366f1, #0ea5e9);
+  background: rgba(16, 185, 129, 0.4);
 }
 
 .role-workspace-panel {
@@ -501,9 +501,8 @@ html, body {
 }
 
 .dashboard-metric-grid > div:hover {
-  border-color: rgba(20, 184, 166, 0.35);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px -4px rgba(20, 184, 166, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.4);
 }
 
 .dashboard-metric-grid h3 {
