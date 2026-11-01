@@ -98,7 +98,7 @@ jobs:
         run: npm run test:e2e
       - name: Upload browser smoke-test artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-browser-test-results
           path: |
@@ -221,7 +221,7 @@ jobs:
         run: npm run test:e2e:live
       - name: Upload live browser-test artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: live-browser-test-results
           path: |
