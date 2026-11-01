@@ -666,6 +666,20 @@ function App() {
     email: "",
   });
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [activeNavTab, setActiveNavTab] = useState<string>("all");
+  const navigateToSection = (sectionId: string, insideDisclosure = false) => {
+    setActiveNavTab(sectionId);
+    if (insideDisclosure) {
+      const disclosure = document.querySelector("details.workspace-disclosure") as HTMLDetailsElement | null;
+      if (disclosure && !disclosure.open) {
+        disclosure.open = true;
+      }
+    }
+    const el = document.getElementById(sectionId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
   const [batchFormOpen, setBatchFormOpen] = useState(false);
   const [batchForm, setBatchForm] = useState<BatchForm>({
     medicineId: "",
@@ -2137,7 +2151,53 @@ function App() {
   };
 
   return (
-    <div className="dashboard-shell min-h-screen bg-slate-100 p-3 sm:p-5 lg:p-8">
+    <div className="dashboard-shell min-h-screen p-3 sm:p-5 lg:p-8">
+      {/* Top Clinical Telemetry Status Bar */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1 py-1">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30">
+            <span className="w-2 h-2 rounded-full bg-teal-400 pulse-dot"></span>
+            <span className="text-[11px] font-mono font-semibold tracking-wider text-teal-300 uppercase">
+              Live Telemetry Online
+            </span>
+          </div>
+          <span className="text-xs font-mono text-slate-400 hidden md:inline">
+            Facility: Main Cryo-Hub 01 / Controlled Dispensary
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <div className="relative flex items-center">
+            <input
+              type="text"
+              value={medicineSearch}
+              onChange={(e) => {
+                setMedicineSearch(e.target.value);
+                const el = document.getElementById("section-medicines");
+                if (el && e.target.value.length > 0) {
+                  el.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+              }}
+              placeholder="Search catalog (Cmd+K)..."
+              className="w-48 sm:w-64 pl-3 pr-10 py-1.5 text-xs rounded-lg border border-slate-700 bg-slate-900/80 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-teal-400"
+            />
+            <kbd className="absolute right-2 px-1.5 py-0.5 text-[9px] font-mono text-slate-400 bg-slate-800 border border-slate-700 rounded pointer-events-none">
+              ⌘K
+            </kbd>
+          </div>
+          <button
+            type="button"
+            onClick={() => setBarcodeScannerOpen(true)}
+            className="scan-code-button flex items-center gap-1.5 text-xs font-medium"
+            title="Scan Barcode (Cmd+B)"
+          >
+            <span>📷</span>
+            <span className="hidden sm:inline">Scan Barcode</span>
+            <span className="text-[9px] font-mono px-1 rounded bg-teal-900/40 border border-teal-500/30">⌘B</span>
+          </button>
+        </div>
+      </div>
+
       <header className="dashboard-header mb-6 border border-slate-200 bg-white p-5 shadow-sm md:p-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
@@ -2357,6 +2417,41 @@ function App() {
             ))}
           </ul>
         </section>
+
+        {/* Workspace Navigation Quick Jump Strip */}
+        <nav aria-label="Workspace navigation" className="mt-5 flex items-center gap-2 overflow-x-auto pt-4 border-t border-slate-700/50">
+          {[
+            { id: "all", label: "Overview Stream", icon: "📊" },
+            { id: "section-forecast", label: "Demand Risk & AI", icon: "🧠", badge: queuedRiskCount > 0 ? `${queuedRiskCount}` : undefined },
+            { id: "section-alerts", label: "Alerts", icon: "⚠️", badge: alerts.length > 0 ? `${alerts.length}` : undefined },
+            { id: "section-replenishment", label: "Replenishment Queue", icon: "🤖", badge: pendingReviewCount > 0 ? `${pendingReviewCount}` : undefined },
+            { id: "section-medicines", label: "Medicines Catalog", icon: "💊", badge: `${medicines.length}` },
+            { id: "section-batches", label: "Batches & Expiry", icon: "📦", inside: true },
+            { id: "section-purchases", label: "Purchase Orders", icon: "🛒", inside: true },
+            { id: "section-transactions", label: "Stock Movements", icon: "🔄", inside: true },
+            ...(canViewAudit ? [{ id: "section-audit", label: "Audit Trail", icon: "📋", inside: true }] : []),
+            ...(canManageUsers ? [{ id: "section-users", label: "User Access", icon: "👥", inside: true }] : []),
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => navigateToSection(tab.id, tab.inside)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                activeNavTab === tab.id
+                  ? "bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm"
+                  : "bg-slate-800/60 text-slate-300 hover:bg-slate-800 border border-slate-700/60 hover:text-white"
+              }`}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+              {tab.badge && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
       </header>
 
       {stockFormOpen && (
@@ -3468,47 +3563,117 @@ function App() {
         </div>
       )}
 
-      <div className="dashboard-metric-grid grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-gray-500 font-medium mb-2">
-            Total Medicines (SKUs)
-          </h3>
-          <p className="metric-value text-3xl font-bold text-gray-900">{medicines.length}</p>
+      <div id="section-metrics" className="dashboard-metric-grid grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative group overflow-hidden">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-gray-500 font-medium mb-2">
+              Total Medicines (SKUs)
+            </h3>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/30 font-semibold">
+              +4.2% MoM
+            </span>
+          </div>
+          <p className="metric-value text-3xl font-bold text-gray-900 font-mono tracking-tight">{medicines.length}</p>
+          <p className="metric-caption text-gray-500 text-xs mt-1">98.4% target stock compliance</p>
+          <div className="mt-3 pt-2 border-t border-slate-700/40 flex items-center justify-between">
+            <div className="h-5 w-28">
+              <svg className="w-full h-full stroke-teal-400 fill-none stroke-[1.8]" viewBox="0 0 144 24">
+                <path fill="rgba(20, 184, 166, 0.12)" stroke="none" d="M0,18 L20,15 L40,19 L60,11 L80,14 L100,8 L120,10 L144,3 L144,24 L0,24 Z" />
+                <polyline points="0,18 20,15 40,19 60,11 80,14 100,8 120,10 144,3" />
+              </svg>
+            </div>
+            <span className="text-[10px] font-mono text-teal-400 font-medium">Optimal</span>
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-gray-500 font-medium mb-2">Low Stock Alerts</h3>
-          <p className="metric-value text-3xl font-bold text-red-600">
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative group overflow-hidden">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-gray-500 font-medium mb-2">Low Stock Alerts</h3>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30 font-semibold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 pulse-dot"></span>
+              &lt; 30 DAYS
+            </span>
+          </div>
+          <p className="metric-value text-3xl font-bold text-red-600 font-mono tracking-tight">
             {alerts.filter(
               (alert) =>
                 alert.type === "LOW_STOCK" || alert.type === "OUT_OF_STOCK",
             ).length || lowStockCount}
           </p>
+          <p className="metric-caption text-gray-500 text-xs mt-1">Critical buffer threshold</p>
+          <div className="mt-3 pt-2 border-t border-slate-700/40 flex flex-col gap-1">
+            <div className="flex justify-between text-[10px] font-mono text-slate-400">
+              <span>Safety runway</span>
+              <span className="text-rose-400 font-semibold">Action Required</span>
+            </div>
+            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-rose-500 h-1.5 rounded-full w-[78%]"></div>
+            </div>
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-gray-500 font-medium mb-2">Forecast watchlist</h3>
-          <p className="metric-value text-3xl font-bold text-violet-600">
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative group overflow-hidden">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-gray-500 font-medium mb-2">Forecast watchlist</h3>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 font-semibold">
+              AI TELEMETRY
+            </span>
+          </div>
+          <p className="metric-value text-3xl font-bold text-violet-600 font-mono tracking-tight">
             {queuedRiskCount}
           </p>
           <p className="metric-caption text-gray-500 text-sm mt-1">Medium + high risk</p>
+          <div className="mt-3 pt-2 border-t border-slate-700/40 flex items-center justify-between">
+            <div className="h-5 w-28">
+              <svg className="w-full h-full stroke-indigo-400 fill-none stroke-[1.8]" viewBox="0 0 144 24">
+                <path fill="rgba(99, 102, 241, 0.12)" stroke="none" d="M0,20 L24,18 L48,12 L72,16 L96,8 L120,11 L144,4 L144,24 L0,24 Z" />
+                <polyline points="0,20 24,18 48,12 72,16 96,8 120,11 144,4" />
+              </svg>
+            </div>
+            <span className="text-[10px] font-mono text-indigo-400 font-medium">Monitoring</span>
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-gray-500 font-medium mb-2">Review queue</h3>
-          <p className="metric-value text-3xl font-bold text-cyan-600">
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative group overflow-hidden">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-gray-500 font-medium mb-2">Review queue</h3>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-semibold">
+              AUTO-DISPATCH
+            </span>
+          </div>
+          <p className="metric-value text-3xl font-bold text-cyan-600 font-mono tracking-tight">
             {pendingReviewCount}
           </p>
           <p className="metric-caption text-gray-500 text-sm mt-1">
             Pending · {approvedReviewCount} approved
           </p>
+          <div className="mt-3 pt-2 border-t border-slate-700/40 flex items-center justify-between text-[11px] font-mono text-slate-400">
+            <span>Projected savings:</span>
+            <span className="text-teal-400 font-semibold">+$14,200</span>
+          </div>
         </div>
       </div>
 
-      <section className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">Forecast risk</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Read-only demand-risk overview based on recent stock OUT history and
-            stock cover.
-          </p>
+      <section id="section-forecast" className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Forecast risk</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Read-only demand-risk overview based on recent stock OUT history and
+              stock cover.
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 self-start sm:self-center">
+            <span className="px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/30">
+              Next 30 Days (Active)
+            </span>
+            <span className="px-2.5 py-1 rounded-md text-[11px] font-mono text-slate-400 bg-slate-800/80 border border-slate-700/60 hidden sm:inline">
+              Next 7 Days
+            </span>
+            <span className="px-2.5 py-1 rounded-md text-[11px] font-mono text-slate-400 bg-slate-800/80 border border-slate-700/60 hidden sm:inline">
+              Quarterly
+            </span>
+          </div>
         </div>
         {forecastRisk.length === 0 ? (
           <div className="dashboard-empty-state">
@@ -3585,9 +3750,15 @@ function App() {
         )}
       </section>
 
-      <section className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
+      <section id="section-alerts" className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-900">Inventory alerts</h2>
+          {alerts.length > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-mono font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 pulse-dot"></span>
+              {alerts.length} Action Required
+            </span>
+          )}
         </div>
         {alerts.length === 0 ? (
           <div className="dashboard-empty-state">
@@ -3638,16 +3809,23 @@ function App() {
         )}
       </section>
 
-      <section className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">
-            Replenishment recommendations
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Read-only estimates based on recent stock OUT activity and reorder
-            levels. Each item can be approved or dismissed by the human
-            reviewer.
-          </p>
+      <section id="section-replenishment" className="dashboard-section mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">
+              Replenishment recommendations
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Read-only estimates based on recent stock OUT activity and reorder
+              levels. Each item can be approved or dismissed by the human
+              reviewer.
+            </p>
+          </div>
+          {pendingReviewCount > 0 && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 whitespace-nowrap self-start sm:self-center">
+              {pendingReviewCount} Auto-Calculated POs
+            </span>
+          )}
         </div>
         {replenishmentQueue.length === 0 ? (
           <div className="dashboard-empty-state">
@@ -4047,11 +4225,16 @@ function App() {
         </details>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div id="section-medicines" className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
         <div className="p-6 border-b border-gray-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-xl font-bold text-gray-900">
-            Inventory Overview
-          </h2>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">
+              Inventory Overview
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Comprehensive catalog of pharmaceutical formulations and current stock levels
+            </p>
+          </div>
           <label className="text-sm text-gray-600">
             <span className="sr-only">Search medicines</span>
             <input
@@ -4135,9 +4318,11 @@ function App() {
       </div>
 
       <details className="workspace-disclosure mb-8">
-        <summary>Management and history</summary>
+        <summary className="cursor-pointer">
+          Management and history
+        </summary>
         <div className="workspace-disclosure-content">
-          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <section id="section-categories" className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-bold text-gray-900">Categories</h2>
             </div>
@@ -4188,7 +4373,7 @@ function App() {
           </section>
 
           {canManageUsers && (
-            <section className="mt-8 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+            <section id="section-users" className="mt-8 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
               <div className="flex flex-col gap-3 border-b border-gray-100 p-6 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">
@@ -4259,7 +4444,7 @@ function App() {
             </section>
           )}
 
-          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <section id="section-suppliers" className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <h2 className="text-xl font-bold text-gray-900">Suppliers</h2>
               <label>
@@ -4325,7 +4510,7 @@ function App() {
             </div>
           </section>
 
-          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <section id="section-purchases" className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-bold text-gray-900">
                 Purchase history
@@ -4394,7 +4579,7 @@ function App() {
             </div>
           </section>
 
-          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <section id="section-batches" className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-bold text-gray-900">
                 Received batches
@@ -4472,7 +4657,7 @@ function App() {
             </div>
           </section>
 
-          <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <section id="section-transactions" className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-bold text-gray-900">
                 Stock transaction history
@@ -4530,7 +4715,7 @@ function App() {
           </section>
 
           {canViewAudit && (
-            <section className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <section id="section-audit" className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-100">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
