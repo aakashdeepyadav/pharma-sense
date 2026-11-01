@@ -2171,7 +2171,7 @@ function App() {
               Dispensary Active
             </span>
           </div>
-          <span className="text-xs font-mono text-slate-400 hidden md:inline">
+          <span className="text-xs text-slate-400 hidden md:inline">
             Central Pharmacy Dispensary • Real-Time Inventory Control
           </span>
         </div>
@@ -2320,26 +2320,26 @@ function App() {
             </div>
             <dl className="mt-4 grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 shadow-sm">
-                <dt className="text-xs font-mono font-semibold uppercase tracking-[0.16em] text-slate-400">
+                <dt className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                   Name
                 </dt>
-                <dd className="mt-1 font-semibold text-white font-mono">
+                <dd className="mt-1 font-semibold text-white">
                   {session.user.name}
                 </dd>
               </div>
               <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 shadow-sm">
-                <dt className="text-xs font-mono font-semibold uppercase tracking-[0.16em] text-slate-400">
+                <dt className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                   Email
                 </dt>
-                <dd className="mt-1 break-words font-semibold text-white font-mono">
+                <dd className="mt-1 break-words font-semibold text-white">
                   {session.user.email ?? "Not provided by the API"}
                 </dd>
               </div>
               <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 shadow-sm">
-                <dt className="text-xs font-mono font-semibold uppercase tracking-[0.16em] text-slate-400">
+                <dt className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                   Role and access
                 </dt>
-                <dd className="mt-1 font-semibold text-teal-300 font-mono">
+                <dd className="mt-1 font-semibold text-emerald-400">
                   {session.user.role}
                 </dd>
               </div>
@@ -2456,7 +2456,7 @@ function App() {
               <span>{tab.icon}</span>
               <span>{tab.label}</span>
               {tab.badge && (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-teal-500/20 text-teal-300 border border-teal-500/30">
                   {tab.badge}
                 </span>
               )}
@@ -2492,7 +2492,7 @@ function App() {
                 {formError}
               </p>
             )}
-            <p className="text-sm text-slate-300 font-mono text-sm mb-4">
+            <p className="text-sm text-slate-300 mb-4">
               {
                 batches.find((batch) => String(batch.id) === stockForm.batchId)
                   ?.medicine.genericName
@@ -2534,7 +2534,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setStockFormOpen(false)}
-                className="px-4 py-2 text-slate-300 font-mono text-sm hover:text-gray-900"
+                className="px-4 py-2 text-slate-300 text-sm font-medium hover:text-white rounded-lg transition"
               >
                 Cancel
               </button>
@@ -2687,7 +2687,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setPurchaseFormOpen(false)}
-                className="px-4 py-2 text-slate-300 font-mono text-sm hover:text-gray-900"
+                className="px-4 py-2 text-slate-300 text-sm font-medium hover:text-white rounded-lg transition"
               >
                 Cancel
               </button>
@@ -2879,7 +2879,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setBatchFormOpen(false)}
-                className="px-4 py-2 text-slate-300 font-mono text-sm hover:text-gray-900"
+                className="px-4 py-2 text-slate-300 text-sm font-medium hover:text-white rounded-lg transition"
               >
                 Cancel
               </button>
@@ -3316,7 +3316,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setSupplierFormOpen(false)}
-                className="px-4 py-2 text-slate-300 font-mono text-sm hover:text-gray-900"
+                className="px-4 py-2 text-slate-300 text-sm font-medium hover:text-white rounded-lg transition"
               >
                 Cancel
               </button>
@@ -3388,7 +3388,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setCategoryFormOpen(false)}
-                className="px-4 py-2 text-slate-300 font-mono text-sm hover:text-gray-900"
+                className="px-4 py-2 text-slate-300 text-sm font-medium hover:text-white rounded-lg transition"
               >
                 Cancel
               </button>
@@ -3600,7 +3600,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setFormOpen(false)}
-                className="px-4 py-2 text-slate-300 font-mono text-sm hover:text-gray-900"
+                className="px-4 py-2 text-slate-300 text-sm font-medium hover:text-white rounded-lg transition"
               >
                 Cancel
               </button>
@@ -3663,11 +3663,11 @@ function App() {
             <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
               Formulary (SKUs)
             </span>
-            <span className="rounded-md border border-slate-700/70 bg-slate-800/80 px-2 py-0.5 text-[11px] font-mono text-slate-300">
+            <span className="rounded-md border border-slate-700/70 bg-slate-800/80 px-2 py-0.5 text-[11px] font-medium text-slate-300">
               {medicines.filter((m) => m.active).length} Active
             </span>
           </div>
-          <p className="metric-value mt-3 font-mono text-3xl font-bold tracking-tight text-white">
+          <p className="metric-value mt-3 text-3xl font-bold tabular-nums tracking-tight text-white">
             {medicines.length}
           </p>
           <p className="metric-caption mt-1 text-xs text-slate-400">
@@ -3695,7 +3695,7 @@ function App() {
                   Stock Alerts
                 </span>
                 <span
-                  className={`rounded-md border px-2 py-0.5 text-[11px] font-mono font-medium ${
+                  className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
                     hasCriticalAlerts
                       ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
                       : "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
@@ -3705,7 +3705,7 @@ function App() {
                 </span>
               </div>
               <p
-                className={`metric-value mt-3 font-mono text-3xl font-bold tracking-tight ${
+                className={`metric-value mt-3 text-3xl font-bold tabular-nums tracking-tight ${
                   hasCriticalAlerts ? "text-rose-400" : "text-white"
                 }`}
               >
@@ -3738,7 +3738,7 @@ function App() {
               Forecast Watchlist
             </span>
             <span
-              className={`rounded-md border px-2 py-0.5 text-[11px] font-mono font-medium ${
+              className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
                 queuedRiskCount > 0
                   ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
                   : "border-slate-700/70 bg-slate-800/80 text-slate-300"
@@ -3747,7 +3747,7 @@ function App() {
               {queuedRiskCount > 0 ? "Elevated Risk" : "Low Risk"}
             </span>
           </div>
-          <p className="metric-value mt-3 font-mono text-3xl font-bold tracking-tight text-white">
+          <p className="metric-value mt-3 text-3xl font-bold tabular-nums tracking-tight text-white">
             {queuedRiskCount}
           </p>
           <p className="metric-caption mt-1 text-xs text-slate-400">
@@ -3775,7 +3775,7 @@ function App() {
               Review Queue
             </span>
             <span
-              className={`rounded-md border px-2 py-0.5 text-[11px] font-mono font-medium ${
+              className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
                 pendingReviewCount > 0
                   ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-300"
                   : "border-slate-700/70 bg-slate-800/80 text-slate-300"
@@ -3784,7 +3784,7 @@ function App() {
               {pendingReviewCount > 0 ? "Pending Action" : "Clear"}
             </span>
           </div>
-          <p className="metric-value mt-3 font-mono text-3xl font-bold tracking-tight text-white">
+          <p className="metric-value mt-3 text-3xl font-bold tabular-nums tracking-tight text-white">
             {pendingReviewCount}
           </p>
           <p className="metric-caption mt-1 text-xs text-slate-400">
@@ -3792,7 +3792,7 @@ function App() {
           </p>
           <div className="mt-4 flex items-center justify-between border-t border-slate-800/80 pt-3 text-[11px] text-slate-400">
             <span>Decisions finalized:</span>
-            <span className="font-mono font-medium text-cyan-400">
+            <span className="font-medium text-cyan-400">
               {approvedReviewCount} approved
             </span>
           </div>
@@ -3809,13 +3809,13 @@ function App() {
             </p>
           </div>
           <div className="flex items-center gap-1.5 self-start sm:self-center">
-            <span className="px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/30">
+            <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/30">
               Next 30 Days (Active)
             </span>
-            <span className="px-2.5 py-1 rounded-md text-[11px] font-mono text-slate-400 bg-slate-800/80 border border-slate-700/60 hidden sm:inline">
+            <span className="px-2.5 py-1 rounded-md text-[11px] font-medium text-slate-400 bg-slate-800/80 border border-slate-700/60 hidden sm:inline">
               Next 7 Days
             </span>
-            <span className="px-2.5 py-1 rounded-md text-[11px] font-mono text-slate-400 bg-slate-800/80 border border-slate-700/60 hidden sm:inline">
+            <span className="px-2.5 py-1 rounded-md text-[11px] font-medium text-slate-400 bg-slate-800/80 border border-slate-700/60 hidden sm:inline">
               Quarterly
             </span>
           </div>
@@ -3854,7 +3854,7 @@ function App() {
                       <p className="font-semibold text-white">
                         {item.medicineName}
                       </p>
-                      <p className="text-xs text-slate-400 font-mono">
+                      <p className="text-xs text-slate-400">
                         Current stock: {item.currentStock}
                       </p>
                     </div>
@@ -3871,7 +3871,7 @@ function App() {
                       </span>
                     </div>
                   </div>
-                  <div className="mt-3 space-y-2 text-sm text-slate-300 font-mono">
+                  <div className="mt-3 space-y-2 text-sm text-slate-300">
                     <p>
                       Projected daily demand:{" "}
                       {item.predictedDailyDemand.toFixed(2)}
@@ -3899,7 +3899,7 @@ function App() {
         <div className="p-6 border-b border-slate-800 bg-slate-950/40 flex items-center justify-between">
           <h2 className="text-xl font-bold text-white tracking-tight">Inventory alerts</h2>
           {alerts.length > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-xs font-mono font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1.5">
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
               {alerts.length} Action Required
             </span>
@@ -3930,19 +3930,19 @@ function App() {
                   >
                     {alert.message}
                   </p>
-                  <p className="text-sm text-slate-400 font-mono">
+                  <p className="text-sm text-slate-400">
                     Quantity affected: {alert.quantity} | Status:{" "}
                     {alert.status.toLowerCase()}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-mono font-semibold uppercase text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                  <span className="text-xs font-semibold uppercase text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
                     {alert.type.replaceAll("_", " ")}
                   </span>
                   {alert.status === "OPEN" && session.user.role !== "Management" && (
                     <button
                       onClick={() => void acknowledgeAlert(alert.id)}
-                      className="px-3 py-1 rounded-lg border border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20 text-xs font-semibold font-mono transition"
+                      className="px-3 py-1 rounded-lg border border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20 text-xs font-semibold transition"
                     >
                       Acknowledge
                     </button>
@@ -3967,7 +3967,7 @@ function App() {
             </p>
           </div>
           {pendingReviewCount > 0 && (
-            <span className="px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 whitespace-nowrap self-start sm:self-center">
+            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 whitespace-nowrap self-start sm:self-center">
               {pendingReviewCount} Auto-Calculated POs
             </span>
           )}
@@ -4101,7 +4101,7 @@ function App() {
               <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider bg-teal-500/20 text-teal-300 border border-teal-500/40 flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-teal-500/20 text-teal-300 border border-teal-500/40 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                       Operational Oversight
                     </span>
@@ -4111,7 +4111,7 @@ function App() {
                     Full operational totals and recent stock movement, visible only to Admin.
                   </p>
                 </div>
-                <p className="text-xs text-slate-400 font-mono flex items-center gap-1.5 self-start sm:self-end">
+                <p className="text-xs text-slate-400 flex items-center gap-1.5 self-start sm:self-end">
                   Updated {new Date(adminStatistics.generatedAt).toLocaleString()}
                 </p>
               </div>
@@ -4125,8 +4125,8 @@ function App() {
                   ["Reviews", adminStatistics.replenishmentReviews],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 shadow-sm hover:border-teal-500/40 transition-all">
-                    <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">{label}</p>
-                    <p className="mt-1 text-lg font-bold text-white font-mono">{value}</p>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</p>
+                    <p className="mt-1 text-lg font-bold text-white tabular-nums">{value}</p>
                   </div>
                 ))}
               </div>
@@ -4135,32 +4135,32 @@ function App() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-white flex items-center gap-2">
                     <span>Last 30 days</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-700/80 text-slate-300">Throughput Velocity</span>
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-700/80 text-slate-300">Throughput Velocity</span>
                   </h3>
-                  <span className="text-xs font-mono text-slate-400 hidden sm:inline">Movement Aggregates</span>
+                  <span className="text-xs text-slate-400 hidden sm:inline">Movement Aggregates</span>
                 </div>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                   <div className="rounded-lg bg-slate-900/60 p-3 border border-slate-800">
-                    <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">Transactions</p>
-                    <p className="mt-1 text-xl font-bold text-white font-mono">{adminStatistics.last30Days?.transactionCount ?? 0}</p>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Transactions</p>
+                    <p className="mt-1 text-xl font-bold text-white tabular-nums">{adminStatistics.last30Days?.transactionCount ?? 0}</p>
                   </div>
                   <div className="rounded-lg bg-slate-900/60 p-3 border border-slate-800">
-                    <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">Units received</p>
-                    <p className="mt-1 text-xl font-bold text-emerald-400 font-mono">{adminStatistics.last30Days?.unitsReceived ?? 0}</p>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Units received</p>
+                    <p className="mt-1 text-xl font-bold text-emerald-400 tabular-nums">{adminStatistics.last30Days?.unitsReceived ?? 0}</p>
                   </div>
                   <div className="rounded-lg bg-slate-900/60 p-3 border border-slate-800">
-                    <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">Units issued</p>
-                    <p className="mt-1 text-xl font-bold text-cyan-400 font-mono">{adminStatistics.last30Days?.unitsIssued ?? 0}</p>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Units issued</p>
+                    <p className="mt-1 text-xl font-bold text-cyan-400 tabular-nums">{adminStatistics.last30Days?.unitsIssued ?? 0}</p>
                   </div>
                   <div className="rounded-lg bg-slate-900/60 p-3 border border-slate-800">
-                    <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">Adjusted units</p>
-                    <p className="mt-1 text-xl font-bold text-amber-400 font-mono">{adminStatistics.last30Days?.adjustedUnits ?? 0}</p>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Adjusted units</p>
+                    <p className="mt-1 text-xl font-bold text-amber-400 tabular-nums">{adminStatistics.last30Days?.adjustedUnits ?? 0}</p>
                   </div>
                 </div>
 
                 {/* Visual Proportional Flow Bar */}
                 <div className="mt-4 pt-3 border-t border-slate-700/50">
-                  <div className="flex items-center justify-between text-xs font-mono text-slate-400 mb-2">
+                  <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
                     <span>Stock Movement Ratio</span>
                     <div className="flex items-center gap-3">
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400"></span> Received ({receivedPct}%)</span>
@@ -4190,32 +4190,32 @@ function App() {
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="bg-slate-800/70 p-5 rounded-xl border border-slate-700/70 hover:border-teal-500/40 transition-all shadow-sm">
-                <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Suppliers</p>
-                <p className="text-2xl font-bold text-white font-mono mt-1">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Suppliers</p>
+                <p className="text-2xl font-bold text-white tabular-nums mt-1">
                   {report.supplierCount}
                 </p>
               </div>
               <div className="bg-slate-800/70 p-5 rounded-xl border border-slate-700/70 hover:border-teal-500/40 transition-all shadow-sm">
-                <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Batches</p>
-                <p className="text-2xl font-bold text-white font-mono mt-1">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Batches</p>
+                <p className="text-2xl font-bold text-white tabular-nums mt-1">
                   {report.batchCount}
                 </p>
               </div>
               <div className="bg-slate-800/70 p-5 rounded-xl border border-slate-700/70 hover:border-teal-500/40 transition-all shadow-sm">
-                <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Units available</p>
-                <p className="text-2xl font-bold text-emerald-400 font-mono mt-1">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Units available</p>
+                <p className="text-2xl font-bold text-emerald-400 tabular-nums mt-1">
                   {report.totalUnits}
                 </p>
               </div>
               <div className="bg-slate-800/70 p-5 rounded-xl border border-slate-700/70 hover:border-teal-500/40 transition-all shadow-sm">
-                <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Units issued</p>
-                <p className="text-2xl font-bold text-cyan-400 font-mono mt-1">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Units issued</p>
+                <p className="text-2xl font-bold text-cyan-400 tabular-nums mt-1">
                   {report.issuedUnits}
                 </p>
               </div>
               <div className="bg-slate-800/70 p-5 rounded-xl border border-slate-700/70 hover:border-teal-500/40 transition-all shadow-sm">
-                <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Inventory cost</p>
-                <p className="text-2xl font-bold text-indigo-300 font-mono mt-1">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Inventory cost</p>
+                <p className="text-2xl font-bold text-indigo-300 tabular-nums mt-1">
                   {report.inventoryCost.toFixed(2)}
                 </p>
               </div>
@@ -4226,10 +4226,10 @@ function App() {
                 <h3 className="font-bold text-white">
                   Most issued medicines
                 </h3>
-                <span className="text-xs font-mono text-teal-400">High Turnover Dispensary Queue</span>
+                <span className="text-xs text-teal-400">High Turnover Dispensary Queue</span>
               </div>
               {report.topIssuedMedicines.length === 0 ? (
-                <p className="text-slate-400 text-sm font-mono">
+                <p className="text-slate-400 text-sm">
                   No stock-out activity has been recorded yet.
                 </p>
               ) : (() => {
@@ -4245,14 +4245,14 @@ function App() {
                     >
                       <div className="flex items-center justify-between text-sm mb-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">
                             #{idx + 1}
                           </span>
                           <span className="font-medium text-white">
                             {medicine.medicineName}
                           </span>
                         </div>
-                        <span className="text-slate-300 font-mono text-xs">
+                        <span className="text-slate-300 text-xs tabular-nums">
                           {medicine.quantityIssued} units issued
                         </span>
                       </div>
@@ -4277,13 +4277,13 @@ function App() {
                   </p>
                 </div>
                 {forecastMl?.available && (
-                  <span className="px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 self-start sm:self-center">
+                  <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 self-start sm:self-center">
                     Research Model Evaluation
                   </span>
                 )}
               </div>
               {!forecastMl?.available || !forecastMl.metrics ? (
-                <p className="mt-3 text-sm text-slate-400 font-mono">
+                <p className="mt-3 text-sm text-slate-400">
                   No evaluated research model is currently available.
                 </p>
               ) : (() => {
@@ -4295,26 +4295,26 @@ function App() {
                 <div className="mt-4 space-y-4">
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
-                      <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Model / dataset</p>
-                      <p className="mt-1 font-semibold text-white font-mono text-sm">
+                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Model / dataset</p>
+                      <p className="mt-1 font-semibold text-white text-sm">
                         {forecastMl.metrics.model} / {forecastMl.metrics.dataset}
                       </p>
                     </div>
                     <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
-                      <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">MAE (units)</p>
-                      <p className="mt-1 text-2xl font-bold text-teal-400 font-mono">
+                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">MAE (units)</p>
+                      <p className="mt-1 text-2xl font-bold text-teal-400 tabular-nums">
                         {forecastMl.metrics.metrics.mae.toFixed(2)}
                       </p>
                     </div>
                     <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
-                      <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">Naive baseline MAE</p>
-                      <p className="mt-1 text-2xl font-bold text-slate-400 font-mono">
+                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Naive baseline MAE</p>
+                      <p className="mt-1 text-2xl font-bold text-slate-400 tabular-nums">
                         {forecastMl.metrics.metrics.baseline_naive_mae.toFixed(2)}
                       </p>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-teal-500/30 bg-teal-500/10 p-3.5 flex items-center justify-between text-xs font-mono text-teal-300">
+                  <div className="rounded-xl border border-teal-500/30 bg-teal-500/10 p-3.5 flex items-center justify-between text-xs text-teal-300">
                     <span className="flex items-center gap-1.5">
                       <span className="text-emerald-400">⚡</span>
                       Research Model Error Gain: <strong>{improvement}% lower error</strong> vs naive baseline
@@ -4353,35 +4353,35 @@ function App() {
               </div>
 
               {!forecastBaseline ? (
-                <p className="mt-4 text-slate-400 font-mono text-sm">
+                <p className="mt-4 text-slate-400 text-sm">
                   Forecast baseline is unavailable for the selected medicine.
                 </p>
               ) : (
                 <>
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
-                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-mono">
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">
                         MAE
                       </p>
-                      <p className="mt-1 text-2xl font-bold text-white font-mono">
+                      <p className="mt-1 text-2xl font-bold text-white tabular-nums">
                         {forecastBaseline.evaluation?.mae == null
                           ? "n/a"
                           : Number(forecastBaseline.evaluation.mae).toFixed(2)}
                       </p>
                     </div>
                     <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
-                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-mono">
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">
                         Observations
                       </p>
-                      <p className="mt-1 text-2xl font-bold text-white font-mono">
+                      <p className="mt-1 text-2xl font-bold text-white tabular-nums">
                         {forecastBaseline.evaluation?.observations ?? 0}
                       </p>
                     </div>
                     <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-4">
-                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-mono">
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">
                         Status
                       </p>
-                      <p className="mt-1 text-lg font-bold text-teal-400 font-mono flex items-center gap-2">
+                      <p className="mt-1 text-lg font-bold text-teal-400 tabular-nums flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-400" />
                         {forecastBaseline.evaluation?.readiness?.status ===
                         "READY_FOR_BASELINE"
@@ -4396,7 +4396,7 @@ function App() {
                       <h4 className="font-semibold text-white">
                         LightGBM next-day prediction
                       </h4>
-                      <span className="rounded-full bg-indigo-500/20 border border-indigo-500/40 px-3 py-1 text-xs font-mono font-medium text-indigo-300">
+                      <span className="rounded-full bg-indigo-500/20 border border-indigo-500/40 px-3 py-1 text-xs font-medium text-indigo-300">
                         {!effectiveLightGbmPrediction
                           ? "Model unavailable"
                           : effectiveLightGbmPrediction.trainingDataSource === "synthetic"
@@ -4405,11 +4405,11 @@ function App() {
                       </span>
                     </div>
                     {!selectedLightGbmForecast ? (
-                      <p className="mt-2 text-sm text-slate-300 font-mono">
+                      <p className="mt-2 text-sm text-slate-300">
                         The model prediction is unavailable. Check the API model artifact and try again.
                       </p>
                     ) : selectedLightGbmForecast.status === "READY" ? (
-                      <p className="mt-2 text-sm text-slate-200 font-mono">
+                      <p className="mt-2 text-sm text-slate-200">
                         Predicted demand for {selectedLightGbmForecast.forecastDate}: {" "}
                         <strong className="text-teal-300">{selectedLightGbmForecast.predictedQuantity?.toFixed(2)} units</strong>
                         <span className="ml-2 text-indigo-300">
@@ -4417,7 +4417,7 @@ function App() {
                         </span>
                       </p>
                     ) : (
-                      <p className="mt-2 text-sm text-slate-400 font-mono">
+                      <p className="mt-2 text-sm text-slate-400">
                         Not enough recorded demand for this medicine. The model needs 30 days of history.
                       </p>
                     )}
@@ -4431,7 +4431,7 @@ function App() {
                   <div className="mt-6">
                     <h4 className="font-semibold text-white mb-3 flex items-center justify-between">
                       <span>Next {forecastBaseline.forecast.length} day forecast</span>
-                      <span className="text-xs font-mono text-slate-400">Predicted daily requirements</span>
+                      <span className="text-xs text-slate-400">Predicted daily requirements</span>
                     </h4>
                     <div className="space-y-2">
                       {forecastBaseline.forecast.map((point) => (
@@ -4439,10 +4439,10 @@ function App() {
                           key={`${forecastBaseline.medicineId}-${point.date}`}
                           className="flex items-center justify-between rounded-lg border border-slate-700/70 bg-slate-900/60 px-3 py-2 text-sm"
                         >
-                          <span className="font-medium text-slate-200 font-mono">
+                          <span className="font-medium text-slate-200">
                             {new Date(point.date).toLocaleDateString()}
                           </span>
-                          <span className="text-teal-300 font-mono font-semibold">
+                          <span className="text-teal-300 font-semibold tabular-nums">
                             {Number(point.predictedQuantity ?? 0).toFixed(2)}{" "}
                             units
                           </span>
@@ -4482,7 +4482,7 @@ function App() {
         {error && <p className="p-6 text-red-400 bg-red-950/40 border-b border-red-800/40">{error}</p>}
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-slate-950/70 text-slate-400 font-mono text-xs uppercase tracking-wider border-b border-slate-800">
+            <thead className="bg-slate-950/70 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-800">
               <tr>
                 <th className="px-6 py-4">Generic Name</th>
                 <th className="px-6 py-4">Brand Name</th>
@@ -4520,23 +4520,23 @@ function App() {
                     <td className="px-6 py-4 font-semibold text-white">
                       {med.genericName}
                     </td>
-                    <td className="px-6 py-4 text-slate-300 font-mono text-sm">{med.brandName}</td>
+                    <td className="px-6 py-4 text-slate-300 text-sm">{med.brandName}</td>
                     <td className="px-6 py-4 text-slate-400 text-sm">
                       {med.manufacturer || "-"}
                     </td>
-                    <td className="px-6 py-4 text-slate-300 font-mono text-sm">{med.unit}</td>
+                    <td className="px-6 py-4 text-slate-300 text-sm">{med.unit}</td>
                     <td className="px-6 py-4">
                       {med.active ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                           Active
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
                           Inactive
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                    <td className="px-6 py-4 text-slate-300 text-sm">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-1.5">
                           <span className={availableMedicineUnits(med) <= med.reorderLevel ? "text-rose-400 font-bold" : availableMedicineUnits(med) <= med.reorderLevel * 2 ? "text-amber-400 font-semibold" : "text-teal-400 font-semibold"}>
@@ -4590,7 +4590,7 @@ function App() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-950/70 text-slate-400 font-mono text-xs uppercase tracking-wider border-b border-slate-800">
+                <thead className="bg-slate-950/70 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="px-6 py-4">Category</th>
                     <th className="px-6 py-4">Description</th>
@@ -4613,7 +4613,7 @@ function App() {
                         <td className="px-6 py-4 font-semibold text-white">
                           {category.name}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {category.description || "-"}
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -4655,7 +4655,7 @@ function App() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="border-b border-slate-800 bg-slate-950/70 font-mono text-xs uppercase tracking-wider text-slate-400">
+                  <thead className="border-b border-slate-800 bg-slate-950/70 text-xs font-semibold uppercase tracking-wider text-slate-400">
                     <tr>
                       <th className="px-6 py-4">Name</th>
                       <th className="px-6 py-4">Email</th>
@@ -4680,13 +4680,13 @@ function App() {
                           <td className="px-6 py-4 font-semibold text-white">
                             {user.name}
                           </td>
-                          <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                          <td className="px-6 py-4 text-slate-300 text-sm">
                             {user.email}
                           </td>
-                          <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                          <td className="px-6 py-4 text-slate-300 text-sm">
                             {user.role.name}
                           </td>
-                          <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                          <td className="px-6 py-4 text-slate-300 text-sm">
                             {user.active ? "Active" : "Deactivated"}
                           </td>
                           <td className="px-6 py-4 text-right">
@@ -4722,7 +4722,7 @@ function App() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-950/70 text-slate-400 font-mono text-xs uppercase tracking-wider border-b border-slate-800">
+                <thead className="bg-slate-950/70 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="px-6 py-4">Supplier</th>
                     <th className="px-6 py-4">Contact</th>
@@ -4748,10 +4748,10 @@ function App() {
                         <td className="px-6 py-4 font-semibold text-white">
                           {supplier.name}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {supplier.contactInfo || "-"}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {supplier._count?.batches ?? 0}
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -4780,7 +4780,7 @@ function App() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-950/70 text-slate-400 font-mono text-xs uppercase tracking-wider border-b border-slate-800">
+                <thead className="bg-slate-950/70 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="px-6 py-4">Purchase</th>
                     <th className="px-6 py-4">Supplier</th>
@@ -4806,10 +4806,10 @@ function App() {
                         <td className="px-6 py-4 font-semibold text-white">
                           #{purchase.id}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {purchase.supplier.name}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {purchase.items
                             .map(
                               (item) =>
@@ -4817,10 +4817,10 @@ function App() {
                             )
                             .join(", ")}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {new Date(purchase.createdAt).toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {purchase.status}
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -4849,7 +4849,7 @@ function App() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-950/70 text-slate-400 font-mono text-xs uppercase tracking-wider border-b border-slate-800">
+                <thead className="bg-slate-950/70 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="px-6 py-4">Batch</th>
                     <th className="px-6 py-4">Medicine</th>
@@ -4875,19 +4875,19 @@ function App() {
                         <td className="px-6 py-4 font-semibold text-white">
                           {batch.batchNumber}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {batch.medicine.genericName}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {batch.supplier.name}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           <span className={isExpiryDatePast(batch.expiryDate) ? "text-red-700" : ""}>
                             {new Date(batch.expiryDate).toLocaleDateString()}
                             {isExpiryDatePast(batch.expiryDate) && " (expired)"}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm text-right">
+                        <td className="px-6 py-4 text-slate-300 text-sm text-right">
                           {batch.quantity}
                         </td>
                         <td className="px-6 py-4 text-right whitespace-nowrap">
@@ -4904,7 +4904,7 @@ function App() {
                               <button
                                 type="button"
                                 onClick={() => openStockForm(batch, "ADJ")}
-                                className="text-slate-300 font-mono text-sm hover:text-gray-900 font-medium"
+                                className="text-slate-300 text-sm hover:text-gray-900 font-medium"
                               >
                                 Adjust
                               </button>
@@ -4927,7 +4927,7 @@ function App() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-950/70 text-slate-400 font-mono text-xs uppercase tracking-wider border-b border-slate-800">
+                <thead className="bg-slate-950/70 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="px-6 py-4">Time</th>
                     <th className="px-6 py-4">Medicine</th>
@@ -4950,22 +4950,22 @@ function App() {
                   ) : (
                     transactions.map((transaction) => (
                       <tr key={transaction.id}>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {new Date(transaction.timestamp).toLocaleString()}
                         </td>
                         <td className="px-6 py-4 font-semibold text-white">
                           {transaction.batch.medicine.genericName}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {transaction.batch.batchNumber}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {transaction.type}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {transaction.quantity}
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                        <td className="px-6 py-4 text-slate-300 text-sm">
                           {transaction.user.name}
                         </td>
                       </tr>
@@ -5034,7 +5034,7 @@ function App() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-slate-300 font-mono text-sm font-medium border-b border-gray-100">
+                  <thead className="bg-gray-50 text-slate-300 text-xs font-semibold uppercase tracking-wider border-b border-slate-800">
                     <tr>
                       <th className="px-6 py-4">Time</th>
                       <th className="px-6 py-4">Action</th>
@@ -5056,20 +5056,20 @@ function App() {
                     ) : (
                       auditLogs.map((log) => (
                         <tr key={log.id}>
-                          <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                          <td className="px-6 py-4 text-slate-300 text-sm">
                             {new Date(log.createdAt).toLocaleString()}
                           </td>
                           <td className="px-6 py-4 font-semibold text-white">
                             {log.action.replaceAll("_", " ")}
                           </td>
-                          <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                          <td className="px-6 py-4 text-slate-300 text-sm">
                             {log.entity}
                             {log.entityId === null ? "" : ` #${log.entityId}`}
                           </td>
-                          <td className="px-6 py-4 text-slate-300 font-mono text-sm">
+                          <td className="px-6 py-4 text-slate-300 text-sm">
                             {log.user.name} ({log.user.role.name})
                           </td>
-                          <td className="px-6 py-4 text-slate-300 font-mono text-sm max-w-sm truncate">
+                          <td className="px-6 py-4 text-slate-300 text-sm max-w-sm truncate">
                             {log.details ?? "-"}
                           </td>
                         </tr>
